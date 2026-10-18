@@ -6,7 +6,7 @@ import type {Position} from '../player/types';
  * Coordinates are normalized to a 2-unit tall model, centred at the origin.
  * Prototype geometry is deliberately separate from the licensed character mesh.
  */
-export function createHockeyEquipment(e:Equipment,position:Position):THREE.Group{
+export function createHockeyEquipment(e:Equipment,position:Position,externalPads=false):THREE.Group{
  const group=new THREE.Group();
  const goalie=position==='G';
  const jersey=COLORS[e.jersey],helmet=COLORS[e.helmet],gloves=COLORS[e.gloves],pads=COLORS[e.pads];
@@ -26,10 +26,10 @@ export function createHockeyEquipment(e:Equipment,position:Position):THREE.Group
   piece(s*.4,-.22,.09,.135,.14,.12,gloves);
   piece(s*.145,-.56,.03,.135,.20,.15,jersey);
   if(goalie){
-   piece(s*.145,-.77,.16,.15,.26,.19,pads,false);
+   if(!externalPads){piece(s*.145,-.77,.16,.15,.26,.19,pads,false);
    piece(s*.145,-.80,.27,.12,.21,.025,silver,false);
    piece(s*.145,-.63,.285,.13,.018,.025,pads,false);
-   piece(s*.145,-.92,.285,.13,.018,.025,pads,false);
+   piece(s*.145,-.92,.285,.13,.018,.025,pads,false);}
   }else{
    piece(s*.145,-.77,.03,.115,.20,.125,jersey);
    piece(s*.145,-.86,.14,.11,.09,.09,silver);
