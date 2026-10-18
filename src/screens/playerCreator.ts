@@ -3,7 +3,7 @@ import {loadPlayerDraft,savePlayerDraft} from '../player/draft';
 import {PlayerDraft,POSITIONS} from '../player/types';
 import {validatePlayer} from '../player/validation';
 import {appearanceFields,appearancePreviewMarkup,renderAppearanceDetails} from './appearanceFields';
-import {mountPlayer3D} from '../graphics/player3d';
+import {mountImportedPlayer3D} from '../graphics/importedPlayer3d';
 import {equipmentFields} from './equipmentFields';
 const LABELS:Record<PlayerDraft['position'],string>={C:'Centre',LW:'Left wing',RW:'Right wing',LD:'Left defence',RD:'Right defence',G:'Goaltender'};
 function esc(s:string):string{return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));}
@@ -23,7 +23,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  ${appearanceFields(p.appearance)}
  ${equipmentFields(p.equipment,p.position)}
  <p class="field-errors" role="alert" aria-live="polite" data-errors></p><button type="submit" class="primary-action">Review player →</button></form><section class="player-review" data-review hidden aria-live="polite"></section><p class="version">Draft saved on this device · v${GAME_VERSION}</p></section></main>`;
- const preview=mountPlayer3D(root.querySelector<HTMLElement>('[data-3d-host]')!,p.appearance,p.equipment,p.position);
+ const preview=mountImportedPlayer3D(root.querySelector<HTMLElement>('[data-3d-host]')!,p.appearance,p.equipment,p.position);
  const form=root.querySelector<HTMLFormElement>('#player-form')!;
  const review=root.querySelector<HTMLElement>('[data-review]')!;
  const errors=root.querySelector<HTMLElement>('[data-errors]')!;
