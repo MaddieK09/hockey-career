@@ -6,8 +6,8 @@ import type {Position} from '../player/types';
 import {mountPlayer3D} from './player3d';
 import {createHockeyEquipment} from './importedHockeyGear';
 
-/** An optional, licensed GLB asset is stored at public/models/player.glb.
- * Until an asset is installed, the current procedural preview stays usable.
+/** A hockey-specific, licensed GLB can be installed at public/models/hockey-player.glb.
+ * Until a hockey-specific asset is installed, use the equipped procedural player.
  * Asset must be upright, with a compatible animation skeleton for future work.
  */
 export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equipment,position:Position){
