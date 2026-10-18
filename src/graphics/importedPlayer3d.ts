@@ -15,14 +15,18 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let scene:THREE.Scene|null=null;
  let camera:THREE.PerspectiveCamera|null=null;
  let model:THREE.Group|null=null;
- let disposed=false,request=0,angle=0,zoom=1;
+ let disposed=false,angle=0,zoom=1;
  let observer:ResizeObserver|null=null;
  let canvas:HTMLCanvasElement|null=null;
+ let mixer:THREE.AnimationMixer|null=null;
+ let animationFrame=0;
+ const clock=new THREE.Clock();
  const assetUrl=`${import.meta.env.BASE_URL}models/player.glb`;
  const showFallback=()=>{
   if(disposed)return;
   observer?.disconnect();observer=null;
   renderer?.dispose();renderer?.domElement.remove();renderer=null;
+  if(fallback)return;
   fallback=mountPlayer3D(host,p,e,position);
  };
  // Only attempt the imported model when it has actually been installed.
@@ -34,7 +38,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   const key=new THREE.DirectionalLight(0xffffff,2.5);key.position.set(-3,5,6);scene.add(key);
   const rim=new THREE.DirectionalLight(0x9fc8ff,1.2);rim.position.set(4,3,-4);scene.add(rim);
   camera=new THREE.PerspectiveCamera(36,1,.01,100);
-  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
+  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});}catch{showFallback();return;}
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -43,7 +47,8 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   host.replaceChildren(canvas);
   const resize=()=>{if(!renderer||!camera)return;const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();};
   const render=()=>{if(disposed||!renderer||!scene||!camera)return;if(model)model.rotation.y=angle;renderer.render(scene,camera);};
-  const setFraming=()=>{if(!model||!camera)return;const bounds=new THREE.Box3().setFromObject(model);const size=bounds.getSize(new THREE.Vector3());const center=bounds.getCenter(new THREE.Vector3());if(!Number.isFinite(size.y)||size.y<=0)return;const radius=Math.max(size.y,size.x*1.8,size.z*1.8);camera.position.set(center.x,center.y,radius*1.9*zoom);camera.lookAt(center);camera.near=Math.max(.01,radius*.01);camera.far=Math.max(100,radius*30);camera.updateProjectionMatrix();};
+  let modelSize=1;
+  const setFraming=()=>{if(!model||!camera)return;const aspect=Math.max(.3,camera.aspect);const verticalFov=THREE.MathUtils.degToRad(camera.fov);const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*aspect);const fitDistance=Math.max(modelSize/(2*Math.tan(verticalFov/2)),modelSize*.65/Math.tan(horizontalFov/2));camera.position.set(0,0,fitDistance*1.22*zoom);camera.lookAt(0,0,0);camera.near=.01;camera.far=Math.max(100,modelSize*40);camera.updateProjectionMatrix();};
   const pointers=new Map<number,{x:number;y:number}>();
   const dist=()=>{const pts=[...pointers.values()];return pts.length<2?null:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
   let pinch:number|null=null;
@@ -59,9 +64,14 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    model=gltf.scene;
    const bounds=new THREE.Box3().setFromObject(model);
    const center=bounds.getCenter(new THREE.Vector3());
-   model.position.sub(center); // Center imported asset at the origin.
+   const size=bounds.getSize(new THREE.Vector3());
+   if(!Number.isFinite(size.y)||size.y<.01){showFallback();return;}
+   model.position.sub(center); // Center the mesh, without moving its skeleton bones.
+   modelSize=Math.max(size.y,size.x*1.6,size.z*1.6);
    scene?.add(model);
-   setFraming();render();
+   if(gltf.animations.length){mixer=new THREE.AnimationMixer(model);const idle=gltf.animations.find(a=>/idle/i.test(a.name))??gltf.animations[0];mixer.clipAction(idle).play();}
+   const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);if(mixer)mixer.update(Math.min(clock.getDelta(),.05));render();};
+   setFraming();tick();
   },undefined,()=>showFallback());
  }).catch(()=>showFallback());
  return {
@@ -70,6 +80,6 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    fallback?.update(p,e,position);
    // Imported meshes require separate equipment attachment and morph targets.
   },
-  dispose:()=>{disposed=true;cancelAnimationFrame(request);observer?.disconnect();fallback?.dispose();renderer?.dispose();host.replaceChildren();}
+  dispose:()=>{disposed=true;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
  };
 }
