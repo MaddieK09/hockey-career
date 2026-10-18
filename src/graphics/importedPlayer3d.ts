@@ -19,6 +19,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let gear:THREE.Group|null=null;
  let gearHeight=1;
  let gearCenter=new THREE.Vector3();
+ let modelBounds=new THREE.Vector3(1,2,1);
  const clearGear=()=>{if(!gear)return;gear.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const m=Array.isArray(obj.material)?obj.material:[obj.material];m.forEach(mat=>mat.dispose());}});gear.parent?.remove(gear);gear=null;};
  const refreshGear=()=>{if(!model)return;clearGear();gear=createHockeyEquipment(e,position);gear.scale.setScalar(gearHeight/2);gear.position.copy(gearCenter);model.add(gear);};
  let disposed=false,angle=0,zoom=1;
@@ -57,7 +58,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   const resize=()=>{if(!renderer||!camera)return;const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();setFraming();};
   const render=()=>{if(disposed||!renderer||!scene||!camera)return;if(model)model.rotation.y=angle;renderer.render(scene,camera);};
   let modelSize=1;
-  const setFraming=()=>{if(!model||!camera)return;const aspect=Math.max(.3,camera.aspect);const verticalFov=THREE.MathUtils.degToRad(camera.fov);const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*aspect);const fitDistance=Math.max(modelSize/(2*Math.tan(verticalFov/2)),modelSize*.65/Math.tan(horizontalFov/2));camera.position.set(0,0,fitDistance*1.22*zoom);camera.lookAt(0,0,0);camera.near=.01;camera.far=Math.max(100,modelSize*40);camera.updateProjectionMatrix();};
+  const setFraming=()=>{if(!model||!camera)return;const aspect=Math.max(.3,camera.aspect);const verticalFov=THREE.MathUtils.degToRad(camera.fov);const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*aspect);const fitDistance=Math.max(modelBounds.y/(2*Math.tan(verticalFov/2)),modelBounds.x/(2*Math.tan(horizontalFov/2)));camera.position.set(0,0,fitDistance*1.13*zoom);camera.lookAt(0,0,0);camera.near=.01;camera.far=Math.max(100,modelSize*40);camera.updateProjectionMatrix();};
   const pointers=new Map<number,{x:number;y:number}>();
   const dist=()=>{const pts=[...pointers.values()];return pts.length<2?null:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
   let pinch:number|null=null;
@@ -73,6 +74,9 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    if(generation!==loadGeneration)return;
    if(disposed)return;
    model=gltf.scene;
+   // Reset the rig to its bind/rest pose: a static creator must not show a walking frame.
+   model.traverse(obj=>{if(obj instanceof THREE.SkinnedMesh)obj.skeleton.pose();});
+   model.updateMatrixWorld(true);
    const bounds=new THREE.Box3().setFromObject(model);
    const center=bounds.getCenter(new THREE.Vector3());
    const size=bounds.getSize(new THREE.Vector3());
@@ -80,10 +84,12 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    model.position.sub(center); // Center the mesh, without moving its skeleton bones.
    gearHeight=size.y;gearCenter=center.clone();refreshGear();
    modelSize=Math.max(size.y,size.x*1.6,size.z*1.6);
+   // Include equipment in the fit, so skates and the stick are never clipped.
+   const combined=new THREE.Box3().setFromObject(model);
+   modelBounds=combined.getSize(new THREE.Vector3());
    scene?.add(model);
    // Do not autoplay unrelated walking or running clips in a static player creator.
-   const idle=gltf.animations.find(a=>/idle|stand|breath/i.test(a.name));
-   if(idle){mixer=new THREE.AnimationMixer(model);mixer.clipAction(idle).play();}
+   // No animation playback in the creator. Animations are retained in the GLB for future gameplay.
    const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);if(mixer)mixer.update(Math.min(clock.getDelta(),.05));render();};
    setFraming();tick();
   },undefined,()=>showFallback());
@@ -93,6 +99,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    p=nextP;e=nextE;position=nextPosition;
    fallback?.update(p,e,position);
    refreshGear();
+   if(model){model.updateMatrixWorld(true);modelBounds=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());}
    // Appearance morph targets still require a compatible custom character asset.
   },
   dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();clearGear();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
