@@ -27,9 +27,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let observer:ResizeObserver|null=null;
  let canvas:HTMLCanvasElement|null=null;
  let loadGeneration=0;
- let mixer:THREE.AnimationMixer|null=null;
  let animationFrame=0;
- const clock=new THREE.Clock();
  const assetUrl=`${import.meta.env.BASE_URL}models/player.glb`;
  const showFallback=()=>{
   if(disposed)return;
@@ -109,7 +107,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    },undefined,()=>{/* Optional pads missing: keep prototype pads. */});
    // Do not autoplay unrelated walking or running clips in a static player creator.
    // No animation playback in the creator. Animations are retained in the GLB for future gameplay.
-   const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);if(mixer)mixer.update(Math.min(clock.getDelta(),.05));render();};
+   const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);render();};
    setFraming();tick();
   },undefined,()=>showFallback());
  }).catch(()=>showFallback());
@@ -121,6 +119,6 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    if(model){model.updateMatrixWorld(true);modelBounds=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());}
    // Appearance morph targets still require a compatible custom character asset.
   },
-  dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();clearGear();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
+  dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();clearGear();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
  };
 }
