@@ -24,6 +24,16 @@ npm run build
 npm run preview
 ```
 
+## GitHub Pages
+
+Deployment workflow: `.github/workflows/deploy-pages.yml`.
+
+In repository **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. After this change is merged into `main`, GitHub Actions will build and deploy the website.
+
+Expected website after a successful deployment: https://maddiek09.github.io/hockey-career/
+
+The Vite `base` setting is `/hockey-career/` so built assets resolve correctly under the repository subpath.
+
 ## Project structure
 
 - `src/config/` — editable game constants
