@@ -14,41 +14,46 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
  const face=p.faceShape==='Round'?1.10:p.faceShape==='Angular'?.94:p.faceShape==='Square'?1.07:1;
  const a:Part[]=[];
  const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
- add(0,-.66,0,.28,.31,.20,'#193a57');add(0,-.24,0,.30,.39,.22,'#245d84');
- add(0,.15,0,.37,.39,.245,'#27648d');add(0,.37,0,.39,.17,.24,'#27648d');
+
+ // Fewer, deliberately overlapping volumes: no disconnected bead-like joints.
+ add(0,-.49,0,.285,.43,.22,'#214967');
+ add(0,.02,0,.345,.43,.245,'#27648d');
+ add(0,.31,0,.355,.24,.24,'#27648d');
+ add(0,-.79,0,.295,.23,.215,'#193a57');
  for(const side of [-1,1]){
-  add(side*.38,.29,0,.175,.205,.19,'#27648d');
-  add(side*.40,.04,0,.15,.32,.16,'#27648d');
-  add(side*.415,-.28,.005,.13,.21,.145,'#245777');
-  add(side*.425,-.52,.015,.12,.24,.13,'#27648d');
-  add(side*.425,-.75,.045,.115,.12,.115,s);
-  const hip=side*.17;
-  add(hip,-.96,0,.175,.32,.19,'#1c344f');
-  add(hip,-1.22,.015,.155,.32,.17,'#1b3048');
-  add(hip,-1.48,.035,.145,.17,.15,'#203d59');
-  add(hip,-1.68,.045,.13,.27,.145,'#1b3048');
-  add(hip,-1.91,.13,.16,.12,.26,'#111d2e');
+  const hip=side*.165;
+  add(side*.365,.245,0,.165,.205,.18,'#27648d');
+  add(side*.392,-.07,0,.142,.39,.155,'#27648d');
+  add(side*.405,-.48,.018,.117,.28,.13,'#245777');
+  add(side*.408,-.70,.035,.105,.115,.115,s);
+  add(hip,-1.09,0,.167,.39,.19,'#1c344f');
+  add(hip,-1.52,.025,.132,.42,.155,'#1b3048');
+  add(hip,-1.89,.12,.155,.125,.24,'#111d2e');
  }
- add(0,.54,0,.14,.18,.14,s);
- add(0,.94,.035,.245*face,p.faceShape==='Round'?.30:.33,.238,s);
+ add(0,.54,0,.125,.16,.125,s);
+ // Neck, jaw, ears and facial features use the same proportion system.
+ add(0,.92,.035,.24*face,p.faceShape==='Round'?.31:.335,.23,s);
+ add(0,.76,.115,.175*face,.115,.16,s);
  for(const side of [-1,1]){
-  add(side*.247*face,.94,.025,.045,.083,.06,s);
-  add(side*.10,.98,.258,.038,.024,.018,'#f0eee8');
-  add(side*.10,.98,.275,.019,.02,.012,e);
-  add(side*.10,.98,.285,.008,.01,.007,'#1d1c24');
-  add(side*.105,1.065,.25,.055,.012,.011,h);
+  add(side*.236*face,.94,.015,.037,.075,.05,s);
+  add(side*.097,.97,.252,.042,.022,.012,'#e9e6e0');
+  add(side*.097,.97,.267,.021,.018,.009,e);
+  add(side*.097,.97,.275,.009,.009,.006,'#24232a');
+  add(side*.105,1.045,.246,.06,.013,.012,h);
  }
- add(0,.895,.273,.031,.048,.035,s);add(0,.782,.236,.068,.01,.013,'#925b58');
+ add(0,.885,.267,.028,.052,.032,s);
+ add(0,.785,.239,.072,.012,.013,'#925b58');
  if(p.hairStyle!=='Bald'&&!helmetOn){
-  const short=p.hairStyle==='Buzz cut';
-  add(0,1.225,-.012,.25*face,short?.05:.10,.24,h);
-  if(!short){add(-.13,1.15,.16,.12,.085,.10,h);add(.14,1.15,.13,.11,.08,.09,h);}
+  const buzz=p.hairStyle==='Buzz cut';
+  add(0,1.205,-.025,.249*face,buzz?.046:.10,.238,h);
+  if(!buzz){add(-.115,1.15,.13,.12,.07,.10,h);add(.115,1.15,.13,.12,.07,.10,h);}
   if(['Medium','Long','Ponytail','Curly'].includes(p.hairStyle)){
-   add(-.225,1.02,-.08,.08,p.hairStyle==='Long'?.31:.20,.13,h);
-   add(.225,1.02,-.08,.08,p.hairStyle==='Long'?.31:.20,.13,h);
+   const length=p.hairStyle==='Long'?.29:.19;
+   add(-.22,1.01,-.085,.075,length,.12,h);
+   add(.22,1.01,-.085,.075,length,.12,h);
   }
-  if(p.hairStyle==='Curly')for(let i=0;i<13;i++){const angle=i*Math.PI*2/13;add(Math.cos(angle)*.19,1.27+Math.sin(angle)*.03,Math.sin(angle)*.17,.073,.066,.07,h);}
-  if(p.hairStyle==='Ponytail')add(0,.99,-.28,.095,.27,.10,h);
+  if(p.hairStyle==='Curly')for(let i=0;i<15;i++){const t=i*Math.PI*2/15;add(Math.cos(t)*.175,1.26+Math.sin(t)*.035,Math.sin(t)*.16,.065,.056,.063,h);}
+  if(p.hairStyle==='Ponytail')add(0,.97,-.28,.085,.26,.09,h);
  }
  return a;
 }
