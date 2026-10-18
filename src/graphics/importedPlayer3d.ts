@@ -18,6 +18,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let disposed=false,angle=0,zoom=1;
  let observer:ResizeObserver|null=null;
  let canvas:HTMLCanvasElement|null=null;
+ let loadGeneration=0;
  let mixer:THREE.AnimationMixer|null=null;
  let animationFrame=0;
  const clock=new THREE.Clock();
@@ -25,13 +26,15 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  const showFallback=()=>{
   if(disposed)return;
   observer?.disconnect();observer=null;
+  cancelAnimationFrame(animationFrame);animationFrame=0;
   renderer?.dispose();renderer?.domElement.remove();renderer=null;
   if(fallback)return;
   fallback=mountPlayer3D(host,p,e,position);
  };
  // Only attempt the imported model when it has actually been installed.
  fetch(assetUrl,{method:'HEAD'}).then(response=>{
-  if(!response.ok||disposed){showFallback();return;}
+  if(disposed)return;
+  if(!response.ok){showFallback();return;}
   scene=new THREE.Scene();
   scene.background=new THREE.Color('#0e2236');
   scene.add(new THREE.HemisphereLight(0xe8f2ff,0x253a55,2.0));
@@ -45,7 +48,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   canvas=renderer.domElement;canvas.className='player-3d-canvas';
   canvas.setAttribute('aria-label','Imported 3D player preview');
   host.replaceChildren(canvas);
-  const resize=()=>{if(!renderer||!camera)return;const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();};
+  const resize=()=>{if(!renderer||!camera)return;const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();setFraming();};
   const render=()=>{if(disposed||!renderer||!scene||!camera)return;if(model)model.rotation.y=angle;renderer.render(scene,camera);};
   let modelSize=1;
   const setFraming=()=>{if(!model||!camera)return;const aspect=Math.max(.3,camera.aspect);const verticalFov=THREE.MathUtils.degToRad(camera.fov);const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*aspect);const fitDistance=Math.max(modelSize/(2*Math.tan(verticalFov/2)),modelSize*.65/Math.tan(horizontalFov/2));camera.position.set(0,0,fitDistance*1.22*zoom);camera.lookAt(0,0,0);camera.near=.01;camera.far=Math.max(100,modelSize*40);camera.updateProjectionMatrix();};
@@ -59,7 +62,9 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   canvas.addEventListener('wheel',event=>{event.preventDefault();zoom=THREE.MathUtils.clamp(zoom+event.deltaY*.001,.65,2.5);setFraming();render();},{passive:false});
   canvas.addEventListener('dblclick',()=>{angle=0;zoom=1;setFraming();render();});
   observer=new ResizeObserver(()=>{resize();render();});observer.observe(host);resize();
+  const generation=++loadGeneration;
   new GLTFLoader().load(assetUrl,gltf=>{
+   if(generation!==loadGeneration)return;
    if(disposed)return;
    model=gltf.scene;
    const bounds=new THREE.Box3().setFromObject(model);
@@ -80,6 +85,6 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    fallback?.update(p,e,position);
    // Imported meshes require separate equipment attachment and morph targets.
   },
-  dispose:()=>{disposed=true;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
+  dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
  };
 }
