@@ -90,15 +90,19 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    modelBounds=combined.getSize(new THREE.Vector3());
    scene?.add(model);
    // Optional licensed hockey-specific pads can replace the prototype leg pads.
-   const padsUrl=`${import.meta.env.BASE_URL}models/goalie-pads.glb`;
+   // CC0 goalie leg pads by 3DAssets.dev; CDN supports cross-origin GLB loading.
+   const padsUrl='https://cdn.3dassets.dev/assets/33719/v1/model.glb';
    new GLTFLoader().load(padsUrl,padsGltf=>{
     if(disposed||generation!==loadGeneration||!model)return;
     externalPads=padsGltf.scene;
     const padsBounds=new THREE.Box3().setFromObject(externalPads);
     const padsSize=padsBounds.getSize(new THREE.Vector3());
     if(padsSize.y>.001){
-     externalPads.scale.setScalar((gearHeight*.35)/padsSize.y);
-     externalPads.position.set(gearCenter.x,gearCenter.y-gearHeight*.34,gearCenter.z+gearHeight*.09);
+     externalPads.scale.setScalar((gearHeight*.40)/padsSize.y);
+     // Center the pad pair around the legs and align their bottom with the skates.
+     const padCenter=padsBounds.getCenter(new THREE.Vector3());
+     const factor=(gearHeight*.40)/padsSize.y;
+     externalPads.position.set(gearCenter.x-padCenter.x*factor,gearCenter.y-gearHeight*.30-padCenter.y*factor,gearCenter.z+gearHeight*.12-padCenter.z*factor);
      model.add(externalPads);refreshGear();
      modelBounds=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());setFraming();
     }
