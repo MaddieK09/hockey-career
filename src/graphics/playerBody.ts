@@ -16,18 +16,21 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
  const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
 
  // Fewer, deliberately overlapping volumes: no disconnected bead-like joints.
- add(0,-.49,0,.285,.43,.22,'#214967');
+ add(0,-.49,0,.30,.43,.225,'#214967');
  add(0,.02,0,.345,.43,.245,'#27648d');
+ // Layer the clavicles and waist to create a more natural taper.
+ add(0,.39,.015,.285,.135,.225,'#27648d');
+ add(0,-.53,.025,.245,.24,.205,'#214967');
  add(0,.31,0,.355,.24,.24,'#27648d');
  add(0,-.79,0,.295,.23,.215,'#193a57');
  for(const side of [-1,1]){
   const hip=side*.165;
-  add(side*.365,.245,0,.165,.205,.18,'#27648d');
-  add(side*.392,-.07,0,.142,.39,.155,'#27648d');
-  add(side*.405,-.48,.018,.117,.28,.13,'#245777');
+  add(side*.352,.245,0,.175,.205,.18,'#27648d');
+  add(side*.388,-.07,0,.146,.39,.155,'#27648d');
+  add(side*.398,-.48,.018,.123,.28,.13,'#245777');
   add(side*.408,-.70,.035,.105,.115,.115,s);
-  add(hip,-1.09,0,.167,.39,.19,'#1c344f');
-  add(hip,-1.52,.025,.132,.42,.155,'#1b3048');
+  add(hip,-1.09,0,.177,.41,.19,'#1c344f');
+  add(hip,-1.52,.025,.137,.42,.155,'#1b3048');
   add(hip,-1.89,.12,.155,.125,.24,'#111d2e');
  }
  add(0,.54,0,.125,.16,.125,s);
@@ -42,6 +45,8 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
   add(side*.105,1.045,.246,.06,.013,.012,h);
  }
  add(0,.885,.267,.028,.052,.032,s);
+ // Small cheek and jaw planes soften the flat face without increasing eye size.
+ for(const side of [-1,1]){add(side*.145,.84,.125,.085,.095,.115,s);}
  add(0,.785,.239,.072,.012,.013,'#925b58');
  if(p.hairStyle!=='Bald'&&!helmetOn){
   const buzz=p.hairStyle==='Buzz cut';
