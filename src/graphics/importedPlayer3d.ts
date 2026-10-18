@@ -4,6 +4,7 @@ import type {PlayerAppearance} from '../player/appearance';
 import type {Equipment} from '../player/equipment';
 import type {Position} from '../player/types';
 import {mountPlayer3D} from './player3d';
+import {createHockeyEquipment} from './importedHockeyGear';
 
 /** An optional, licensed GLB asset is stored at public/models/player.glb.
  * Until an asset is installed, the current procedural preview stays usable.
@@ -15,6 +16,11 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let scene:THREE.Scene|null=null;
  let camera:THREE.PerspectiveCamera|null=null;
  let model:THREE.Group|null=null;
+ let gear:THREE.Group|null=null;
+ let gearHeight=1;
+ let gearCenter=new THREE.Vector3();
+ const clearGear=()=>{if(!gear)return;gear.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const m=Array.isArray(obj.material)?obj.material:[obj.material];m.forEach(mat=>mat.dispose());}});gear.parent?.remove(gear);gear=null;};
+ const refreshGear=()=>{if(!model)return;clearGear();gear=createHockeyEquipment(e,position);gear.scale.setScalar(gearHeight/2);gear.position.copy(gearCenter);model.add(gear);};
  let disposed=false,angle=0,zoom=1;
  let observer:ResizeObserver|null=null;
  let canvas:HTMLCanvasElement|null=null;
@@ -72,9 +78,12 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    const size=bounds.getSize(new THREE.Vector3());
    if(!Number.isFinite(size.y)||size.y<.01){showFallback();return;}
    model.position.sub(center); // Center the mesh, without moving its skeleton bones.
+   gearHeight=size.y;gearCenter=center.clone();refreshGear();
    modelSize=Math.max(size.y,size.x*1.6,size.z*1.6);
    scene?.add(model);
-   if(gltf.animations.length){mixer=new THREE.AnimationMixer(model);const idle=gltf.animations.find(a=>/idle/i.test(a.name))??gltf.animations[0];mixer.clipAction(idle).play();}
+   // Do not autoplay unrelated walking or running clips in a static player creator.
+   const idle=gltf.animations.find(a=>/idle|stand|breath/i.test(a.name));
+   if(idle){mixer=new THREE.AnimationMixer(model);mixer.clipAction(idle).play();}
    const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);if(mixer)mixer.update(Math.min(clock.getDelta(),.05));render();};
    setFraming();tick();
   },undefined,()=>showFallback());
@@ -83,8 +92,9 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   update:(nextP:PlayerAppearance,nextE:Equipment,nextPosition:Position)=>{
    p=nextP;e=nextE;position=nextPosition;
    fallback?.update(p,e,position);
-   // Imported meshes require separate equipment attachment and morph targets.
+   refreshGear();
+   // Appearance morph targets still require a compatible custom character asset.
   },
-  dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
+  dispose:()=>{disposed=true;loadGeneration++;cancelAnimationFrame(animationFrame);observer?.disconnect();fallback?.dispose();mixer?.stopAllAction();clearGear();model?.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials)material.dispose();}});renderer?.dispose();host.replaceChildren();}
  };
 }
