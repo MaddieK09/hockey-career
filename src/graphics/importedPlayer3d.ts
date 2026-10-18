@@ -19,9 +19,10 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let gear:THREE.Group|null=null;
  let gearHeight=1;
  let gearCenter=new THREE.Vector3();
+ let externalPads:THREE.Group|null=null;
  let modelBounds=new THREE.Vector3(1,2,1);
  const clearGear=()=>{if(!gear)return;gear.traverse(obj=>{if(obj instanceof THREE.Mesh){obj.geometry.dispose();const m=Array.isArray(obj.material)?obj.material:[obj.material];m.forEach(mat=>mat.dispose());}});gear.parent?.remove(gear);gear=null;};
- const refreshGear=()=>{if(!model)return;clearGear();gear=createHockeyEquipment(e,position);gear.scale.setScalar(gearHeight/2);gear.position.copy(gearCenter);model.add(gear);};
+ const refreshGear=()=>{if(!model)return;clearGear();gear=createHockeyEquipment(e,position,externalPads!==null);gear.scale.setScalar(gearHeight/2);gear.position.copy(gearCenter);model.add(gear);if(externalPads)externalPads.visible=position==='G';};
  let disposed=false,angle=0,zoom=1;
  let observer:ResizeObserver|null=null;
  let canvas:HTMLCanvasElement|null=null;
@@ -88,6 +89,20 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
    const combined=new THREE.Box3().setFromObject(model);
    modelBounds=combined.getSize(new THREE.Vector3());
    scene?.add(model);
+   // Optional licensed hockey-specific pads can replace the prototype leg pads.
+   const padsUrl=`${import.meta.env.BASE_URL}models/goalie-pads.glb`;
+   new GLTFLoader().load(padsUrl,padsGltf=>{
+    if(disposed||generation!==loadGeneration||!model)return;
+    externalPads=padsGltf.scene;
+    const padsBounds=new THREE.Box3().setFromObject(externalPads);
+    const padsSize=padsBounds.getSize(new THREE.Vector3());
+    if(padsSize.y>.001){
+     externalPads.scale.setScalar((gearHeight*.35)/padsSize.y);
+     externalPads.position.set(gearCenter.x,gearCenter.y-gearHeight*.34,gearCenter.z+gearHeight*.09);
+     model.add(externalPads);refreshGear();
+     modelBounds=new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());setFraming();
+    }
+   },undefined,()=>{/* Optional pads missing: keep prototype pads. */});
    // Do not autoplay unrelated walking or running clips in a static player creator.
    // No animation playback in the creator. Animations are retained in the GLB for future gameplay.
    const tick=()=>{if(disposed||!renderer)return;animationFrame=requestAnimationFrame(tick);if(mixer)mixer.update(Math.min(clock.getDelta(),.05));render();};
