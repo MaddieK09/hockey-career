@@ -9,7 +9,7 @@ import {mountPlayer3D} from './player3d';
  * Until an asset is installed, the current procedural preview stays usable.
  * Asset must be upright, with a compatible animation skeleton for future work.
  */
-export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equipment,position:Position){
+export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equipment,position:Position,customAssetUrl?:string){
  let fallback:ReturnType<typeof mountPlayer3D>|null=null;
  let renderer:THREE.WebGLRenderer|null=null;
  let scene:THREE.Scene|null=null;
@@ -22,7 +22,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let mixer:THREE.AnimationMixer|null=null;
  let animationFrame=0;
  const clock=new THREE.Clock();
- const assetUrl=`${import.meta.env.BASE_URL}models/player.glb`;
+ const assetUrl=customAssetUrl??`${import.meta.env.BASE_URL}models/player.glb`;
  const showFallback=()=>{
   if(disposed)return;
   observer?.disconnect();observer=null;
@@ -32,7 +32,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   fallback=mountPlayer3D(host,p,e,position);
  };
  // Only attempt the imported model when it has actually been installed.
- fetch(assetUrl,{method:'HEAD'}).then(response=>{
+ (customAssetUrl?Promise.resolve({ok:true}):fetch(assetUrl,{method:'HEAD'})).then(response=>{
   if(disposed)return;
   if(!response.ok){showFallback();return;}
   scene=new THREE.Scene();
