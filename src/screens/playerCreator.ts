@@ -4,6 +4,7 @@ import {PlayerDraft,POSITIONS} from '../player/types';
 import {validatePlayer} from '../player/validation';
 import {appearanceFields,appearancePreviewMarkup,renderAppearanceDetails} from './appearanceFields';
 import {mountPlayer3D} from '../graphics/player3d';
+import {equipmentFields} from './equipmentFields';
 const LABELS:Record<PlayerDraft['position'],string>={C:'Centre',LW:'Left wing',RW:'Right wing',LD:'Left defence',RD:'Right defence',G:'Goaltender'};
 function esc(s:string):string{return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));}
 export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
@@ -20,13 +21,14 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  <label>Jersey number<input name="jerseyNumber" type="number" inputmode="numeric" min="0" max="99" step="1" required value="${p.jerseyNumber}"></label>
  </div></fieldset>
  ${appearanceFields(p.appearance)}
+ ${equipmentFields(p.equipment,p.position)}
  <p class="field-errors" role="alert" aria-live="polite" data-errors></p><button type="submit" class="primary-action">Review player →</button></form><section class="player-review" data-review hidden aria-live="polite"></section><p class="version">Draft saved on this device · v${GAME_VERSION}</p></section></main>`;
- const preview=mountPlayer3D(root.querySelector<HTMLElement>('[data-3d-host]')!,p.appearance);
+ const preview=mountPlayer3D(root.querySelector<HTMLElement>('[data-3d-host]')!,p.appearance,p.equipment,p.position);
  const form=root.querySelector<HTMLFormElement>('#player-form')!;
  const review=root.querySelector<HTMLElement>('[data-review]')!;
  const errors=root.querySelector<HTMLElement>('[data-errors]')!;
- const read=():PlayerDraft=>{const f=new FormData(form);return {firstName:String(f.get('firstName')??'').trim(),lastName:String(f.get('lastName')??'').trim(),birthdate:String(f.get('birthdate')??''),nationality:String(f.get('nationality')??'').trim(),position:String(f.get('position')??'') as PlayerDraft['position'],hand:String(f.get('hand')??'') as PlayerDraft['hand'],jerseyNumber:Number(f.get('jerseyNumber')??NaN),appearance:{heightCm:Number(f.get('heightCm')??NaN),weightKg:Number(f.get('weightKg')??NaN),hairStyle:String(f.get('hairStyle')) as PlayerDraft['appearance']['hairStyle'],hairColor:String(f.get('hairColor')) as PlayerDraft['appearance']['hairColor'],skinTone:String(f.get('skinTone')) as PlayerDraft['appearance']['skinTone'],faceShape:String(f.get('faceShape')) as PlayerDraft['appearance']['faceShape'],eyeColor:String(f.get('eyeColor')) as PlayerDraft['appearance']['eyeColor']}};};
- const update=()=>{const current=read();savePlayerDraft(current);review.hidden=true;errors.textContent='';root.querySelector<HTMLElement>('[data-hand-label]')!.textContent=current.position==='G'?'Catching hand':'Shooting hand';preview.update(current.appearance);renderAppearanceDetails(root,current.appearance);};
+ const read=():PlayerDraft=>{const f=new FormData(form);return {firstName:String(f.get('firstName')??'').trim(),lastName:String(f.get('lastName')??'').trim(),birthdate:String(f.get('birthdate')??''),nationality:String(f.get('nationality')??'').trim(),position:String(f.get('position')??'') as PlayerDraft['position'],hand:String(f.get('hand')??'') as PlayerDraft['hand'],jerseyNumber:Number(f.get('jerseyNumber')??NaN),appearance:{heightCm:Number(f.get('heightCm')??NaN),weightKg:Number(f.get('weightKg')??NaN),hairStyle:String(f.get('hairStyle')) as PlayerDraft['appearance']['hairStyle'],hairColor:String(f.get('hairColor')) as PlayerDraft['appearance']['hairColor'],skinTone:String(f.get('skinTone')) as PlayerDraft['appearance']['skinTone'],faceShape:String(f.get('faceShape')) as PlayerDraft['appearance']['faceShape'],eyeColor:String(f.get('eyeColor')) as PlayerDraft['appearance']['eyeColor']},equipment:{jersey:String(f.get('gearJersey')) as PlayerDraft['equipment']['jersey'],helmet:String(f.get('gearHelmet')) as PlayerDraft['equipment']['helmet'],gloves:String(f.get('gearGloves')) as PlayerDraft['equipment']['gloves'],pads:String(f.get('gearPads')) as PlayerDraft['equipment']['pads'],stick:String(f.get('gearStick')) as PlayerDraft['equipment']['stick']}};};
+ const update=()=>{const current=read();savePlayerDraft(current);review.hidden=true;errors.textContent='';root.querySelector<HTMLElement>('[data-hand-label]')!.textContent=current.position==='G'?'Catching hand':'Shooting hand';root.querySelector<HTMLElement>('[data-goalie-gear]')!.hidden=current.position!=='G';preview.update(current.appearance,current.equipment,current.position);renderAppearanceDetails(root,current.appearance);};
  form.addEventListener('input',update);form.addEventListener('change',update);
  root.querySelector<HTMLButtonElement>('[data-back]')!.addEventListener('click',()=>{preview.dispose();onBack();});
  renderAppearanceDetails(root,p.appearance);

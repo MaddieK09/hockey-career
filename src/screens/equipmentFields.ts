@@ -1,0 +1,4 @@
+import {Equipment,GEAR_COLORS} from '../player/equipment';
+import type {Position} from '../player/types';
+const field=(name:string,label:string,values:readonly string[],selected:string)=>`<label>${label}<select name="${name}">${values.map(v=>`<option value="${v}" ${v===selected?'selected':''}>${v}</option>`).join('')}</select></label>`;
+export function equipmentFields(e:Equipment,position:Position):string{return `<fieldset><legend>Hockey equipment</legend><p class="section-help">Choose your colours. The 3D preview updates instantly. Detailed branded models will come later.</p><div class="form-grid">${field('gearJersey','Jersey',GEAR_COLORS,e.jersey)}${field('gearHelmet','Helmet / mask',GEAR_COLORS,e.helmet)}${field('gearGloves','Gloves',GEAR_COLORS,e.gloves)}${field('gearStick','Stick finish',['Black','White','Natural'],e.stick)}</div><div data-goalie-gear ${position==='G'?'':'hidden'}>${field('gearPads','Goalie leg pads',GEAR_COLORS,e.pads)}</div></fieldset>`;}
