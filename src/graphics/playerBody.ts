@@ -4,7 +4,7 @@ const skin:Record<string,string>={Porcelain:'#f8dfd1',Fair:'#edc5a9',Light:'#dba
 const hair:Record<string,string>={Black:'#24212a','Dark brown':'#39251f',Brown:'#77503a',Blonde:'#d6ad61',Platinum:'#ece3c6',Red:'#a63e29',Auburn:'#86422b',Blue:'#427fd2',Pink:'#d878a4'};
 const eyes:Record<string,string>={Brown:'#63422c',Blue:'#5b9ed0',Green:'#568969',Hazel:'#96804a',Grey:'#8394a0',Amber:'#c58c42'};
 /** All dimensions are relative to a 180 cm player. Overlapping joint geometry prevents detached limbs. */
-export function buildPlayerBody(p:PlayerAppearance):Part[]{
+export function buildPlayerBody(p:PlayerAppearance, helmetOn=false):Part[]{
  const height=Number.isFinite(p.heightCm)?Math.max(.78,Math.min(1.2,p.heightCm/180)):1;
  const mass=Number.isFinite(p.weightKg)?Math.max(.78,Math.min(1.27,Math.sqrt(p.weightKg/77))):1;
  const s=skin[p.skinTone]??skin.Fair,h=hair[p.hairColor]??hair.Brown,e=eyes[p.eyeColor]??eyes.Blue;
@@ -42,7 +42,7 @@ export function buildPlayerBody(p:PlayerAppearance):Part[]{
  }
  add(0,.935,.275,.036,.058,.045,s);
  add(0,.803,.238,.074,.012,.018,'#925b58');
- if(p.hairStyle!=='Bald'){
+ if(p.hairStyle!=='Bald'&&!helmetOn){
   const short=p.hairStyle==='Buzz cut';
   add(0,1.274,-.012,.272*face,short?.065:.12,.247,h);
   if(!short){add(-.13,1.19,.17,.13,.10,.11,h);add(.15,1.19,.13,.115,.095,.10,h);}
