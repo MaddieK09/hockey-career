@@ -15,7 +15,7 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
  add(0,.34,.015,goalie?.425:.39,.145,.245,jersey);
  add(0,-.30,.025,.295,.28,.22,jersey);
  add(0,-.67,.025,.30,.23,.235,jersey);
- if(goalie){add(0,.14,.25,.31,.27,.085,jersey);add(0,.42,.20,.28,.095,.08,trim);}
+ if(goalie){add(0,.14,.25,.34,.31,.13,jersey);add(0,.42,.20,.28,.095,.08,trim);add(0,-.04,.34,.25,.16,.045,jersey);}
  for(const side of [-1,1]){
   add(side*.385,.26,.025,goalie?.205:.17,.20,.195,jersey);
   add(side*.40,-.035,.025,goalie?.17:.145,.31,.17,jersey);
@@ -25,7 +25,7 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
   if(goalie){
    add(side*.17,-1.36,.15,.225,.36,.25,pads);
    add(side*.17,-1.69,.15,.225,.31,.25,pads);
-   add(side*.17,-1.53,.37,.19,.46,.055,pads);
+   add(side*.17,-1.53,.37,.19,.46,.055,pads);add(side*.17,-1.55,.435,.155,.40,.018,trim);
    for(let j=0;j<5;j++)add(side*.17,-1.26-j*.145,.425,.185,.009,.012,trim);
    add(side*.17,-1.82,.31,.17,.06,.085,dark);
   }else{
@@ -43,12 +43,12 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
   add(0,1.045,.29,.215,.22,.027,trim);
   for(let i=-2;i<=2;i++)add(i*.079,1.04,.326,.009,.19,.014,dark);
   for(let j=0;j<5;j++)add(0,.88+j*.082,.338,.21,.008,.013,dark);
-  add(-.42,-.70,.18,.20,.21,.18,gloves);
+  add(-.42,-.70,.18,.23,.22,.19,gloves);
   add(-.42,-.72,.31,.19,.17,.045,trim);
-  add(.42,-.70,.18,.19,.22,.18,gloves);
+  add(.42,-.70,.18,.24,.20,.16,gloves);
   add(.42,-.71,.31,.17,.16,.03,trim);
  }else{
-  add(0,1.04,.28,.21,.052,.024,trim);
+  add(0,1.04,.28,.21,.052,.024,trim);add(0,1.075,.305,.19,.045,.012,'#9ab6c7');
   add(0,.97,.288,.19,.012,.012,blade);
  }
  const stick=e.stick==='White'?'#e5e9ed':e.stick==='Natural'?'#b99164':'#252b33';

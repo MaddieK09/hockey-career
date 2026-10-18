@@ -15,10 +15,10 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
  const a:Part[]=[];
  const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
  add(0,-.66,0,.28,.31,.20,'#193a57');add(0,-.24,0,.30,.39,.22,'#245d84');
- add(0,.15,0,.37,.39,.245,'#27648d');add(0,.37,0,.39,.17,.24,'#27648d');
+ add(0,.15,0,.38,.42,.245,'#27648d');add(0,.37,0,.39,.17,.24,'#27648d');
  for(const side of [-1,1]){
-  add(side*.38,.29,0,.175,.205,.19,'#27648d');
-  add(side*.40,.04,0,.15,.32,.16,'#27648d');
+  add(side*.355,.29,0,.19,.205,.19,'#27648d');
+  add(side*.395,.04,0,.16,.32,.16,'#27648d');
   add(side*.415,-.28,.005,.13,.21,.145,'#245777');
   add(side*.425,-.52,.015,.12,.24,.13,'#27648d');
   add(side*.425,-.75,.045,.115,.12,.115,s);
