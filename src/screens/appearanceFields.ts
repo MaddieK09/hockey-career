@@ -12,7 +12,7 @@ export function appearanceFields(p:PlayerAppearance):string {
  </div></fieldset>`;
 }
 export function appearancePreviewMarkup():string {
- return `<section class="appearance-preview appearance-preview-3d" aria-label="3D player preview"><div class="player-3d-host" data-3d-host></div><p class="preview-title">3D player preview</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Drag left or right to rotate · Improved anatomy prototype · drag to rotate</p></section>`;
+ return `<section class="appearance-preview appearance-preview-3d" aria-label="3D player preview"><div class="player-3d-host" data-3d-host></div><p class="preview-title">3D player preview</p><label class="model-import-label">Test an imported 3D character (.glb)<input type="file" accept=".glb,model/gltf-binary" data-model-upload></label><p class="preview-note" data-model-status aria-live="polite">Optional test: select a GLB file from your device. It stays on your device.</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Drag to rotate · Pinch to zoom · Double-tap to reset</p></section>`;
 }
 export function renderAppearanceDetails(root:HTMLElement,p:PlayerAppearance):void {
  const detail=root.querySelector<HTMLElement>('[data-appearance-details]');
