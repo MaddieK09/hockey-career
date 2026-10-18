@@ -12,7 +12,7 @@ export function appearanceFields(p:PlayerAppearance):string {
  </div></fieldset>`;
 }
 export function appearancePreviewMarkup():string {
- return `<section class="appearance-preview appearance-preview-3d" aria-label="3D player preview"><div class="player-3d-host" data-3d-host></div><p class="preview-title">3D player preview</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Drag left or right to rotate · Early 3D prototype</p></section>`;
+ return `<section class="appearance-preview appearance-preview-3d" aria-label="3D player preview"><div class="player-3d-host" data-3d-host></div><p class="preview-title">3D player preview</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Drag left or right to rotate · Improved anatomy prototype · drag to rotate</p></section>`;
 }
 export function renderAppearanceDetails(root:HTMLElement,p:PlayerAppearance):void {
  const detail=root.querySelector<HTMLElement>('[data-appearance-details]');
