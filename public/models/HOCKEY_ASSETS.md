@@ -1,16 +1,12 @@
 # Hockey-specific 3D asset integration
 
-The imported player preview can now optionally load `public/models/goalie-pads.glb`. If the file is absent, the prototype goalie pads remain visible.
+The experimental imported player preview now loads a **real goalie leg-pad GLB** from [3DAssets.dev](https://3dassets.dev/assets/ice-hockey-arena-and-locker-room-goalie-pads-c713e1bd) at `https://cdn.3dassets.dev/assets/33719/v1/model.glb`.
 
-A potential CC0 source to evaluate is [Ice Hockey Arena and Locker Room](https://3dassets.dev/packs/ice-hockey-arena-and-locker-room) on 3Dassets.dev. **No model from this pack has been downloaded or committed.** Verify each individual asset's license and geometry before importing.
+The asset page lists CC0 1.0 Universal, 1,824 triangles, 0.72 × 0.95 × 0.23 metres, no animations, and a stable CORS-enabled CDN. No attribution required. The file is **loaded from the CDN at runtime** and is not committed to the repository. If loading fails, the prototype pads remain.
 
 ## Known limitations
 
-- The current `player.glb` is still the Cesium Man test character, not a hockey-specific human.
-- The optional pads loader assumes the pads mesh is preassembled and aligned in local coordinates; it is not bone-rigged, so leg movements will not deform it.
-- The preview remains experimental, and final scale/offset require testing on iPhone.
-- The equipment overlay uses basic shapes. This is an integration hook, not a realistic goalie render.
-
-## To install
-
-Place a licensed, optimized GLB at `public/models/goalie-pads.glb`. Keep source/license attribution in `public/models/ASSET_LICENSE.md`. The game automatically attempts to load the file; no source-code change is needed.
+- `player.glb` is still the generic Cesium Man character. This does not yet replace the astronaut.
+- These are **static leg pads**, not skinned to the player rig; no independent leg motion or attachment to leg bones.
+- Size and offsets are provisional and need iPhone visual QA. Other equipment remains simplified geometry.
+- CDN availability is required for the real pads to appear.
