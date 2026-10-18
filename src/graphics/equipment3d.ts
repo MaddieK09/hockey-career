@@ -13,11 +13,14 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
  // Rounded jersey and chest protection; broader shoulders for goaltenders.
  add(0,.07,.01,goalie?.405:.355,.46,goalie?.30:.235,jersey);
  add(0,.34,.015,goalie?.425:.39,.145,.245,jersey);
+ // Subtle jersey yoke and side panels separate the uniform from the body.
+ add(0,.385,.16,goalie?.34:.315,.065,.115,jersey);
  add(0,-.30,.025,.315,.31,.22,jersey);
  add(0,-.67,.025,.30,.23,.235,jersey);
  if(goalie){add(0,.14,.25,.31,.27,.085,jersey);add(0,-.08,.29,.27,.13,.07,jersey);add(0,.42,.20,.28,.095,.08,trim);}
  for(const side of [-1,1]){
   add(side*.38,.26,.025,goalie?.205:.17,.22,.195,jersey);
+  add(side*.39,.08,.174,goalie?.145:.12,.18,.024,jersey);
   add(side*.405,-.09,.025,goalie?.17:.145,.37,.17,jersey);
   add(side*.415,-.44,.035,.145,.25,.15,jersey);
   add(side*.42,-.68,.10,goalie?.16:.145,.17,.16,gloves);
@@ -27,6 +30,9 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
    add(side*.17,-1.69,.15,.225,.31,.25,pads);
    add(side*.17,-1.53,.37,.19,.46,.055,pads);add(side*.17,-1.53,.432,.155,.40,.016,trim);
    for(let j=0;j<5;j++)add(side*.17,-1.26-j*.145,.425,.185,.009,.012,trim);
+   // Knee break and vertical outside roll help identify the goalie pad shape.
+   add(side*.17,-1.38,.431,.19,.035,.02,trim);
+   add(side*.17+side*.19,-1.53,.36,.034,.43,.048,pads);
    add(side*.17,-1.82,.31,.17,.06,.085,dark);
   }else{
    add(side*.17,-1.42,.05,.155,.30,.17,jersey);
@@ -41,12 +47,15 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
  for(const side of [-1,1]){add(side*.24,1.04,.012,.07,.155,.18,helmet);add(side*.18,1.16,-.13,.075,.12,.15,helmet);}
  if(goalie){
   add(0,1.045,.29,.215,.22,.027,trim);
+  add(0,.855,.288,.16,.035,.025,helmet);
   for(let i=-2;i<=2;i++)add(i*.079,1.04,.326,.009,.19,.014,dark);
   for(let j=0;j<5;j++)add(0,.88+j*.082,.338,.21,.008,.013,dark);
   add(-.42,-.70,.18,.22,.21,.18,gloves);
   add(-.42,-.72,.31,.19,.17,.045,trim);
   add(.42,-.70,.18,.23,.21,.18,gloves);
   add(.42,-.71,.31,.17,.16,.03,trim);
+  add(-.42,-.73,.355,.11,.10,.015,dark);
+  add(.42,-.73,.35,.13,.11,.015,dark);
  }else{
   add(0,1.04,.28,.21,.052,.024,trim);add(0,1.065,.307,.18,.042,.011,'#9ab6c7');
   add(0,.97,.288,.19,.012,.012,blade);
