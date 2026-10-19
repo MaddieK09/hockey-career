@@ -10,11 +10,11 @@ const eyes:Record<string,string>={Brown:'#63422c',Blue:'#5b9ed0',Green:'#568969'
 export function playerPortrait(p:PlayerAppearance,e:Equipment):string{
  const s=skin[p.skinTone]??skin.Fair,h=hair[p.hairColor]??hair.Brown,iris=eyes[p.eyeColor]??eyes.Blue,jersey=COLORS[e.jersey]??'#27648d';
  const round=p.faceShape==='Round',square=p.faceShape==='Square',heart=p.faceShape==='Heart',angular=p.faceShape==='Angular';
- const cheek=round?78:square?77:angular?66:heart?72:70;
- const jaw=round?65:square?69:heart?48:angular?53:58;
+ const cheek=round?71:square?74:angular?65:heart?69:68;
+ const jaw=round?58:square?65:heart?48:angular?53:56;
  const shadow=p.skinTone==='Deep'||p.skinTone==='Rich'?'#211518':'#653d37';
  const bald=p.hairStyle==='Bald',buzz=p.hairStyle==='Buzz cut',curly=p.hairStyle==='Curly';
- const facePath=`M 160 82 C 111 80 ${160-cheek} 107 ${160-cheek} 161 C ${160-cheek-3} 216 ${160-jaw-7} 261 160 288 C ${160+jaw+7} 261 ${160+cheek+3} 216 ${160+cheek} 161 C ${160+cheek} 107 209 80 160 82 Z`;
+ const facePath=`M 160 89 C 116 86 ${160-cheek+3} 111 ${160-cheek} 162 C ${160-cheek-1} 216 ${160-jaw-4} 258 160 ${round?280:284} C ${160+jaw+4} 258 ${160+cheek+1} 216 ${160+cheek} 162 C ${160+cheek-3} 111 204 86 160 89 Z`;
  const style=p.hairStyle;
  const back=style==='Mullet'?`<path d="M104 135 Q93 157 99 185 L105 209 Q102 237 115 260 Q127 272 137 267 L129 225 Q122 185 124 139Z M216 135 Q227 157 221 185 L215 209 Q218 237 205 260 Q193 272 183 267 L191 225 Q198 185 196 139Z" fill="url(#hair-shade)" opacity=".9"/><path d="M119 239 Q140 252 159 244 Q182 253 202 239 L201 269 Q182 287 159 278 Q137 287 118 269Z" fill="${h}" opacity=".88"/>`:style==='Medium'?`<path d="M98 137 Q91 159 96 184 Q101 198 109 194 L114 145Z M222 137 Q229 159 224 184 Q219 198 211 194 L206 145Z" fill="url(#hair-shade)"/>`:style==='Ponytail'?`<path d="M221 116 Q239 135 238 159 Q248 188 232 218 Q222 229 218 211 Q226 174 216 146Z" fill="url(#hair-shade)"/>`:style==='Curly'?`<path d="M97 106 Q79 135 86 186 Q90 217 102 223 L112 139Z M223 106 Q241 135 234 186 Q230 217 218 223 L208 139Z" fill="url(#hair-shade)"/>`:'';
  const shortTop=`<path d="M89 143 Q80 117 94 92 Q111 60 153 64 Q206 55 226 87 Q232 110 225 137 L220 125 Q210 115 197 116 Q170 104 146 120 Q119 129 100 130Z" fill="url(#hair-shade)"/>`;
@@ -35,7 +35,7 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string{
  <path d="M132 257 L131 307 Q160 334 189 307 L188 257" fill="${s}"/><path d="M133 265 Q159 298 187 265 L188 279 Q162 312 132 280Z" fill="${shadow}" opacity=".18"/>
  <path d="M-8 390 Q1 320 91 295 L127 281 L160 314 L193 281 L229 295 Q319 320 328 390Z" fill="url(#portrait-jersey)"/>
  <path d="M124 282 L160 321 L196 282" fill="none" stroke="#f1f5f9" stroke-width="9"/><path d="M27 353 L100 325 M293 353 L220 325" stroke="#e7f2fc" stroke-opacity=".34" stroke-width="5"/>
- <path d="M86 169 C67 160 73 203 92 213 L102 188Z M234 169 C253 160 247 203 228 213 L218 188Z" fill="${s}"/>
+ <path d="M91 171 C74 165 78 201 94 208 L101 188Z M229 171 C246 165 242 201 226 208 L219 188Z" fill="${s}"/>
  <path d="${facePath}" fill="${s}"/><path d="${facePath}" fill="url(#face-light)"/>
  <path d="M99 207 Q119 219 141 209 M179 209 Q202 219 222 207" fill="none" stroke="${shadow}" stroke-opacity=".075" stroke-width="8" stroke-linecap="round"/>
  <path d="M106 171 Q125 163 146 173 M174 173 Q195 163 214 171" fill="none" stroke="${shadow}" stroke-width="3.5" stroke-linecap="round" opacity=".62"/>
