@@ -9,3 +9,6 @@ body > .creator-mini-preview{position:fixed!important;top:calc(env(safe-area-ins
 @media(max-width:600px){.player-3d-host{height:clamp(410px,112vw,540px)}}
 
 .creator-preview-switch button{min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:normal;line-height:1.2;font-size:.9rem;position:relative;z-index:2}.creator-preview-switch{touch-action:pan-y}.creator-preview-switch button:focus-visible{outline:3px solid #b9edff;outline-offset:2px}
+
+/* Portrait-fit pass: keep all hairstyle silhouettes inside the card at phone widths. */
+.player-portrait-host{height:clamp(310px,105vw,460px);padding:0;box-sizing:border-box}.player-portrait-host svg{width:100%;height:100%;max-width:none;object-fit:contain}.appearance-preview-3d{min-width:0;overflow:hidden}.creator-mini-preview .creator-mini-image svg{max-width:100%}@media(max-width:430px){.player-portrait-host{height:clamp(310px,108vw,440px)}.creator-mini-preview{gap:8px}.creator-mini-info{min-width:0;overflow:hidden}.creator-mini-info span{overflow-wrap:anywhere}}
