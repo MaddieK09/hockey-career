@@ -4,3 +4,6 @@
 .creator-mini-preview{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;transform:translateX(-50%);width:min(94vw,430px);z-index:20;display:flex;align-items:center;gap:12px;padding:7px 12px;background:#0b2236f2;border:1px solid #648eab;border-radius:14px;box-shadow:0 8px 30px #0008;pointer-events:none}.creator-mini-preview[hidden]{display:none!important}.creator-mini-image{width:68px;height:72px;flex:none;border-radius:8px;overflow:hidden}.creator-mini-image svg{display:block;width:100%;height:100%}.creator-mini-info{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:#d5e7f5}.creator-mini-info strong{font-size:.72rem;letter-spacing:.09em;color:#a9d9fb}@media(min-width:850px){.creator-mini-preview{left:auto;right:16px;transform:none;width:220px}}
 
 body > .creator-mini-preview{position:fixed!important;top:calc(env(safe-area-inset-top,0px) + 12px)!important;left:50%!important;right:auto!important;transform:translate3d(-50%,0,0)!important;z-index:2147483000!important;width:min(calc(100vw - 24px),390px)!important;box-sizing:border-box;isolation:isolate}body > .creator-mini-preview[hidden]{display:none!important}
+
+/* Give the equipment viewer more vertical room on narrow phones. */
+@media(max-width:600px){.player-3d-host{height:clamp(410px,112vw,540px)}}
