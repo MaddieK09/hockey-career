@@ -7,11 +7,10 @@ const eyes:Record<string,string>={Brown:'#63422c',Blue:'#5b9ed0',Green:'#568969'
 /** Deterministic, responsive vector portrait: no external image request or canvas required. */
 export function playerPortrait(p:PlayerAppearance,e:Equipment):string{
  const face=skin[p.skinTone]??skin.Fair,h=hair[p.hairColor]??hair.Brown,eye=eyes[p.eyeColor]??eyes.Blue,jersey=COLORS[e.jersey];
- const cheek=skin[p.skinTone]??skin.Fair;
  const shadow=p.skinTone==='Rich'||p.skinTone==='Deep'?'#2d1b1c':'#7b3f3b';
  const wide=p.faceShape==='Round'||p.faceShape==='Square',angular=p.faceShape==='Angular';
- const rx=wide?79:angular?64:72,chin=p.faceShape==='Heart'?59:wide?73:64;
- const outline=`M ${160-rx} 144 Q ${160-rx-7} 224 ${160-chin} 261 Q 160 310 ${160+chin} 261 Q ${160+rx+7} 224 ${160+rx} 144 Q ${160+rx} 78 160 75 Q ${160-rx} 78 ${160-rx} 144 Z`;
+ const rx=wide?77:angular?65:71,chin=p.faceShape==='Heart'?56:wide?69:61;
+ const outline=`M ${160-rx} 144 Q ${160-rx-7} 224 ${160-chin} 261 Q 160 293 ${160+chin} 261 Q ${160+rx+7} 224 ${160+rx} 144 Q ${160+rx} 78 160 75 Q ${160-rx} 78 ${160-rx} 144 Z`;
  const hairTop=p.hairStyle==='Bald'?'':`<path d="M78 165 Q69 83 111 64 Q150 38 197 62 Q248 66 243 166 L224 133 Q208 109 192 100 Q145 122 98 118 Z" fill="${h}"/>`;
  const longHair=['Long','Medium','Ponytail','Curly'].includes(p.hairStyle);
  const hairBack=longHair?`<path d="M91 124 Q60 205 67 ${p.hairStyle==='Long'?354:281} L101 ${p.hairStyle==='Long'?357:278} L112 152 M228 125 Q255 213 254 ${p.hairStyle==='Long'?354:281} L222 ${p.hairStyle==='Long'?357:278} L207 151" fill="${h}"/>`:'';
@@ -29,8 +28,8 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string{
  <path d="${outline}" fill="${face}"/><path d="${outline}" fill="url(#face-light)"/><path d="M99 216 Q113 225 132 218 M188 218 Q208 225 221 215" fill="none" stroke="${shadow}" opacity=".12" stroke-width="9" stroke-linecap="round"/><path d="M160 235 Q151 247 158 248" fill="none" stroke="#fff" opacity=".2" stroke-width="2"/>
  <path d="M109 174 Q128 162 147 174 M173 174 Q192 162 211 174" fill="none" stroke="#3e2929" stroke-width="5" stroke-linecap="round" opacity=".75"/>
  <path d="M110 190 Q130 176 149 189 Q131 202 110 190 Z" fill="#f4eae2"/><path d="M171 189 Q190 176 210 190 Q189 202 171 189 Z" fill="#f4eae2"/><path d="M110 190 Q130 176 149 189 M171 189 Q190 176 210 190" fill="none" stroke="${shadow}" opacity=".65" stroke-width="2"/>
- <circle cx="130" cy="189" r="8" fill="${eye}"/><circle cx="190" cy="189" r="8" fill="${eye}"/>
- <circle cx="130" cy="189" r="4" fill="#1a1d28"/><circle cx="190" cy="189" r="4" fill="#1a1d28"/>
+ <circle cx="130" cy="189" r="7" fill="${eye}"/><circle cx="190" cy="189" r="8" fill="${eye}"/>
+ <circle cx="130" cy="189" r="3.5" fill="#1a1d28"/><circle cx="190" cy="189" r="4" fill="#1a1d28"/>
  <circle cx="133" cy="186" r="2" fill="white"/><circle cx="193" cy="186" r="2" fill="white"/>
  <path d="M160 189 L152 229 Q160 235 168 229" fill="none" stroke="#865b4d" stroke-opacity=".55" stroke-width="3"/>
  <path d="M140 253 Q160 260 180 253 Q160 269 140 253" fill="${shadow}" opacity=".48"/><path d="M148 251 Q160 255 172 251" fill="none" stroke="#fff" opacity=".22" stroke-width="2"/><path d="M115 232 Q128 236 140 232 M181 232 Q193 236 205 231" fill="none" stroke="#fff" opacity=".09" stroke-width="3"/>
