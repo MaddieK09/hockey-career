@@ -7,16 +7,16 @@ import type {Position} from '../player/types';
 export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance):Part[]{
  const {height,width}=p?bodyDimensions(p):{height:1,width:1};
  const a:Part[]=[];
- const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
+ const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string,taper=0)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color,taper});
  const goalie=position==='G',jersey=COLORS[e.jersey],helmet=COLORS[e.helmet],gloves=COLORS[e.gloves],pads=COLORS[e.pads];
  const trim='#d5e0e9',dark='#182431',blade='#9eabb6',shadow='#10293e';
  const stripe='#f1f4f7';
  // Rounded jersey and chest protection; broader shoulders for goaltenders.
- add(0,.07,.01,goalie?.34:.31,.40,goalie?.245:.21,jersey);
+ add(0,.07,.01,goalie?.34:.31,.40,goalie?.245:.21,jersey,.14);
  add(0,.34,.015,goalie?.355:.325,.105,.21,jersey);
  // Subtle jersey yoke and side panels separate the uniform from the body.
  add(0,.385,.16,goalie?.30:.285,.045,.10,jersey);
- add(0,-.30,.025,.285,.24,.20,jersey);
+ add(0,-.30,.025,.285,.24,.20,jersey,.05);
  add(0,-.67,.025,.275,.18,.20,jersey);
  // Front-facing jersey bands, collar and hem make the uniform legible at phone size.
  add(0,.435,.192,.175,.023,.032,trim);
@@ -34,8 +34,8 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
   add(side*.42,-.68,.10,goalie?.135:.12,.14,.135,gloves);
   add(side*.17,-.99,.02,.15,.25,.17,jersey);
   if(goalie){
-   add(side*.17,-1.36,.15,.19,.34,.19,pads);
-   add(side*.17,-1.69,.15,.19,.28,.19,pads);
+   add(side*.17,-1.36,.15,.19,.34,.19,pads,.04);
+   add(side*.17,-1.69,.15,.19,.28,.19,pads,.04);
    add(side*.17,-1.53,.37,.17,.43,.04,pads);add(side*.17,-1.53,.432,.14,.38,.012,trim);
    for(let j=0;j<5;j++)add(side*.17,-1.26-j*.145,.425,.16,.008,.01,trim);
    // Knee break and vertical outside roll help identify the goalie pad shape.
