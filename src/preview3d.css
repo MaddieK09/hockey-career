@@ -7,3 +7,5 @@ body > .creator-mini-preview{position:fixed!important;top:calc(env(safe-area-ins
 
 /* Give the equipment viewer more vertical room on narrow phones. */
 @media(max-width:600px){.player-3d-host{height:clamp(410px,112vw,540px)}}
+
+.creator-preview-switch button{min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:normal;line-height:1.2;font-size:.9rem;position:relative;z-index:2}.creator-preview-switch{touch-action:pan-y}.creator-preview-switch button:focus-visible{outline:3px solid #b9edff;outline-offset:2px}

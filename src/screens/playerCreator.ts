@@ -29,9 +29,9 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  let preview:ReturnType<typeof mountImportedPlayer3D>|null=null;
  let mode:'appearance'|'equipment'='appearance';
  const mini=root.querySelector<HTMLElement>('[data-mini-preview]')!;
- document.body.appendChild(mini); // Escape transformed menu ancestors on iOS Safari.
- const miniImage=root.querySelector<HTMLElement>('[data-mini-portrait]')!;
- const miniLabel=root.querySelector<HTMLElement>('[data-mini-label]')!;
+ const miniImage=mini.querySelector<HTMLElement>('[data-mini-portrait]')!;
+ const miniLabel=mini.querySelector<HTMLElement>('[data-mini-label]')!;
+ document.body.appendChild(mini); // Portal after obtaining children; otherwise queries against root fail.
  const paintPortrait=(draft:PlayerDraft)=>{const svg=playerPortrait(draft.appearance,draft.equipment);hostPortrait.innerHTML=svg;miniImage.innerHTML=svg.replaceAll('face-light','mini-face-light').replaceAll('portrait-bg','mini-portrait-bg').replaceAll('portrait-jersey','mini-portrait-jersey');miniLabel.textContent=`${draft.appearance.hairColor} hair · ${draft.appearance.eyeColor} eyes`;};
  const visibilityObserver=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
   const above=entries[0]?.boundingClientRect.bottom!==undefined&&entries[0].boundingClientRect.bottom<0;
@@ -51,7 +51,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
   if(equipmentMode&&!preview){const draft=read();preview=mountImportedPlayer3D(host3d,draft.appearance,draft.equipment,draft.position);}
   if(!equipmentMode&&preview){preview.dispose();preview=null;}
  };
- root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.addEventListener('click',()=>switchMode(button.dataset.mode as 'appearance'|'equipment')));
+ root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();switchMode(button.dataset.mode as 'appearance'|'equipment');}));
  const form=root.querySelector<HTMLFormElement>('#player-form')!;
  const review=root.querySelector<HTMLElement>('[data-review]')!;
  const errors=root.querySelector<HTMLElement>('[data-errors]')!;
