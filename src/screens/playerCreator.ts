@@ -38,7 +38,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
   root.querySelector<HTMLElement>('.preview-note')!.textContent=equipmentMode?'Drag to rotate · pinch to zoom · equipment prototype':'Your portrait updates as you edit your appearance';
   root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===next)));
   root.querySelector<HTMLFieldSetElement>('.appearance-fields')!.hidden=equipmentMode;
-  root.querySelector<HTMLFieldSetElement>('.equipment-fields')!.hidden=!equipmentMode;
+  root.querySelector<HTMLFieldSetElement>('[data-equipment-section]')!.hidden=!equipmentMode;
   if(equipmentMode&&!preview){const draft=read();preview=mountImportedPlayer3D(host3d,draft.appearance,draft.equipment,draft.position);}
   if(!equipmentMode&&preview){preview.dispose();preview=null;}
  };
