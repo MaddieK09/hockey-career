@@ -34,6 +34,8 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
   add(hip,-1.89,.12,.135,.10,.22,'#111d2e');
  }
  add(0,.54,0,.125,.16,.125,s);
+ // A tapered jaw and forehead break up the featureless oval silhouette.
+ add(0,.765,.08,.155*face,.11,.16,s);
  // Neck, jaw, ears and facial features use the same proportion system.
  add(0,.92,.035,.225*face,p.faceShape==='Round'?.285:.31,.23,s);
  add(0,.76,.115,.16*face,.115,.16,s);
@@ -43,11 +45,14 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
   add(side*.097,.97,.267,.021,.018,.009,e);
   add(side*.097,.97,.275,.009,.009,.006,'#24232a');
   add(side*.105,1.045,.246,.06,.013,.012,h);
+  add(side*.105,.91,.265,.058,.012,.009,s);
  }
  add(0,.885,.267,.028,.052,.032,s);
+ add(0,.865,.297,.022,.012,.011,s);
  // Small cheek and jaw planes soften the flat face without increasing eye size.
  for(const side of [-1,1]){add(side*.145,.84,.125,.085,.095,.115,s);}
  add(0,.785,.239,.072,.012,.013,'#925b58');
+ add(0,.74,.182,.085,.02,.045,s);
  if(p.hairStyle!=='Bald'&&!helmetOn){
   const buzz=p.hairStyle==='Buzz cut';
   add(0,1.205,-.025,.249*face,buzz?.046:.10,.238,h);
