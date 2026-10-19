@@ -32,7 +32,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  const miniImage=mini.querySelector<HTMLElement>('[data-mini-portrait]')!;
  const miniLabel=mini.querySelector<HTMLElement>('[data-mini-label]')!;
  document.body.appendChild(mini); // Portal after obtaining children; otherwise queries against root fail.
- const paintPortrait=(draft:PlayerDraft)=>{const svg=playerPortrait(draft.appearance,draft.equipment);hostPortrait.innerHTML=svg;miniImage.innerHTML=svg.replaceAll('face-light','mini-face-light').replaceAll('portrait-bg','mini-portrait-bg').replaceAll('portrait-jersey','mini-portrait-jersey');miniLabel.textContent=`${draft.appearance.hairColor} hair · ${draft.appearance.eyeColor} eyes`;};
+ const paintPortrait=(draft:PlayerDraft)=>{const svg=playerPortrait(draft.appearance,draft.equipment);hostPortrait.innerHTML=svg;miniImage.innerHTML=svg.replaceAll('face-light','mini-face-light').replaceAll('portrait-bg','mini-portrait-bg').replaceAll('portrait-jersey','mini-portrait-jersey').replaceAll('hair-shade','mini-hair-shade');miniLabel.textContent=`${draft.appearance.hairColor} hair · ${draft.appearance.eyeColor} eyes`;};
  const visibilityObserver=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
   const above=entries[0]?.boundingClientRect.bottom!==undefined&&entries[0].boundingClientRect.bottom<0;
   mini.hidden=!(mode==='appearance'&&above);
@@ -40,7 +40,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  visibilityObserver?.observe(hostPortrait);
  paintPortrait(p);
  const switchMode=(next:'appearance'|'equipment')=>{
-  mode=next;
+  mode=next;\n  mini.hidden=true;
   const equipmentMode=next==='equipment';
   hostPortrait.hidden=equipmentMode;host3d.hidden=!equipmentMode;
   root.querySelector<HTMLElement>('[data-preview-title]')!.textContent=equipmentMode?'3D equipment preview':'2D player portrait';
@@ -49,7 +49,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
   root.querySelector<HTMLFieldSetElement>('.appearance-fields')!.hidden=equipmentMode;
   root.querySelector<HTMLFieldSetElement>('[data-equipment-section]')!.hidden=!equipmentMode;
   if(equipmentMode&&!preview){const draft=read();preview=mountImportedPlayer3D(host3d,draft.appearance,draft.equipment,draft.position);}
-  if(!equipmentMode&&preview){preview.dispose();preview=null;}
+  if(!equipmentMode&&preview){preview.dispose();preview=null;}\n  syncMini();
  };
  root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();switchMode(button.dataset.mode as 'appearance'|'equipment');}));
  const form=root.querySelector<HTMLFormElement>('#player-form')!;
@@ -58,7 +58,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  const read=():PlayerDraft=>{const f=new FormData(form);return {firstName:String(f.get('firstName')??'').trim(),lastName:String(f.get('lastName')??'').trim(),birthdate:String(f.get('birthdate')??''),nationality:String(f.get('nationality')??'').trim(),position:String(f.get('position')??'') as PlayerDraft['position'],hand:String(f.get('hand')??'') as PlayerDraft['hand'],jerseyNumber:Number(f.get('jerseyNumber')??NaN),appearance:{heightCm:Number(f.get('heightCm')??NaN),weightKg:Number(f.get('weightKg')??NaN),hairStyle:String(f.get('hairStyle')) as PlayerDraft['appearance']['hairStyle'],hairColor:String(f.get('hairColor')) as PlayerDraft['appearance']['hairColor'],skinTone:String(f.get('skinTone')) as PlayerDraft['appearance']['skinTone'],faceShape:String(f.get('faceShape')) as PlayerDraft['appearance']['faceShape'],eyeColor:String(f.get('eyeColor')) as PlayerDraft['appearance']['eyeColor']},equipment:{jersey:String(f.get('gearJersey')) as PlayerDraft['equipment']['jersey'],helmet:String(f.get('gearHelmet')) as PlayerDraft['equipment']['helmet'],gloves:String(f.get('gearGloves')) as PlayerDraft['equipment']['gloves'],pads:String(f.get('gearPads')) as PlayerDraft['equipment']['pads'],stick:String(f.get('gearStick')) as PlayerDraft['equipment']['stick']}};};
  const update=()=>{const current=read();savePlayerDraft(current);review.hidden=true;errors.textContent='';root.querySelector<HTMLElement>('[data-hand-label]')!.textContent=current.position==='G'?'Catching hand':'Shooting hand';root.querySelector<HTMLElement>('[data-goalie-gear]')!.hidden=current.position!=='G';paintPortrait(current);preview?.update(current.appearance,current.equipment,current.position);renderAppearanceDetails(root,current.appearance);};
  form.addEventListener('input',update);form.addEventListener('change',update);
- root.querySelector<HTMLButtonElement>('[data-back]')!.addEventListener('click',()=>{visibilityObserver?.disconnect();mini.remove();preview?.dispose();onBack();});
+ root.querySelector<HTMLButtonElement>('[data-back]')!.addEventListener('click',()=>{window.removeEventListener('scroll',syncMini);window.removeEventListener('resize',syncMini);mini.remove();preview?.dispose();onBack();});
  renderAppearanceDetails(root,p.appearance);
  switchMode('appearance');
  form.addEventListener('submit',event=>{event.preventDefault();const player=read();const invalid=validatePlayer(player);if(Object.keys(invalid).length){errors.textContent=Object.values(invalid).join(' ');review.hidden=true;return;}savePlayerDraft(player);errors.textContent='';review.hidden=false;review.innerHTML=`<h2>Player preview</h2><p><strong>${esc(player.firstName)} ${esc(player.lastName)}</strong> · #${player.jerseyNumber}</p><p>${LABELS[player.position]} · ${esc(player.nationality)}</p><p>Born ${esc(player.birthdate)} · ${player.hand}-handed ${player.position==='G'?'catch':'shot'}</p><p>${player.appearance.heightCm} cm · ${player.appearance.weightKg} kg · ${esc(player.appearance.faceShape)} face · ${esc(player.appearance.eyeColor)} eyes</p><p>${esc(player.appearance.hairStyle)} ${esc(player.appearance.hairColor.toLowerCase())} hair · ${esc(player.appearance.skinTone)} skin tone</p><p class="review-note">Your draft is saved locally. Full career saves and progression are coming later.</p><button type="button" class="secondary-action" data-edit>Edit details</button>`;review.querySelector<HTMLButtonElement>('[data-edit]')!.addEventListener('click',()=>{review.hidden=true;form.querySelector<HTMLInputElement>('input')?.focus();});review.scrollIntoView({behavior:'smooth',block:'nearest'});});
