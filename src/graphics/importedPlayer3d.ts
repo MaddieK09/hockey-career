@@ -28,13 +28,15 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
  let canvas:HTMLCanvasElement|null=null;
  let loadGeneration=0;
  let animationFrame=0;
- const assetUrl=`${import.meta.env.BASE_URL}models/player.glb`;
+ // Never load the generic CesiumMan test asset in the player creator.
+ const assetUrl=`${import.meta.env.BASE_URL}models/hockey-player.glb`;
  const showFallback=()=>{
   if(disposed)return;
   observer?.disconnect();observer=null;
   cancelAnimationFrame(animationFrame);animationFrame=0;
   renderer?.dispose();renderer?.domElement.remove();renderer=null;
   if(fallback)return;
+  model=null;
   fallback=mountPlayer3D(host,p,e,position);
  };
  // Only attempt the imported model when it has actually been installed.
@@ -70,8 +72,7 @@ export function mountImportedPlayer3D(host:HTMLElement,p:PlayerAppearance,e:Equi
   observer=new ResizeObserver(()=>{resize();render();});observer.observe(host);resize();
   const generation=++loadGeneration;
   new GLTFLoader().load(assetUrl,gltf=>{
-   if(generation!==loadGeneration)return;
-   if(disposed)return;
+   if(generation!==loadGeneration||disposed||fallback)return;
    model=gltf.scene;
    // Reset the rig to its bind/rest pose: a static creator must not show a walking frame.
    model.traverse(obj=>{if(obj instanceof THREE.SkinnedMesh)obj.skeleton.pose();});
