@@ -1,4 +1,5 @@
 import type {PlayerAppearance} from '../player/appearance';
+import {portraitHair} from './portraitHair';
 import type {Equipment} from '../player/equipment';
 import {COLORS} from '../player/equipment';
 
@@ -17,12 +18,7 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
  const jaw=round?57:square?64:heart?48:angular?51:55;
  const chinY=round?278:283;
  const face=`M160 91 C119 89 ${160-cheek+5} 113 ${160-cheek} 163 C${160-cheek-1} 218 ${160-jaw-3} 254 160 ${chinY} C${160+jaw+3} 254 ${160+cheek+1} 218 ${160+cheek} 163 C${160+cheek-5} 113 201 89 160 91Z`;
- const style=p.hairStyle;
- const longBack=style==='Mullet'?`<path d="M105 132 Q90 173 96 218 Q90 244 96 276 L103 268 L107 287 L114 274 L119 279 Q118 247 124 218 L126 132Z M215 132 Q230 173 224 218 Q230 244 224 276 L217 268 L213 287 L206 274 L201 279 Q202 247 196 218 L194 132Z" fill="url(#${id}-hair)"/>`:style==='Ponytail'?`<path d="M208 112 Q232 125 231 154 Q246 180 237 207 Q242 226 226 245 Q216 251 221 234 Q227 202 221 178 L203 127Z" fill="url(#${id}-hair)"/><path d="M229 165 Q239 198 227 229" stroke="${hair}" stroke-width="3" opacity=".6" fill="none"/>`:style==='Medium'?`<path d="M99 125 Q88 150 95 186 L106 205 L117 145Z M221 125 Q232 150 225 186 L214 205 L203 145Z" fill="url(#${id}-hair)"/>`:'';
- const cap=style==='Bald'?'':style==='Buzz cut'?`<path d="M93 132 Q91 84 129 76 Q163 64 197 77 Q229 90 227 132 Q191 115 159 119 Q125 115 93 132Z" fill="${hair}" opacity=".47"/>`:style==='Curly'?`<path d="M89 144 Q78 99 112 76 Q151 49 198 72 Q237 91 231 145 L217 128 Q178 110 142 124 Q117 122 101 139Z" fill="url(#${id}-hair)"/>`:style==='Ponytail'?`<path d="M89 147 Q80 111 102 83 Q123 60 162 62 Q206 61 227 91 L227 143 Q207 120 181 119 Q143 123 101 140Z" fill="url(#${id}-hair)"/><path d="M106 116 Q164 93 217 120" fill="none" stroke="${hair}" stroke-width="6" opacity=".8"/>`:style==='Mullet'?`<path d="M90 145 Q82 108 103 84 Q130 58 169 63 Q211 59 228 94 Q233 114 225 144 L217 124 Q185 110 155 122 Q125 126 101 140Z" fill="url(#${id}-hair)"/><path d="M101 127 Q126 107 151 111 Q181 104 205 116 Q173 125 147 134 L105 141Z" fill="${hair}" opacity=".85"/>`:style==='Medium'?`<path d="M89 147 Q78 112 99 83 Q127 54 166 60 Q216 58 231 97 L225 146 Q210 123 184 115 Q147 131 102 144Z" fill="url(#${id}-hair)"/><path d="M101 130 Q144 104 178 109 Q202 104 217 116 Q182 121 160 138 Q128 135 104 146Z" fill="${hair}" opacity=".83"/>`:`<path d="M91 144 Q81 113 103 85 Q131 58 165 65 Q208 60 227 95 L226 140 Q201 114 176 115 Q143 119 104 137Z" fill="url(#${id}-hair)"/><path d="M103 129 Q140 107 170 111 Q191 104 208 117 Q177 122 153 131 L107 141Z" fill="${hair}" opacity=".78"/>`;
- const curls=style==='Curly'?Array.from({length:30},(_,i)=>{const row=Math.floor(i/10),col=i%10,x=93+col*14+(row%2)*5,y=80+row*15+Math.sin(col*1.7+row)*5;return `<path d="M${x-7} ${y+7} Q${x-13} ${y-3} ${x-1} ${y-9} Q${x+11} ${y-13} ${x+10} ${y+2} Q${x+7} ${y+9} ${x-3} ${y+8}" fill="${i%4===0?'url(#'+id+'-hair)':hair}" opacity=".94"/>`;}).join(''):'';
- const fibers=style==='Bald'||style==='Buzz cut'||style==='Curly'?'':Array.from({length:23},(_,i)=>{const x=101+i*5.2,y=86+Math.sin(i*.74)*9;return `<path d="M${x.toFixed(1)} ${y.toFixed(1)} q-8 12 -8 25" stroke="${i%3===0?'#fff':'#1a1516'}" stroke-opacity="${i%3===0?.11:.13}" stroke-width="${i%4===0?1.8:1}" fill="none"/>`;}).join('');
- const stubble=style==='Buzz cut'?Array.from({length:64},(_,i)=>{const x=106+(i%16)*7,y=92+Math.floor(i/16)*8;return `<path d="M${x} ${y}l1 -2" stroke="${hair}" stroke-width=".8" opacity=".45"/>`;}).join(''):'';
+ const {back:longBack,front:cap}=portraitHair(p.hairStyle,hair,`${id}-hair`);
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 390" role="img" aria-label="Studio hockey portrait, ${p.hairStyle.toLowerCase()} ${p.hairColor.toLowerCase()} hair, ${p.eyeColor.toLowerCase()} eyes">
  <defs>
  <radialGradient id="${id}-bg" cx="46%" cy="30%" r="86%"><stop stop-color="#385468"/><stop offset=".55" stop-color="#182d41"/><stop offset="1" stop-color="#081522"/></radialGradient>
@@ -54,6 +50,6 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
  <path d="M160 194 Q159 211 154 226 Q160 231 168 226" stroke="#6c433a" stroke-opacity=".43" stroke-width="2.2" stroke-linecap="round" fill="none"/>
  <path d="M145 252 Q160 248 175 252 Q160 257 145 252Z" fill="#8a5c55" opacity=".64"/><path d="M149 253 Q160 255 171 253" stroke="#fff" stroke-opacity=".15" stroke-width="1.3" fill="none"/>
  <path d="M138 267 Q160 276 182 267" stroke="#fff" stroke-opacity=".10" stroke-width="1.5" fill="none"/>
- ${cap}${fibers}${stubble}${curls}
+ ${cap}
  </svg>`;
 }
