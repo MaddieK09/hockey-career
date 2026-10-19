@@ -52,14 +52,14 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
   const buzz=p.hairStyle==='Buzz cut';
   add(0,1.205,-.025,.249*face,buzz?.046:.10,.238,h);
   if(!buzz){add(-.115,1.15,.13,.12,.07,.10,h);add(.115,1.15,.13,.12,.07,.10,h);}
-  if(['Medium','Mullet','Ponytail','Curly'].includes(p.hairStyle)){
+  if(['Flow','Mullet','Curly'].includes(p.hairStyle)){
    const length=p.hairStyle==='Mullet'?.15:.19;
    add(-.22,1.01,-.085,.075,length,.12,h);
    add(.22,1.01,-.085,.075,length,.12,h);
   }
   if(p.hairStyle==='Mullet'){add(0,.96,-.29,.19,.29,.09,h);add(-.12,.91,-.29,.085,.25,.08,h);add(.12,.91,-.29,.085,.25,.08,h);}
   if(p.hairStyle==='Curly')for(let i=0;i<15;i++){const t=i*Math.PI*2/15;add(Math.cos(t)*.175,1.26+Math.sin(t)*.035,Math.sin(t)*.16,.065,.056,.063,h);}
-  if(p.hairStyle==='Ponytail')add(0,.97,-.28,.085,.26,.09,h);
+  if(p.hairStyle==='Flow')add(0,.97,-.28,.085,.26,.09,h);
  }
  return a;
 }
