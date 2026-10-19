@@ -7,7 +7,7 @@ import type {Position} from '../player/types';
 export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance):Part[]{
  const {height,width}=p?bodyDimensions(p):{height:1,width:1};
  const a:Part[]=[];
- const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
+ const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string,shape:'round'|'box'='round')=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color,shape});
  const goalie=position==='G',jersey=COLORS[e.jersey],helmet=COLORS[e.helmet],gloves=COLORS[e.gloves],pads=COLORS[e.pads];
  const trim='#d5e0e9',dark='#182431',blade='#9eabb6',shadow='#10293e';
  // Rounded jersey and chest protection; broader shoulders for goaltenders.
@@ -62,8 +62,8 @@ export function equipmentParts(e:Equipment,position:Position,p?:PlayerAppearance
  }
  const stick=e.stick==='White'?'#e5e9ed':e.stick==='Natural'?'#b99164':'#252b33';
  // Hockey stick shaft extends from the lower glove to the ice; blade sweeps inward.
- add(.51,-1.15,.23,.022,.66,.022,stick);
- add(.51,-1.72,.23,.022,.48,.022,stick);
- add(.34,-2.02,.23,.21,.027,.055,stick);
+ add(.51,-1.15,.23,.022,.66,.022,stick,'box');
+ add(.51,-1.72,.23,.022,.48,.022,stick,'box');
+ add(.34,-2.02,.23,.21,.027,.055,stick,'box');
  return a;
 }
