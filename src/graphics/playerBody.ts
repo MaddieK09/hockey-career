@@ -16,27 +16,27 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
  const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
 
  // Fewer, deliberately overlapping volumes: no disconnected bead-like joints.
- add(0,-.49,0,.30,.43,.225,'#214967');
- add(0,.02,0,.345,.43,.245,'#27648d');
+ add(0,-.49,0,.265,.36,.20,'#214967');
+ add(0,.02,0,.29,.37,.205,'#27648d');
  // Layer the clavicles and waist to create a more natural taper.
- add(0,.39,.015,.285,.135,.225,'#27648d');
- add(0,-.53,.025,.245,.24,.205,'#214967');
- add(0,.31,0,.355,.24,.24,'#27648d');
- add(0,-.79,0,.295,.23,.215,'#193a57');
+ add(0,.39,.015,.265,.115,.20,'#27648d');
+ add(0,-.53,.025,.235,.20,.18,'#214967');
+ add(0,.31,0,.31,.19,.20,'#27648d');
+ add(0,-.79,0,.27,.20,.18,'#193a57');
  for(const side of [-1,1]){
   const hip=side*.165;
-  add(side*.352,.245,0,.175,.205,.18,'#27648d');
-  add(side*.388,-.07,0,.146,.39,.155,'#27648d');
-  add(side*.398,-.48,.018,.123,.28,.13,'#245777');
+  add(side*.352,.245,0,.145,.18,.15,'#27648d');
+  add(side*.388,-.07,0,.12,.34,.13,'#27648d');
+  add(side*.398,-.48,.018,.105,.24,.12,'#245777');
   add(side*.408,-.70,.035,.105,.115,.115,s);
-  add(hip,-1.09,0,.177,.41,.19,'#1c344f');
-  add(hip,-1.52,.025,.137,.42,.155,'#1b3048');
-  add(hip,-1.89,.12,.155,.125,.24,'#111d2e');
+  add(hip,-1.09,0,.15,.38,.16,'#1c344f');
+  add(hip,-1.52,.025,.12,.38,.13,'#1b3048');
+  add(hip,-1.89,.12,.135,.10,.22,'#111d2e');
  }
  add(0,.54,0,.125,.16,.125,s);
  // Neck, jaw, ears and facial features use the same proportion system.
- add(0,.92,.035,.24*face,p.faceShape==='Round'?.31:.335,.23,s);
- add(0,.76,.115,.175*face,.115,.16,s);
+ add(0,.92,.035,.225*face,p.faceShape==='Round'?.285:.31,.23,s);
+ add(0,.76,.115,.16*face,.115,.16,s);
  for(const side of [-1,1]){
   add(side*.236*face,.94,.015,.037,.075,.05,s);
   add(side*.097,.97,.252,.042,.022,.012,'#e9e6e0');
