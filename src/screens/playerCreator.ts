@@ -33,14 +33,17 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  const miniLabel=mini.querySelector<HTMLElement>('[data-mini-label]')!;
  document.body.appendChild(mini); // Portal after obtaining children; otherwise queries against root fail.
  const paintPortrait=(draft:PlayerDraft)=>{const svg=playerPortrait(draft.appearance,draft.equipment);hostPortrait.innerHTML=svg;miniImage.innerHTML=svg.replaceAll('face-light','mini-face-light').replaceAll('portrait-bg','mini-portrait-bg').replaceAll('portrait-jersey','mini-portrait-jersey').replaceAll('hair-shade','mini-hair-shade');miniLabel.textContent=`${draft.appearance.hairColor} hair · ${draft.appearance.eyeColor} eyes`;};
- const visibilityObserver=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
-  const above=entries[0]?.boundingClientRect.bottom!==undefined&&entries[0].boundingClientRect.bottom<0;
-  mini.hidden=!(mode==='appearance'&&above);
- },{threshold:0});
- visibilityObserver?.observe(hostPortrait);
+ const appearanceSection=root.querySelector<HTMLElement>('.appearance-fields')!;
+ const syncMini=()=>{
+  const portrait=hostPortrait.getBoundingClientRect(),fields=appearanceSection.getBoundingClientRect();
+  mini.hidden=!(mode==='appearance'&&portrait.bottom<0&&fields.top<window.innerHeight*.75&&fields.bottom>110);
+ };
+ window.addEventListener('scroll',syncMini,{passive:true});
+ window.addEventListener('resize',syncMini,{passive:true});
  paintPortrait(p);
  const switchMode=(next:'appearance'|'equipment')=>{
-  mode=next;\n  mini.hidden=true;
+  mode=next;
+  mini.hidden=true;
   const equipmentMode=next==='equipment';
   hostPortrait.hidden=equipmentMode;host3d.hidden=!equipmentMode;
   root.querySelector<HTMLElement>('[data-preview-title]')!.textContent=equipmentMode?'3D equipment preview':'2D player portrait';
@@ -49,7 +52,8 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
   root.querySelector<HTMLFieldSetElement>('.appearance-fields')!.hidden=equipmentMode;
   root.querySelector<HTMLFieldSetElement>('[data-equipment-section]')!.hidden=!equipmentMode;
   if(equipmentMode&&!preview){const draft=read();preview=mountImportedPlayer3D(host3d,draft.appearance,draft.equipment,draft.position);}
-  if(!equipmentMode&&preview){preview.dispose();preview=null;}\n  syncMini();
+  if(!equipmentMode&&preview){preview.dispose();preview=null;}
+  syncMini();
  };
  root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();switchMode(button.dataset.mode as 'appearance'|'equipment');}));
  const form=root.querySelector<HTMLFormElement>('#player-form')!;
