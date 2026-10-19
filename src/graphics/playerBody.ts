@@ -1,5 +1,5 @@
 import type {PlayerAppearance} from '../player/appearance';
-export type Part={center:[number,number,number];scale:[number,number,number];color:string};
+export type Part={center:[number,number,number];scale:[number,number,number];color:string;taper?:number};
 const skin:Record<string,string>={Porcelain:'#f8dfd1',Fair:'#edc5a9',Light:'#dba88a',Medium:'#bd8464',Tan:'#a76a4b',Deep:'#774632',Rich:'#4c2e27'};
 const hair:Record<string,string>={Black:'#24212a','Dark brown':'#39251f',Brown:'#77503a',Blonde:'#d6ad61',Platinum:'#ece3c6',Red:'#a63e29',Auburn:'#86422b',Blue:'#427fd2',Pink:'#d878a4'};
 const eyes:Record<string,string>={Brown:'#63422c',Blue:'#5b9ed0',Green:'#568969',Hazel:'#96804a',Grey:'#8394a0',Amber:'#c58c42'};
@@ -13,24 +13,24 @@ export function buildPlayerBody(p:PlayerAppearance,helmetOn=false):Part[]{
  const {height,width}=bodyDimensions(p),s=skin[p.skinTone]??skin.Fair,h=hair[p.hairColor]??hair.Brown,e=eyes[p.eyeColor]??eyes.Blue;
  const face=p.faceShape==='Round'?1.10:p.faceShape==='Angular'?.94:p.faceShape==='Square'?1.07:1;
  const a:Part[]=[];
- const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color});
+ const add=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string,taper=0)=>a.push({center:[x*width,y*height,z*width],scale:[sx*width,sy*height,sz*width],color,taper});
 
  // Fewer, deliberately overlapping volumes: no disconnected bead-like joints.
- add(0,-.49,0,.265,.36,.20,'#214967');
- add(0,.02,0,.29,.37,.205,'#27648d');
+ add(0,-.49,0,.265,.36,.20,'#214967',-.08);
+ add(0,.02,0,.29,.37,.205,'#27648d',.18);
  // Layer the clavicles and waist to create a more natural taper.
  add(0,.39,.015,.265,.115,.20,'#27648d');
  add(0,-.53,.025,.235,.20,.18,'#214967');
- add(0,.31,0,.31,.19,.20,'#27648d');
+ add(0,.31,0,.31,.19,.20,'#27648d',.12);
  add(0,-.79,0,.27,.20,.18,'#193a57');
  for(const side of [-1,1]){
   const hip=side*.165;
   add(side*.352,.245,0,.145,.18,.15,'#27648d');
-  add(side*.388,-.07,0,.12,.34,.13,'#27648d');
+  add(side*.388,-.07,0,.12,.34,.13,'#27648d',.10);
   add(side*.398,-.48,.018,.105,.24,.12,'#245777');
   add(side*.408,-.70,.035,.105,.115,.115,s);
-  add(hip,-1.09,0,.15,.38,.16,'#1c344f');
-  add(hip,-1.52,.025,.12,.38,.13,'#1b3048');
+  add(hip,-1.09,0,.15,.38,.16,'#1c344f',.11);
+  add(hip,-1.52,.025,.12,.38,.13,'#1b3048',.12);
   add(hip,-1.89,.12,.135,.10,.22,'#111d2e');
  }
  add(0,.54,0,.125,.16,.125,s);
