@@ -69,15 +69,28 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   return mesh(new THREE.TubeGeometry(curve,1,radius,6,false),color,.45,.39);
  };
 
+ // Raised seams and small segmented panels break the mannequin-like flat surfaces.
+ const seam=(a:THREE.Vector3,b:THREE.Vector3)=>line(a,b,'#a6bdce',.0045);
  // Anatomically tapered uniform: broad shoulders, cinched waist, structured hem.
  mesh(taperedLoft([
   {y:-.62,rx:.252,rz:.185,z:.01},{y:-.56,rx:.280,rz:.203,z:.01},
   {y:-.31,rx:.290,rz:.215},{y:.05,rx:goalie?.335:.310,rz:goalie?.252:.217},
   {y:.32,rx:goalie?.363:.338,rz:.221},{y:.47,rx:.224,rz:.151}
  ]),uniform);
+ // Shoulder yoke, collar and jersey side seams sit on the actual tapered body.
+ for(const s of [-1,1]){
+  seam(v(s*.222,.425,.145),v(s*.338,.29,.155));
+  seam(v(s*.294,.27,.137),v(s*.290,-.43,.145));
+ }
  mesh(taperedLoft([{y:-.87,rx:.241,rz:.177},{y:-.76,rx:.278,rz:.199},{y:-.56,rx:.277,rz:.195}]),navy);
  box(0,-.55,.202,.49,.035,.016,stripe,.008);
  box(0,-.30,.215,.56,.018,.013,white,.005);
+ // Loose bottom hem extends past the shoulder-pad taper.
+ box(0,-.606,.177,.495,.025,.024,uniform,.009);
+ for(const s of [-1,1]){
+  box(s*.254,-.49,.08,.022,.23,.075,navy,.01);
+  box(s*.17,.34,.166,.11,.022,.017,stripe,.006);
+ }
  box(0,.405,.144,.24,.045,.09,navy,.019);
  box(0,.402,.220,.18,.017,.015,stripe,.007);
  // Team-neutral crest: tiny ice-rink emblem rather than an unlicensed NHL logo.
@@ -89,55 +102,64 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  for(const side of [-1,1]){
   const s=side,shoulder=v(s*.335,.315,.014),elbow=v(s*.402,-.115,.02);
   const wrist=v(s*(goalie?.49:.432),goalie?-.47:-.49,.09);
-  oval(s*.345,.299,.009,goalie?.185:.155,.152,.17,uniform);
+  oval(s*.345,.299,.009,goalie?.168:.145,.133,.15,uniform);
   limb(shoulder,elbow,goalie?.16:.139,goalie?.138:.114,uniform);
   limb(elbow,wrist,.119,.091,uniform);
-  oval(s*.400,-.098,.02,.124,.114,.13,uniform);
+  oval(s*.400,-.098,.02,.110,.090,.115,uniform);
   box(s*.415,-.218,.151,.22,.028,.02,stripe,.008);
   box(s*.415,-.260,.145,.205,.014,.02,navy,.006);
   // Hip, articulated thigh, knee and a continuous sock/skate profile.
   const hip=v(s*.17,-.75,0),knee=v(s*.188,-1.36,.049),ankle=v(s*.19,-1.88,.09);
-  oval(s*.17,-.781,0,.157,.15,.178,navy);
+  oval(s*.17,-.781,0,.143,.13,.156,navy);
   limb(hip,knee,.158,.123,navy);
-  oval(s*.188,-1.35,.04,.134,.126,.152,navy);
+  oval(s*.188,-1.35,.04,.122,.105,.136,navy);
   limb(knee,ankle,.129,.10,goalie?navy:uniform);
   if(!goalie){
    box(s*.188,-1.53,.175,.245,.15,.045,white,.025);
    box(s*.188,-1.66,.173,.235,.048,.047,stripe,.018);
   }
   // Skate shells, laces, blades and exposed steel rails.
-  const boot=box(s*.196,-1.955,.17,.250,.174,.435,navy,.065);
+  const boot=box(s*.196,-1.955,.17,.225,.155,.405,navy,.045);
   boot.rotation.x=-.09;
-  box(s*.196,-1.912,.355,.190,.095,.045,ink,.026);
-  for(let j=0;j<4;j++)box(s*.196,-1.875-j*.026,.383,.12,.008,.008,stripe,.003);
-  box(s*.196,-2.068,.175,.185,.025,.400,steel,.009,.68);
+  box(s*.196,-1.912,.355,.172,.083,.041,ink,.022);
+  for(let j=0;j<4;j++)box(s*.196,-1.875-j*.026,.383,.105,.008,.008,stripe,.003);
+  // Boot heel cup and tendon guard connect the boot to the sock.
+  box(s*.196,-1.850,-.010,.170,.15,.082,ink,.024);
+  box(s*.196,-2.068,.175,.172,.019,.402,steel,.008,.78);
   for(const z of [.02,.30])box(s*.196,-2.037,z,.125,.045,.034,ink,.007);
  }
 
  // Neck/head: subtle nose, eye sockets and cheeks, no googly-eyes.
  oval(0,.548,0,.107,.173,.106,skin);
  const face=p.faceShape==='Round'?1.065:p.faceShape==='Square'?1.055:p.faceShape==='Angular'?.95:1;
- oval(0,.908,.007,.213*face,.279,.206,skin);
- oval(0,.747,.095,.146*face,.095,.115,skin);
+ oval(0,.908,.007,.197*face,.257,.194,skin);
+ oval(0,.747,.095,.139*face,.092,.107,skin);
  for(const s of [-1,1]){
-  oval(s*.211*face,.901,.01,.034,.065,.055,skin);
-  oval(s*.093,.952,.191,.054,.027,.021,'#dbd1c7');
-  oval(s*.093,.952,.207,.025,.023,.011,eyes);
-  oval(s*.093,.953,.217,.011,.014,.006,ink);
-  oval(s*.097,1.004,.191,.060,.010,.011,'#69594f');
+  oval(s*.197*face,.901,.01,.031,.061,.048,skin);
+  oval(s*.087,.952,.182,.039,.017,.013,'#dbd1c7');
+  oval(s*.087,.952,.195,.018,.015,.008,eyes);
+  oval(s*.087,.953,.202,.008,.010,.005,ink);
+  oval(s*.091,1.004,.181,.048,.008,.008,'#69594f');
  }
- oval(0,.846,.208,.029,.053,.040,skin);
- oval(0,.811,.228,.041,.017,.023,skin);
- box(0,.762,.189,.095,.012,.014,'#99665d',.006);
+ oval(0,.846,.198,.025,.049,.036,skin);
+ oval(0,.811,.215,.034,.015,.019,skin);
+ box(0,.762,.180,.078,.010,.012,'#99665d',.005);
 
  // Hard-shell helmet with a real face opening, side guards, chin strap.
  const crown=mesh(new THREE.SphereGeometry(1,32,18,0,Math.PI*2,0,1.37),helmet,0,.43);
- crown.position.set(0,.922,-.008);crown.scale.set(.246,.300,.237);
+ crown.position.set(0,.922,-.008);crown.scale.set(.232,.277,.224);
  for(const s of [-1,1]){
-  const guard=box(s*.217,.936,-.013,.065,.185,.174,helmet,.034);
+  const guard=box(s*.204,.936,-.013,.059,.172,.158,helmet,.031);
   guard.rotation.z=s*.12;
-  box(s*.215,.912,.122,.051,.080,.033,ink,.014);
+  box(s*.205,.912,.122,.045,.074,.030,ink,.013);
   line(v(s*.212,.868,.140),v(s*.133,.807,.202),ink,.010);
+ }
+ // Ventilation slots and helmet shell ribs read correctly at three-quarter angles.
+ for(const s of [-1,1]){
+  for(let i=0;i<3;i++){
+   const vent=box(s*.160,1.113-i*.023,-.095,.065,.008,.012,ink,.003);
+   vent.rotation.z=s*.16;
+  }
  }
  // Visor and cage distinguish skaters from goaltenders at a glance.
  if(goalie){
@@ -167,11 +189,15 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   // Squared, segmented modern goalie pads; these are NOT marshmallow ellipsoids.
   for(const s of [-1,1]){
    const x=s*.185;
-   box(x,-1.525,.158,.349,1.020,.303,pads,.045);
-   box(x,-1.508,.319,.297,.914,.023,white,.014);
+   box(x,-1.525,.158,.320,1.020,.266,pads,.035);
+   box(x,-1.508,.302,.275,.914,.022,white,.012);
    for(let i=0;i<6;i++)box(x,-1.17-i*.138,.338,.286,.010,.012,steel,.004);
    box(x+s*.130,-1.53,.331,.055,.950,.024,pads,.014);
-   box(x,-1.098,.328,.296,.144,.033,pads,.035);
+   box(x,-1.098,.328,.276,.135,.031,pads,.031);
+   // External knee roll, toe binding and inner sliding edge.
+   box(x+s*.125,-1.54,.324,.028,.920,.030,navy,.012);
+   box(x,-1.993,.284,.290,.042,.086,navy,.012);
+   for(let j=0;j<4;j++)box(x,-1.26-j*.18,.344,.230,.006,.008,navy,.003);
   }
   // Left: rounded catcher pocket with lace/detail. Right: broad flat blocker.
   oval(-.50,-.488,.155,.205,.166,.110,gloves);
@@ -192,9 +218,16 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  // A full-length stick, correctly connected from glove height to the ice.
  const stick=e.stick==='White'?'#e8eef2':e.stick==='Natural'?'#b99462':'#20262f';
  line(v(.50,-.47,.245),v(.56,-1.94,.255),stick,.022);
- const blade=box(.420,-1.974,.264,.315,.060,.082,stick,.018);
+ const blade=box(.420,-1.974,.264,.315,.048,.071,stick,.015);
  blade.rotation.z=-.08;
  box(.50,-.52,.246,.045,.13,.045,gloves,.017);
+ // Subtle jersey stitching and sleeve trim on the rear of the player.
+ for(const s of [-1,1]){
+  seam(v(s*.290,.30,-.148),v(s*.278,-.39,-.151));
+  box(s*.408,-.245,-.145,.211,.019,.014,stripe,.005);
+ }
+ // A faint vertical centre seam avoids a completely blank back.
+ seam(v(0,.34,-.224),v(0,-.53,-.201));
  return root;
 }
 
