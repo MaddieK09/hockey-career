@@ -40,8 +40,6 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  figure.scale.set(width,height,width);
  const goalie=position==='G';
  const mats=new Map<string,THREE.MeshStandardMaterial>();
- const torsoMaterial=new THREE.MeshStandardMaterial({color:COLORS[e.jersey],roughness:.93,metalness:0});
- // Hockey cloth is deliberately matte, while plastic shells and steel retain specular highlights.
  const mat=(color:string,metalness=0,roughness=.72)=>{
   const key=`${color}/${metalness}/${roughness}`;let m=mats.get(key);
   if(!m){m=new THREE.MeshStandardMaterial({color,metalness,roughness});mats.set(key,m);}return m;
