@@ -1,30 +1,125 @@
+import * as THREE from 'three';
 import type {PlayerAppearance} from '../player/appearance';
-import {buildPlayerBody} from './playerBody';
-import {equipmentParts} from './equipment3d';
 import type {Equipment} from '../player/equipment';
 import type {Position} from '../player/types';
-const hex=(value:string):[number,number,number]=>{const h=value.replace('#','');return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255) as [number,number,number];};
-const vertex=`attribute vec3 position;attribute vec3 normal;uniform mat4 projection;uniform float angle;uniform float zoom;uniform vec3 center;uniform vec3 scale;varying vec3 lightNormal;void main(){vec3 p=position*scale+center;float c=cos(angle),s=sin(angle);mat3 rot=mat3(c,0.,-s,0.,1.,0.,s,0.,c);vec3 world=rot*p;lightNormal=normalize(rot*(normal/scale));gl_Position=projection*vec4(world.x,world.y,world.z-zoom,1.);}`;
-const fragment=`precision mediump float;uniform vec3 tint;varying vec3 lightNormal;void main(){vec3 n=normalize(lightNormal);float key=max(dot(n,normalize(vec3(-.45,.8,1.))),0.);float fill=max(dot(n,normalize(vec3(.8,.3,-.6))),0.);float rim=pow(1.-max(n.z,0.),3.);float light=.40+.48*key+.14*fill+.09*rim;gl_FragColor=vec4(min(tint*light,vec3(1.)),1.);}`;
-function shader(gl:WebGLRenderingContext,type:number,source:string){const s=gl.createShader(type);if(!s)throw Error('Shader unavailable');gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(String(gl.getShaderInfoLog(s)));return s;}
-function sphere(){const verts:number[]=[],norms:number[]=[],indices:number[]=[];const rows=24,cols=32;for(let y=0;y<=rows;y++){const v=y/rows,theta=v*Math.PI;for(let x=0;x<=cols;x++){const phi=x/cols*Math.PI*2,nx=Math.sin(theta)*Math.cos(phi),ny=Math.cos(theta),nz=Math.sin(theta)*Math.sin(phi);verts.push(nx,ny,nz);norms.push(nx,ny,nz);}}for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const i=y*(cols+1)+x;indices.push(i,i+cols+1,i+1,i+1,i+cols+1,i+cols+2);}return {verts:new Float32Array(verts),norms:new Float32Array(norms),indices:new Uint16Array(indices)};}
+import {buildHockeyPlayerModel,disposeHockeyPlayerModel} from './hockeyPlayerModel';
+
+/** Mobile-first, lit and rotatable 3D showroom. No custom raw WebGL shader/ball model. */
 export function mountPlayer3D(host:HTMLElement,initial:PlayerAppearance,initialEquipment:Equipment,initialPosition:Position){
- const canvas=document.createElement('canvas');canvas.className='player-3d-canvas';canvas.setAttribute('aria-label','Rotatable three-dimensional hockey player preview');canvas.setAttribute('role','img');host.replaceChildren(canvas);
- const gl=canvas.getContext('webgl',{alpha:false,antialias:true,powerPreference:'low-power'});
- if(!gl){host.textContent='3D preview unavailable on this device.';return {update:(_p:PlayerAppearance)=>{},dispose:()=>{}};}
- let program:WebGLProgram|null=null;try{program=gl.createProgram();if(!program)throw Error('No WebGL program');gl.attachShader(program,shader(gl,gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl,gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error('WebGL link failed');}catch{host.textContent='3D graphics are unavailable.';return {update:(_p:PlayerAppearance)=>{},dispose:()=>{}};}
- gl.useProgram(program);
- const mesh=sphere();const buffers=[gl.createBuffer(),gl.createBuffer(),gl.createBuffer()];
- if(buffers.some(b=>!b)){host.textContent='3D graphics are unavailable.';return {update:(_p:PlayerAppearance)=>{},dispose:()=>{}};}
- const bind=(buffer:WebGLBuffer|null,data:BufferSource,target:number)=>{gl.bindBuffer(target,buffer);gl.bufferData(target,data,gl.STATIC_DRAW);};
- bind(buffers[0],mesh.verts,gl.ARRAY_BUFFER);bind(buffers[1],mesh.norms,gl.ARRAY_BUFFER);bind(buffers[2],mesh.indices,gl.ELEMENT_ARRAY_BUFFER);
- const attr=(name:string,buffer:WebGLBuffer|null)=>{const loc=gl.getAttribLocation(program!,name);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);};
- attr('position',buffers[0]);attr('normal',buffers[1]);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buffers[2]);
- const uniforms={projection:gl.getUniformLocation(program,'projection'),angle:gl.getUniformLocation(program,'angle'),zoom:gl.getUniformLocation(program,'zoom'),center:gl.getUniformLocation(program,'center'),scale:gl.getUniformLocation(program,'scale'),tint:gl.getUniformLocation(program,'tint')};
- gl.enable(gl.DEPTH_TEST);let angle=0,zoom=3.12,model=[...buildPlayerBody(initial,true),...equipmentParts(initialEquipment,initialPosition,initial)],frame=0,disposed=false;
- const draw=()=>{if(disposed)return;const w=Math.max(1,Math.round(canvas.clientWidth*Math.min(devicePixelRatio||1,2))),h=Math.max(1,Math.round(canvas.clientHeight*Math.min(devicePixelRatio||1,2)));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clearColor(.055,.13,.21,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const aspect=w/h,f=1/Math.tan(Math.PI/5.0),near=.1,far=100;gl.uniformMatrix4fv(uniforms.projection,false,new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)/(near-far),-1,0,0,2*far*near/(near-far),0]));gl.uniform1f(uniforms.angle,angle);gl.uniform1f(uniforms.zoom,zoom);for(const part of model){gl.uniform3fv(uniforms.center,part.center);gl.uniform3fv(uniforms.scale,part.scale);gl.uniform3fv(uniforms.tint,hex(part.color));gl.drawElements(gl.TRIANGLES,mesh.indices.length,gl.UNSIGNED_SHORT,0);}};
- let startX:number|null=null;const pointers=new Map<number,{x:number;y:number}>();let pinchDistance:number|null=null;const distance=()=>{const v=[...pointers.values()];return v.length<2?null:Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y);};const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(2.75,Math.min(6.2,zoom+e.deltaY*.003));draw();};canvas.addEventListener('wheel',wheel,{passive:false});const down=(e:PointerEvent)=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});startX=pointers.size===1?e.clientX:null;pinchDistance=distance();canvas.setPointerCapture(e.pointerId);};const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;const previous=pointers.get(e.pointerId)!;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size>=2){const next=distance();if(next!==null&&pinchDistance!==null){zoom=Math.max(2.75,Math.min(6.2,zoom*pinchDistance/Math.max(1,next)));draw();}pinchDistance=next;startX=null;}else{angle+=(e.clientX-previous.x)*.012;startX=e.clientX;draw();}};const up=(e:PointerEvent)=>{pointers.delete(e.pointerId);pinchDistance=distance();startX=null;};const reset=()=>{angle=0;zoom=3.12;draw();};
- canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('dblclick',reset);
- const observer=new ResizeObserver(()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);});observer.observe(canvas);frame=requestAnimationFrame(draw);
- return {update:(p:PlayerAppearance,e:Equipment,position:Position)=>{model=[...buildPlayerBody(p,true),...equipmentParts(e,position,p)];draw();},dispose:()=>{disposed=true;observer.disconnect();cancelAnimationFrame(frame);canvas.removeEventListener('dblclick',reset);canvas.removeEventListener('wheel',wheel);canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);buffers.forEach(b=>gl.deleteBuffer(b));gl.deleteProgram(program);}};
+ let renderer:THREE.WebGLRenderer;
+ try{
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
+ }catch{
+  host.textContent='3D preview is unavailable on this device.';
+  return {update:(_p:PlayerAppearance,_e:Equipment,_position:Position)=>{},dispose:()=>{host.replaceChildren();}};
+ }
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+ renderer.outputColorSpace=THREE.SRGBColorSpace;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;
+ renderer.toneMappingExposure=1.18;
+ const canvas=renderer.domElement;
+ canvas.className='player-3d-canvas';
+ canvas.setAttribute('aria-label','Rotatable 3D hockey player with detailed equipment');
+ canvas.setAttribute('role','img');
+ host.replaceChildren(canvas);
+
+ const scene=new THREE.Scene();
+ scene.background=new THREE.Color('#0b1e30');
+ scene.add(new THREE.HemisphereLight('#eaf5ff','#213a51',2.05));
+ const key=new THREE.DirectionalLight('#fff2e3',2.85);key.position.set(-3.5,5,6);scene.add(key);
+ const fill=new THREE.DirectionalLight('#88c9ff',1.05);fill.position.set(4,2,-4);scene.add(fill);
+ const rim=new THREE.DirectionalLight('#d1eaff',1.4);rim.position.set(0,4,-5);scene.add(rim);
+
+ // Low-cost studio floor and contact shadow: no expensive dynamic shadows on iPhone.
+ const floorMat=new THREE.MeshStandardMaterial({color:'#143148',roughness:.8,metalness:.04});
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,30),floorMat);
+ floor.rotation.x=-Math.PI/2;floor.position.y=-2.114;scene.add(floor);
+ const shadowMat=new THREE.MeshBasicMaterial({color:'#010b14',transparent:true,opacity:.30,depthWrite:false});
+ const shadow=new THREE.Mesh(new THREE.CircleGeometry(1,48),shadowMat);
+ shadow.rotation.x=-Math.PI/2;shadow.scale.set(.86,.58,1);shadow.position.y=-2.110;scene.add(shadow);
+ const circleMat=new THREE.MeshBasicMaterial({color:'#5281a0',transparent:true,opacity:.22,depthWrite:false});
+ const circle=new THREE.Mesh(new THREE.RingGeometry(1.12,1.13,64),circleMat);
+ circle.rotation.x=-Math.PI/2;circle.position.y=-2.109;scene.add(circle);
+
+ const camera=new THREE.PerspectiveCamera(37,1,.1,60);
+ let player=buildHockeyPlayerModel(initial,initialEquipment,initialPosition);
+ scene.add(player);
+ let angle=0,zoom=1,disposed=false,frame=0;
+ const positionCamera=()=>{
+  camera.position.set(0,-.42,5.9*zoom);
+  camera.lookAt(0,-.42,0);
+  camera.updateProjectionMatrix();
+ };
+ const render=()=>{
+  if(disposed)return;
+  const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
+  if(canvas.width!==Math.round(w*renderer.getPixelRatio())||canvas.height!==Math.round(h*renderer.getPixelRatio())){
+   renderer.setSize(w,h,false);
+   camera.aspect=w/h;camera.updateProjectionMatrix();
+  }
+  player.rotation.y=angle;
+  positionCamera();renderer.render(scene,camera);
+ };
+ const requestRender=()=>{if(disposed||frame)return;frame=requestAnimationFrame(()=>{frame=0;render();});};
+ const observer=new ResizeObserver(requestRender);observer.observe(host);
+ const pointers=new Map<number,{x:number;y:number}>();
+ const pointerDistance=()=>{
+  if(pointers.size<2)return null;
+  const [a,b]=[...pointers.values()];
+  return Math.hypot(a.x-b.x,a.y-b.y);
+ };
+ let previousPinch:number|null=null;
+ const down=(ev:PointerEvent)=>{
+  pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  try{canvas.setPointerCapture(ev.pointerId);}catch{/* No capture on this browser. */}
+  previousPinch=pointerDistance();
+ };
+ const move=(ev:PointerEvent)=>{
+  const previous=pointers.get(ev.pointerId);if(!previous)return;
+  pointers.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(pointers.size>=2){
+   const next=pointerDistance();
+   if(previousPinch!==null&&next!==null&&next>0)
+    zoom=THREE.MathUtils.clamp(zoom*previousPinch/next,.72,2.3);
+   previousPinch=next;
+  }else{
+   angle+=(ev.clientX-previous.x)*.012;
+  }
+  requestRender();
+ };
+ const up=(ev:PointerEvent)=>{pointers.delete(ev.pointerId);previousPinch=pointerDistance();};
+ const wheel=(ev:WheelEvent)=>{ev.preventDefault();zoom=THREE.MathUtils.clamp(zoom+ev.deltaY*.001,.72,2.3);requestRender();};
+ const reset=()=>{angle=0;zoom=1;requestRender();};
+ canvas.addEventListener('pointerdown',down);
+ canvas.addEventListener('pointermove',move);
+ canvas.addEventListener('pointerup',up);
+ canvas.addEventListener('pointercancel',up);
+ canvas.addEventListener('wheel',wheel,{passive:false});
+ canvas.addEventListener('dblclick',reset);
+ requestRender();
+ return {
+  update:(p:PlayerAppearance,e:Equipment,position:Position)=>{
+   if(disposed)return;
+   const next=buildHockeyPlayerModel(p,e,position);
+   next.rotation.y=angle;
+   scene.remove(player);
+   disposeHockeyPlayerModel(player);
+   player=next;scene.add(player);requestRender();
+  },
+  dispose:()=>{
+   if(disposed)return;disposed=true;
+   cancelAnimationFrame(frame);observer.disconnect();
+   canvas.removeEventListener('pointerdown',down);
+   canvas.removeEventListener('pointermove',move);
+   canvas.removeEventListener('pointerup',up);
+   canvas.removeEventListener('pointercancel',up);
+   canvas.removeEventListener('wheel',wheel);
+   canvas.removeEventListener('dblclick',reset);
+   scene.remove(player);disposeHockeyPlayerModel(player);
+   floor.geometry.dispose();floorMat.dispose();
+   shadow.geometry.dispose();shadowMat.dispose();
+   circle.geometry.dispose();circleMat.dispose();
+   renderer.dispose();host.replaceChildren();
+  }
+ };
 }
