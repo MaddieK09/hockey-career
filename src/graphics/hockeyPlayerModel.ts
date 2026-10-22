@@ -91,45 +91,40 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   const wire=(points:THREE.Vector3[],radius=.0055)=>{
    mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),Math.max(10,points.length*6),radius,7,false),color.steel,cage,.35,.62);
   };
-  // Low-profile crown and occipital shell. Front is left open for the cage.
-  const crown=mesh(new THREE.SphereGeometry(1,40,24,0,Math.PI*2,0,1.38),color.shell,mask,.38);
-  crown.position.set(0,.955,-.029);crown.scale.set(.224,.250,.213);
-  // Contoured cheek and jaw wings narrow toward a protective chin cup.
+  // Helmet shell hugs the skull; the rear wrap covers the exposed ear/occipital area.
+  const crown=mesh(new THREE.SphereGeometry(1,40,24,0,Math.PI*2,0,1.46),color.shell,mask,.42);
+  crown.position.set(0,.942,-.016);crown.scale.set(.226,.254,.216);
+  const backShell=ell(0,.917,-.131,.214,.194,.122,color.shell,mask);
+  backShell.scale.z=.115;
+  // Smooth side shells replace the protruding round ear cups.
   for(const s of [-1,1]){
-   const cheek=ell(s*.183,.905,.056,.053,.146,.144,color.shell,mask);
-   cheek.rotation.z=-s*.19;
-   const jaw=panel(s*.125,.799,.128,.124,.105,.170,color.shell,mask,.041);
-   jaw.rotation.z=s*.28;
-   panel(s*.201,.943,-.040,.018,.075,.067,color.ink,mask,.008);
-   for(let i=0;i<3;i++){
-    const y=.976+i*.040;
-    panel(s*.208,y,-.066,.012,.012,.039,color.ink,mask,.005);
-   }
-   // Ear and chin straps sit behind the wire cage.
-   wire([V(s*.207,.876,.122),V(s*.172,.823,.178),V(s*.107,.781,.208)],.006);
+   const temple=ell(s*.174,.928,.005,.064,.154,.159,color.shell,mask);
+   temple.rotation.z=-s*.09;
+   const cheek=ell(s*.148,.831,.115,.061,.102,.116,color.shell,mask);
+   cheek.rotation.z=s*.24;
+   panel(s*.187,.926,-.063,.009,.052,.043,color.ink,mask,.005);
+   // Slots stay small and flush to the helmet surface.
+   for(let i=0;i<3;i++)panel(s*.187,1.012+i*.023,-.072,.008,.009,.034,color.ink,mask,.003);
+   wire([V(s*.176,1.068,.177),V(s*.178,.976,.220),V(s*.163,.880,.239),V(s*.103,.800,.221)],.006);
   }
-  const chin=ell(0,.767,.150,.134,.078,.114,color.shell,mask);
-  chin.rotation.x=-.20;
-  panel(0,.754,.243,.169,.022,.019,color.ink,mask,.009);
-  // Rounded opening and forward-curving bars, rather than a square grid.
-  wire([V(-.176,1.074,.194),V(-.103,1.091,.241),V(0,1.098,.260),V(.103,1.091,.241),V(.176,1.074,.194)],.008);
-  for(const s of [-1,1]){
-   wire([V(s*.178,1.072,.199),V(s*.203,.989,.238),V(s*.195,.886,.267),V(s*.148,.797,.260)],.008);
-  }
+  // Integrated chin cup and throat protector close the formerly floating lower jaw.
+  ell(0,.772,.125,.132,.082,.107,color.shell,mask);
+  panel(0,.766,.220,.166,.025,.032,color.ink,mask,.012);
+  panel(0,.705,.099,.170,.104,.118,color.navy,mask,.033);
+  // Mask cage sits closer to the face, with a shallow rounded projection.
+  wire([V(-.162,1.070,.174),V(-.092,1.087,.209),V(0,1.093,.222),V(.092,1.087,.209),V(.162,1.070,.174)],.007);
+  for(const s of [-1,1])wire([V(s*.165,1.067,.180),V(s*.181,.987,.216),V(s*.171,.889,.247),V(s*.121,.799,.232)],.007);
   for(let row=0;row<5;row++){
-   const y=.834+row*.050;
-   const spread=.144+.055*Math.sin((row+1)*Math.PI/6);
-   const front=.278+(row===2?.024:row===1||row===3?.015:0);
-   wire([V(-spread,y,.230),V(-spread*.53,y-.006,front),V(0,y-.009,front+.010),V(spread*.53,y-.006,front),V(spread,y,.230)]);
+   const y=.834+row*.049,spread=.126+.048*Math.sin((row+1)*Math.PI/6);
+   const front=.241+(row===2?.018:row===1||row===3?.012:0);
+   wire([V(-spread,y,.203),V(-spread*.53,y-.004,front),V(0,y-.007,front+.008),V(spread*.53,y-.004,front),V(spread,y,.203)],.0045);
   }
   for(let i=-2;i<=2;i++){
-   const x=i*.064;
-   wire([V(x*.92,1.083,.248),V(x,1.010,.291),V(x*.94,.915,.311),V(x*.76,.826,.274)],.005);
+   const x=i*.056;
+   wire([V(x*.89,1.081,.213),V(x,1.006,.247),V(x*.94,.917,.265),V(x*.75,.830,.244)],.0045);
   }
-  // Raised centre brow and lower chin rails reinforce the mask profile.
-  wire([V(-.151,.810,.242),V(0,.794,.281),V(.151,.810,.242)],.007);
-  // Matte chin and side decals are distinct from the metal cage.
-  panel(0,1.122,.011,.080,.013,.047,color.ink,mask,.006);
+  wire([V(-.127,.807,.225),V(0,.791,.245),V(.127,.807,.225)],.006);
+  panel(0,1.116,.002,.075,.012,.036,color.ink,mask,.005);
  }else{
   const verts:number[]=[],indices:number[]=[];
   for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
