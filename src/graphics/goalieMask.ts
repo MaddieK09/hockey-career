@@ -21,22 +21,26 @@ export function createGoalieMask(shellColor:string):THREE.Group {
  // aerodynamic crown down to the forward-tapered chin. A varying front
  // aperture keeps the face open without overlapping oval helmet pieces.
  const rings=[
-  {y:1.185,rx:.035,rz:.039,z:-.043,open:0},
-  {y:1.167,rx:.120,rz:.133,z:-.046,open:0},
-  {y:1.122,rx:.188,rz:.183,z:-.045,open:0},
-  {y:1.070,rx:.218,rz:.204,z:-.043,open:.43},
-  {y:1.018,rx:.230,rz:.211,z:-.044,open:.69},
-  {y:.957,rx:.226,rz:.214,z:-.047,open:.77},
-  {y:.895,rx:.215,rz:.204,z:-.047,open:.75},
-  {y:.840,rx:.192,rz:.192,z:-.029,open:.62},
-  {y:.802,rx:.162,rz:.180,z:.001,open:.47},
-  // Angled chin projects forward as the jaw narrows, then sweeps down to a point.
-  {y:.766,rx:.130,rz:.174,z:.033,open:.28},
-  {y:.729,rx:.108,rz:.167,z:.058,open:.08},
-  {y:.693,rx:.088,rz:.153,z:.074,open:0},
-  {y:.654,rx:.065,rz:.127,z:.081,open:0},
-  {y:.622,rx:.041,rz:.091,z:.080,open:0},
-  {y:.608,rx:.016,rz:.046,z:.077,open:0}
+  // Full, closed crown.
+  {y:1.192,rx:.030,rz:.037,z:-.041,open:0},
+  {y:1.174,rx:.125,rz:.127,z:-.042,open:0},
+  {y:1.128,rx:.193,rz:.190,z:-.043,open:0},
+  {y:1.078,rx:.221,rz:.220,z:-.037,open:.35},
+  // The ONLY open area is the eye/cage window. Solid shell surrounds it.
+  {y:1.038,rx:.238,rz:.244,z:-.025,open:.62},
+  {y:.990,rx:.237,rz:.252,z:-.021,open:.70},
+  {y:.943,rx:.231,rz:.247,z:-.017,open:.63},
+  {y:.900,rx:.223,rz:.240,z:-.011,open:.45},
+  {y:.857,rx:.211,rz:.233,z:.002,open:.21},
+  // Continuous cheek and jaw protection closes under the cage.
+  {y:.826,rx:.192,rz:.226,z:.022,open:0},
+  {y:.787,rx:.166,rz:.218,z:.042,open:0},
+  {y:.751,rx:.139,rz:.205,z:.057,open:0},
+  // Long tapered chin is part of the SAME shell, not a hanging oval.
+  {y:.714,rx:.113,rz:.181,z:.078,open:0},
+  {y:.678,rx:.084,rz:.150,z:.088,open:0},
+  {y:.640,rx:.052,rz:.115,z:.091,open:0},
+  {y:.619,rx:.016,rz:.067,z:.091,open:0}
  ];
  const n=64,verts:number[]=[],indices:number[]=[];
  for(const ring of rings){
@@ -65,25 +69,25 @@ export function createGoalieMask(shellColor:string):THREE.Group {
   return V(Math.sin(t)*r.rx,r.y,Math.cos(t)*r.rz+r.z);
  };
  for(const s of [-1,1]){
-  rim(rings.slice(2,12).map(r=>opening(r,s)),.018);
-  // Broad structural cheek/temple ribs fill the gap between shell and grille.
-  rim([V(s*.151,1.075,.132),V(s*.175,1.023,.135),V(s*.185,.942,.139),V(s*.174,.862,.145),V(s*.139,.789,.160),V(s*.082,.713,.214)],.026);
+  rim(rings.slice(3,10).map(r=>opening(r,s)),.020);
+  // Structural cheek pieces connect the wire mounting points to the solid face shell.
+  rim([V(s*.153,1.073,.174),V(s*.173,1.025,.179),V(s*.166,.946,.188),V(s*.139,.890,.201),V(s*.080,.852,.229)],.023);
  }
- rim([V(-.151,1.075,.132),V(-.085,1.092,.149),V(0,1.095,.156),V(.085,1.092,.149),V(.151,1.075,.132)],.020);
- rim([V(-.118,.777,.186),V(-.068,.718,.219),V(0,.677,.229),V(.068,.718,.219),V(.118,.777,.186)],.020);
+ rim([V(-.151,1.077,.171),V(-.085,1.089,.183),V(0,1.092,.191),V(.085,1.089,.183),V(.151,1.077,.171)],.019);
+ rim([V(-.113,.830,.240),V(-.070,.819,.250),V(0,.814,.253),V(.070,.819,.250),V(.113,.830,.240)],.021);
  const mountMat=new THREE.MeshStandardMaterial({color:'#aeb9c3',roughness:.34,metalness:.7});
  const mount=(x:number,y:number,z:number)=>{
   const m=add(new THREE.SphereGeometry(.014,16,12),mountMat);
   m.position.set(x,y,z);m.scale.set(1,1,.35);
  };
  for(const s of [-1,1]){
-  mount(s*.170,1.071,.164);
-  mount(s*.115,.788,.191);
-  mount(s*.184,.917,.168);
+  mount(s*.151,1.077,.171);
+  mount(s*.080,.852,.229);
+  mount(s*.139,.890,.201);
  }
  // The dark face cavity is recessed behind the steel bars.
  const inset=add(new THREE.SphereGeometry(1,40,28),dark);
- inset.position.set(0,.951,.008);inset.scale.set(.147,.146,.083);
+ inset.position.set(0,.977,.103);inset.scale.set(.136,.103,.106);
  // Chin ventilation and crown air inlets.
  const vent=(x:number,y:number,z:number,sx:number,sy:number,sz:number)=>{
   const m=add(new THREE.SphereGeometry(1,20,12),dark);m.position.set(x,y,z);m.scale.set(sx,sy,sz);
@@ -96,20 +100,20 @@ export function createGoalieMask(shellColor:string):THREE.Group {
  vent(0,.666,.222,.010,.013,.004);
  // Rounded cage profile, with gently bowed vertical and horizontal wires.
  const cage=new THREE.Group();cage.name='rounded-goalie-cage';root.add(cage);
- wire([V(-.168,1.073,.154),V(-.100,1.090,.205),V(0,1.093,.221),V(.100,1.090,.205),V(.168,1.073,.154)],.008,cage);
+ wire([V(-.151,1.077,.171),V(-.090,1.096,.227),V(0,1.101,.244),V(.090,1.096,.227),V(.151,1.077,.171)],.008,cage);
  for(const s of [-1,1]){
-  wire([V(s*.170,1.071,.164),V(s*.187,.989,.207),V(s*.184,.917,.168),V(s*.115,.788,.191)],.007,cage);
+  wire([V(s*.151,1.077,.171),V(s*.181,1.008,.238),V(s*.158,.929,.255),V(s*.080,.852,.229)],.007,cage);
  }
  for(let row=0;row<5;row++){
-  const y=.843+row*.048,span=.125+.050*Math.sin((row+1)*Math.PI/6);
+  const y=.867+row*.046,span=.112+.049*Math.sin((row+1)*Math.PI/6);
   const front=.227+(row===2?.022:.008);
-  wire([V(-span,y,.174),V(-span*.54,y-.006,front),V(0,y-.009,front+.012),V(span*.54,y-.006,front),V(span,y,.174)],.0047,cage);
+  wire([V(-span,y,.217),V(-span*.54,y-.006,front+.022),V(0,y-.009,front+.034),V(span*.54,y-.006,front+.022),V(span,y,.217)],.0047,cage);
  }
  for(let i=-2;i<=2;i++){
   const x=i*.057;
-  wire([V(x*.88,1.086,.209),V(x,1.016,.254),V(x*.94,.925,.266),V(x*.73,.827,.221)],.0046,cage);
+  wire([V(x*.88,1.095,.228),V(x,1.026,.270),V(x*.94,.947,.277),V(x*.73,.859,.249)],.0046,cage);
  }
- wire([V(-.116,.814,.186),V(-.083,.764,.213),V(-.049,.715,.231),V(0,.675,.231),V(.049,.715,.231),V(.083,.764,.213),V(.116,.814,.186)],.006,cage);
+ wire([V(-.080,.852,.229),V(-.048,.832,.264),V(0,.829,.271),V(.048,.832,.264),V(.080,.852,.229)],.006,cage);
  // Small flexible throat bib follows the pointed shell, without replacing it.
  const bib=add(new THREE.SphereGeometry(1,28,20),padding);
  bib.name='throat-guard';bib.position.set(0,.578,-.012);bib.scale.set(.115,.058,.095);
