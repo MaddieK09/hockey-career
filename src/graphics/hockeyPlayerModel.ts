@@ -1,256 +1,144 @@
 import * as THREE from 'three';
-import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
-import {bodyDimensions} from './playerBody';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { bodyDimensions } from './playerBody';
 import type {PlayerAppearance} from '../player/appearance';
-import {COLORS, type Equipment} from '../player/equipment';
+import type {Equipment} from '../player/equipment';
+import {COLORS} from '../player/equipment';
 import type {Position} from '../player/types';
 
+/**
+ * V3 authorable hockey character: separate player rigs, continuous lofted
+ * clothing, position-specific equipment, and shared disposable materials.
+ * GLB-ready: each major part lives in a named equipment group.
+ */
 const SKIN:Record<string,string>={Porcelain:'#f8dfd1',Fair:'#edc5a9',Light:'#dba88a',Medium:'#bd8464',Tan:'#a76a4b',Deep:'#774632',Rich:'#4c2e27'};
+const HAIR:Record<string,string>={Black:'#24212a','Dark brown':'#39251f',Brown:'#77503a',Blonde:'#d6ad61',Platinum:'#ece3c6',Red:'#a63e29',Auburn:'#86422b',Blue:'#427fd2',Pink:'#d878a4'};
 const EYES:Record<string,string>={Brown:'#63422c',Blue:'#5b9ed0',Green:'#568969',Hazel:'#96804a',Grey:'#8394a0',Amber:'#c58c42'};
 type Ring={y:number;rx:number;rz:number;z?:number};
 
-/** Connected tapered mesh instead of a stack of intersecting ball-shaped torso pieces. */
-function taperedLoft(rings:Ring[],segments=28):THREE.BufferGeometry {
- const vertices:number[]=[],faces:number[]=[];
- for(const ring of rings)for(let i=0;i<segments;i++){
-  const theta=i*2*Math.PI/segments;
-  vertices.push(Math.cos(theta)*ring.rx,ring.y,Math.sin(theta)*ring.rz+(ring.z??0));
- }
- for(let j=0;j<rings.length-1;j++)for(let i=0;i<segments;i++){
-  const a=j*segments+i,b=j*segments+(i+1)%segments,c=(j+1)*segments+i,d=(j+1)*segments+(i+1)%segments;
-  faces.push(a,c,b,b,c,d);
- }
- // End caps keep the uniform opaque when viewed below or from above.
+function loft(rings:Ring[],n=32):THREE.BufferGeometry {
+ const vertices:number[]=[],indices:number[]=[];
+ for(const r of rings) for(let i=0;i<n;i++){const t=i*2*Math.PI/n;vertices.push(Math.cos(t)*r.rx,r.y,Math.sin(t)*r.rz+(r.z??0));}
+ for(let j=0;j<rings.length-1;j++)for(let i=0;i<n;i++){const a=j*n+i,b=j*n+(i+1)%n,c=(j+1)*n+i,d=(j+1)*n+(i+1)%n;indices.push(a,c,b,b,c,d);}
  const bottom=vertices.length/3;vertices.push(0,rings[0].y,rings[0].z??0);
- const top=vertices.length/3;const last=rings[rings.length-1];vertices.push(0,last.y,last.z??0);
- for(let i=0;i<segments;i++){faces.push(bottom,i,(i+1)%segments);const start=(rings.length-1)*segments;faces.push(top,start+(i+1)%segments,start+i);}
- const geometry=new THREE.BufferGeometry();
- geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
- geometry.setIndex(faces);geometry.computeVertexNormals();return geometry;
+ const last=rings[rings.length-1],top=vertices.length/3;vertices.push(0,last.y,last.z??0);
+ for(let i=0;i<n;i++){indices.push(bottom,i,(i+1)%n);const j=(rings.length-1)*n;indices.push(top,j+(i+1)%n,j+i);}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.setIndex(indices);g.computeVertexNormals();return g;
 }
-
-/** A single cohesive, rotatable hockey player for phones and desktop.
- * Mesh is authored here, so no network-only GLB or licensing dependency.
- * Relative proportions are deliberate and the surface materials are shared.
- */
-export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:Position):THREE.Group {
- const root=new THREE.Group(),figure=new THREE.Group();root.add(figure);
- const {height,width}=bodyDimensions(p);
- // Height and weight modify the figure, not the camera, ice or controls.
- figure.scale.set(width,height,width);
- const goalie=position==='G';
+export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:Position):THREE.Group{
+ const root=new THREE.Group();root.name='hockey-character-v3';
+ const body=new THREE.Group();body.name=position==='G'?'goalie-rig':'skater-rig';root.add(body);
+ const {height,width}=bodyDimensions(p);body.scale.set(width,height,width);
+ const isGoalie=position==='G';
+ const color={shirt:COLORS[e.jersey],shell:COLORS[e.helmet],glove:COLORS[e.gloves],pad:COLORS[e.pads],skin:SKIN[p.skinTone]??SKIN.Fair,hair:HAIR[p.hairColor]??HAIR.Brown,eye:EYES[p.eyeColor]??EYES.Blue,navy:'#17283c',ink:'#111b2b',white:'#f1f4f7',steel:'#abb9c6',seam:'#8193a9'};
  const mats=new Map<string,THREE.MeshStandardMaterial>();
- const mat=(color:string,metalness=0,roughness=.72)=>{
-  const key=`${color}/${metalness}/${roughness}`;let m=mats.get(key);
-  if(!m){m=new THREE.MeshStandardMaterial({color,metalness,roughness});mats.set(key,m);}return m;
- };
- const uniform=COLORS[e.jersey],helmet=COLORS[e.helmet],gloves=COLORS[e.gloves],pads=COLORS[e.pads];
- const skin=SKIN[p.skinTone]??SKIN.Fair,eyes=EYES[p.eyeColor]??EYES.Blue;
- const ink='#172638',navy='#102335',white='#e7eef4',stripe='#d9e3ec',steel='#a7becd';
- // Each position gets its own equipment geometry and silhouette, not merely recoloured pads.
- const mesh=(geo:THREE.BufferGeometry,color:string,metalness=0,roughness=.72,parent=figure)=>{
-  const m=new THREE.Mesh(geo,mat(color,metalness,roughness));m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;
- };
- const oval=(x:number,y:number,z:number,sx:number,sy:number,sz:number,color:string)=>{
-  const m=mesh(new THREE.SphereGeometry(1,24,16),color);m.position.set(x,y,z);m.scale.set(sx,sy,sz);return m;
- };
- const box=(x:number,y:number,z:number,w:number,h:number,d:number,color:string,r=.028,metalness=0)=>{
-  const shape=new RoundedBoxGeometry(w,h,d,3,Math.min(r,w*.35,h*.35,d*.35));
-  const m=mesh(shape,color,metalness);m.position.set(x,y,z);return m;
- };
- const limb=(start:THREE.Vector3,end:THREE.Vector3,top:number,bottom:number,color:string)=>{
-  const direction=new THREE.Vector3().subVectors(end,start);
-  const m=mesh(new THREE.CylinderGeometry(top,bottom,direction.length(),20,1),color);
-  m.position.copy(start).add(end).multiplyScalar(.5);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.normalize());return m;
- };
- const v=(x:number,y:number,z:number)=>new THREE.Vector3(x,y,z);
- const line=(a:THREE.Vector3,b:THREE.Vector3,color:string,radius=.008)=>{
-  const curve=new THREE.LineCurve3(a,b);
-  return mesh(new THREE.TubeGeometry(curve,1,radius,6,false),color,.45,.39);
- };
-
- // Raised seams and small segmented panels break the mannequin-like flat surfaces.
- const seam=(a:THREE.Vector3,b:THREE.Vector3)=>line(a,b,'#a6bdce',.0045);
- // Anatomically tapered uniform: broad shoulders, cinched waist, structured hem.
- mesh(taperedLoft([
-  {y:-.62,rx:.252,rz:.185,z:.01},{y:-.56,rx:.280,rz:.203,z:.01},
-  {y:-.31,rx:.290,rz:.215},{y:.05,rx:goalie?.335:.310,rz:goalie?.252:.217},
-  {y:.32,rx:goalie?.363:.338,rz:.221},{y:.47,rx:.224,rz:.151}
- ]),uniform);
- // Shoulder yoke, collar and jersey side seams sit on the actual tapered body.
+ const material=(hex:string,roughness=.83,metalness=0)=>{const key=hex+'/'+roughness+'/'+metalness;let m=mats.get(key);if(!m){m=new THREE.MeshStandardMaterial({color:hex,roughness,metalness});mats.set(key,m);}return m;};
+ const group=(name:string)=>{const g=new THREE.Group();g.name=name;body.add(g);return g;};
+ const jersey=group('jersey-and-shoulder-pads'),head=group('head-and-helmet'),legs=group('pants-and-skates'),equipment=group(isGoalie?'goalie-equipment':'skater-equipment');
+ const mesh=(g:THREE.BufferGeometry,c:string,parent:THREE.Group,rough=.83,metal=0)=>{const x=new THREE.Mesh(g,material(c,rough,metal));x.castShadow=true;x.receiveShadow=true;parent.add(x);return x;};
+ const ell=(x:number,y:number,z:number,sx:number,sy:number,sz:number,c:string,parent:THREE.Group)=>{const m=mesh(new THREE.SphereGeometry(1,24,18),c,parent);m.position.set(x,y,z);m.scale.set(sx,sy,sz);return m;};
+ const panel=(x:number,y:number,z:number,sx:number,sy:number,sz:number,c:string,parent:THREE.Group,r=.02,rough=.72)=>{const m=mesh(new RoundedBoxGeometry(sx,sy,sz,3,Math.min(r,sx*.25,sy*.25,sz*.25)),c,parent,rough);m.position.set(x,y,z);return m;};
+ const V=(x:number,y:number,z:number)=>new THREE.Vector3(x,y,z);
+ const tube=(a:THREE.Vector3,b:THREE.Vector3,r:number,c:string,parent:THREE.Group)=>mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a,b),1,r,8,false),c,parent,.5,.12);
+ const tapered=(a:THREE.Vector3,b:THREE.Vector3,ra:number,rb:number,c:string,parent:THREE.Group)=>{const d=b.clone().sub(a);const m=mesh(new THREE.CylinderGeometry(rb,ra,d.length(),20,1),c,parent);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());return m;};
+ // The jersey is a connected cloth-like shape, not an assembly of capsules.
+ mesh(loft([{y:-.64,rx:.273,rz:.197,z:.01},{y:-.55,rx:.289,rz:.208,z:.01},{y:-.36,rx:.283,rz:.206},{y:-.09,rx:isGoalie?.327:.296,rz:isGoalie?.251:.211},{y:.24,rx:isGoalie?.366:.325,rz:isGoalie?.267:.223},{y:.37,rx:.328,rz:.219},{y:.48,rx:.205,rz:.146}]),color.shirt,jersey,.98);
+ // Upper-body yoke and cloth trims.
+ mesh(loft([{y:.42,rx:.205,rz:.153},{y:.465,rx:.174,rz:.129},{y:.487,rx:.122,rz:.101}]),color.navy,jersey);
+ mesh(loft([{y:-.659,rx:.275,rz:.199},{y:-.632,rx:.281,rz:.208}]),color.white,jersey);
+ const crest=panel(0,.08,.248,.168,.168,.017,color.navy,jersey,.04);
+ crest.rotation.z=Math.PI/4;
+ panel(0,.08,.263,.075,.075,.008,color.white,jersey,.022);
+ mesh(loft([{y:-.89,rx:.238,rz:.188},{y:-.74,rx:.276,rz:.208},{y:-.56,rx:.278,rz:.198}]),color.navy,legs);
  for(const s of [-1,1]){
-  seam(v(s*.222,.425,.145),v(s*.338,.29,.155));
-  seam(v(s*.294,.27,.137),v(s*.290,-.43,.145));
+  const shoulder=V(s*.318,.315,.005),elbow=V(s*(isGoalie?.470:.402),isGoalie?-.052:-.113,.038),wrist=V(s*(isGoalie?.565:.423),isGoalie?-.405:-.455,isGoalie?.18:.077);
+  // The sleeves remain anatomical in profile; sleeve cuffs follow the wrists.
+  tapered(shoulder,elbow,isGoalie?.150:.128,.108,color.shirt,jersey);
+  tapered(elbow,wrist,.109,.085,color.shirt,jersey);
+  ell(s*.333,.308,.001,.139,.117,.132,color.shirt,jersey);
+  panel(s*(isGoalie?.538:.416),isGoalie?-.302:-.35,isGoalie?.16:.136,.174,.028,.025,color.white,jersey,.009);
+  tube(V(s*.218,.405,.158),V(s*.335,.296,.153),.004,color.seam,jersey);
+  tube(V(s*.293,.29,-.157),V(s*.282,-.43,-.16),.004,color.seam,jersey);
+  const x=s*(isGoalie?.195:.173),kneeX=s*(isGoalie?.230:.184),ankleX=s*(isGoalie?.24:.184);
+  tapered(V(x,-.73,0),V(kneeX,-1.36,.048),.150,.121,color.navy,legs);
+  tapered(V(kneeX,-1.36,.048),V(ankleX,-1.86,.085),.118,.095,isGoalie?color.navy:color.shirt,legs);
+  if(!isGoalie){panel(kneeX,-1.49,.168,.211,.118,.035,color.white,legs,.025);panel(kneeX,-1.65,.167,.216,.045,.038,color.white,legs,.012);}
+  // Skate boot shaped as heel / tongue / toe, with a separate steel runner.
+  panel(ankleX,-1.958,.165,.220,.16,.405,color.ink,legs,.045);
+  panel(ankleX,-1.906,.33,.146,.085,.075,color.navy,legs,.018);
+  panel(ankleX,-1.842,-.022,.149,.15,.097,color.navy,legs,.02);
+  for(let i=0;i<4;i++)tube(V(ankleX-.052,-1.873-i*.025,.38),V(ankleX+.052,-1.873-i*.025,.38),.0035,color.white,legs);
+  panel(ankleX,-2.066,.156,.155,.019,.407,color.steel,legs,.008,.27);
+  for(const z of [-.01,.32])panel(ankleX,-2.038,z,.105,.046,.028,color.ink,legs,.008);
  }
- mesh(taperedLoft([{y:-.87,rx:.241,rz:.177},{y:-.76,rx:.278,rz:.199},{y:-.56,rx:.277,rz:.195}]),navy);
- box(0,-.55,.202,.49,.035,.016,stripe,.008);
- box(0,-.30,.215,.56,.018,.013,white,.005);
- // Loose bottom hem extends past the shoulder-pad taper.
- box(0,-.606,.177,.495,.025,.024,uniform,.009);
+ const faceShape=p.faceShape==='Round'?1.06:p.faceShape==='Angular'?.94:p.faceShape==='Square'?1.04:1;
+ ell(0,.558,0,.095,.14,.092,color.skin,head);
+ ell(0,.897,.0,.191*faceShape,.244,.183,color.skin,head);
+ ell(0,.751,.094,.132*faceShape,.08,.11,color.skin,head);
  for(const s of [-1,1]){
-  box(s*.254,-.49,.08,.022,.23,.075,navy,.01);
-  box(s*.17,.34,.166,.11,.022,.017,stripe,.006);
+  ell(s*.183*faceShape,.906,.005,.027,.047,.043,color.skin,head);
+  ell(s*.081,.945,.172,.031,.014,.012,'#e2d9d1',head);
+  ell(s*.081,.945,.183,.017,.014,.008,color.eye,head);
+  ell(s*.081,.947,.190,.007,.008,.005,color.ink,head);
+  tube(V(s*.050,.990,.178),V(s*.118,.989,.163),.006,color.hair,head);
  }
- box(0,.405,.144,.24,.045,.09,navy,.019);
- box(0,.402,.220,.18,.017,.015,stripe,.007);
- // Team-neutral crest: tiny ice-rink emblem rather than an unlicensed NHL logo.
- oval(0,.12,.236,.105,.105,.012,navy);
- oval(0,.12,.251,.078,.078,.009,white);
- box(0,.12,.261,.111,.017,.009,uniform,.004);
-
- // Seamless padded sleeves and tapered arm volumes.
- for(const side of [-1,1]){
-  const s=side,shoulder=v(s*.335,.315,.014),elbow=v(s*(goalie?.48:.402),goalie?-.06:-.115,goalie?.09:.02);
-  const wrist=v(s*(goalie?.56:.432),goalie?-.40:-.49,goalie?.20:.09);
-  oval(s*.345,.299,.009,goalie?.168:.145,.133,.15,uniform);
-  limb(shoulder,elbow,goalie?.16:.139,goalie?.138:.114,uniform);
-  limb(elbow,wrist,.119,.091,uniform);
-  oval(s*(goalie?.48:.400),goalie?-.06:-.098,goalie?.09:.02,.110,.090,.115,uniform);
-  box(s*(goalie?.50:.415),goalie?-.19:-.218,goalie?.18:.151,.22,.028,.02,stripe,.008);
-  box(s*(goalie?.51:.415),goalie?-.22:-.260,goalie?.19:.145,.205,.014,.02,navy,.006);
-  // Hip, articulated thigh, knee and a continuous sock/skate profile.
-  const hip=v(s*.17,-.75,0),knee=v(s*(goalie?.218:.188),goalie?-1.35:-1.36,goalie?.10:.049),ankle=v(s*(goalie?.23:.19),-1.88,.09);
-  oval(s*.17,-.781,0,.143,.13,.156,navy);
-  limb(hip,knee,.158,.123,navy);
-  oval(s*.188,-1.35,.04,.122,.105,.136,navy);
-  limb(knee,ankle,.129,.10,goalie?navy:uniform);
-  if(!goalie){
-   box(s*.188,-1.53,.175,.245,.15,.045,white,.025);
-   box(s*.188,-1.66,.173,.235,.048,.047,stripe,.018);
-  }
-  // Skate shells, laces, blades and exposed steel rails.
-  const boot=box(s*.196,-1.955,.17,.225,.155,.405,navy,.045);
-  boot.rotation.x=-.09;
-  box(s*.196,-1.912,.355,.172,.083,.041,ink,.022);
-  for(let j=0;j<4;j++)box(s*.196,-1.875-j*.026,.383,.105,.008,.008,stripe,.003);
-  // Boot heel cup and tendon guard connect the boot to the sock.
-  box(s*.196,-1.850,-.010,.170,.15,.082,ink,.024);
-  box(s*.196,-2.068,.175,.172,.019,.402,steel,.008,.78);
-  for(const z of [.02,.30])box(s*.196,-2.037,z,.125,.045,.034,ink,.007);
- }
-
- // Neck/head: subtle nose, eye sockets and cheeks, no googly-eyes.
- oval(0,.548,0,.107,.173,.106,skin);
- const face=p.faceShape==='Round'?1.065:p.faceShape==='Square'?1.055:p.faceShape==='Angular'?.95:1;
- oval(0,.908,.007,.197*face,.257,.194,skin);
- oval(0,.747,.095,.139*face,.092,.107,skin);
+ ell(0,.851,.194,.023,.045,.035,color.skin,head);
+ panel(0,.772,.178,.073,.009,.011,'#955e5c',head,.004);
+ // Complete shell rim with a genuine open face and goalie-only wire cage.
+ const cap=mesh(new THREE.SphereGeometry(1,36,20,0,Math.PI*2,0,1.25),color.shell,head,.46);
+ cap.position.set(0,.947,-.01);cap.scale.set(.221,.255,.216);
  for(const s of [-1,1]){
-  oval(s*.197*face,.901,.01,.031,.061,.048,skin);
-  oval(s*.087,.952,.182,.039,.017,.013,'#dbd1c7');
-  oval(s*.087,.952,.195,.018,.015,.008,eyes);
-  oval(s*.087,.953,.202,.008,.010,.005,ink);
-  oval(s*.091,1.004,.181,.048,.008,.008,'#69594f');
+  panel(s*.195,.926,.002,.056,.16,.149,color.shell,head,.024,.45);
+  tube(V(s*.192,.872,.129),V(s*.125,.785,.191),.009,color.ink,head);
+  for(let i=0;i<3;i++)panel(s*.144,1.118-i*.024,-.081,.059,.007,.009,color.ink,head,.002);
  }
- oval(0,.846,.198,.025,.049,.036,skin);
- oval(0,.811,.215,.034,.015,.019,skin);
- box(0,.762,.180,.078,.010,.012,'#99665d',.005);
-
- // Hard-shell helmet with a real face opening, side guards, chin strap.
- const crown=mesh(new THREE.SphereGeometry(1,32,18,0,Math.PI*2,0,1.37),helmet,0,.43);
- crown.position.set(0,.922,-.008);crown.scale.set(.232,.277,.224);
- for(const s of [-1,1]){
-  const guard=box(s*.204,.936,-.013,.059,.172,.158,helmet,.031);
-  guard.rotation.z=s*.12;
-  box(s*.205,.912,.122,.045,.074,.030,ink,.013);
-  line(v(s*.212,.868,.140),v(s*.133,.807,.202),ink,.010);
- }
- // Ventilation slots and helmet shell ribs read correctly at three-quarter angles.
- for(const s of [-1,1]){
-  for(let i=0;i<3;i++){
-   const vent=box(s*.160,1.113-i*.023,-.095,.065,.008,.012,ink,.003);
-   vent.rotation.z=s*.16;
-  }
- }
- // Visor and cage distinguish skaters from goaltenders at a glance.
- if(goalie){
-  for(let i=-2;i<=2;i++)line(v(i*.073,1.044,.250),v(i*.064,.790,.244),steel,.008);
-  for(let i=0;i<5;i++){
-   const y=.818+i*.060,spread=.184+(y-.818)*.065;
-   line(v(-spread,y,.245),v(spread,y,.245),steel,.007);
-  }
-  line(v(-.203,1.038,.224),v(-.160,.793,.225),helmet,.015);
-  line(v(.203,1.038,.224),v(.160,.793,.225),helmet,.015);
-  box(0,.786,.247,.30,.020,.027,helmet,.007);
+ if(isGoalie){
+  for(let i=-3;i<=3;i++)tube(V(i*.055,1.040,.223),V(i*.052,.785,.232),.005,color.steel,head);
+  for(let i=0;i<5;i++){const y=.804+i*.054;tube(V(-.182,y,.238),V(.182,y,.238),.005,color.steel,head);}
+  panel(0,.780,.228,.287,.023,.026,color.shell,head,.006);
  }else{
-  // A translucent visor follows the curvature of the brow.
-  const vertices:number[]=[],indices:number[]=[];
-  for(let row=0;row<2;row++)for(let i=0;i<=12;i++){
-   const u=i/12,x=(u-.5)*.425;
-   vertices.push(x,row===0?1.007:.912,.231+.032*(1-Math.pow(2*u-1,2)));
-  }
-  for(let i=0;i<12;i++){indices.push(i,i+1,i+13,i,i+13,i+12);}
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.setIndex(indices);g.computeVertexNormals();
-  const visor=new THREE.Mesh(g,new THREE.MeshPhysicalMaterial({color:'#a7d5ed',transparent:true,opacity:.22,roughness:.12,metalness:.04,side:THREE.DoubleSide,depthWrite:false}));
-  figure.add(visor);
-  line(v(-.210,1.010,.230),v(.210,1.010,.230),steel,.006);
+  const verts:number[]=[],indices:number[]=[];
+  for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
+  for(let i=0;i<16;i++)indices.push(i,i+1,i+17,i,i+17,i+16);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(indices);g.computeVertexNormals();
+  head.add(new THREE.Mesh(g,new THREE.MeshPhysicalMaterial({color:'#b3d8ed',transparent:true,opacity:.18,roughness:.14,depthWrite:false,side:THREE.DoubleSide})));
+  tube(V(-.205,1.008,.215),V(.205,1.008,.215),.005,color.steel,head);
  }
-
- if(goalie){
-  // Squared, segmented modern goalie pads; these are NOT marshmallow ellipsoids.
+ if(isGoalie){
+  // Tall flat-front pads, with articulated knee blocks and binding sides.
   for(const s of [-1,1]){
-   const x=s*.224;
-   box(x,-1.525,.158,.345,1.020,.275,pads,.040);
-   box(x,-1.508,.306,.299,.914,.024,white,.014);
-   for(let i=0;i<6;i++)box(x,-1.17-i*.138,.338,.294,.010,.012,steel,.004);
-   box(x+s*.146,-1.53,.330,.050,.950,.025,pads,.014);
-   box(x,-1.098,.328,.296,.135,.031,pads,.031);
-   // External knee roll, toe binding and inner sliding edge.
-   box(x+s*.145,-1.54,.324,.028,.920,.030,navy,.012);
-   box(x,-1.993,.284,.306,.042,.086,navy,.012);
-   for(let j=0;j<4;j++)box(x,-1.26-j*.18,.344,.230,.006,.008,navy,.003);
+   const x=s*.230;
+   panel(x,-1.520,.165,.331,1.01,.272,color.pad,equipment,.033);
+   panel(x,-1.503,.311,.278,.912,.023,color.white,equipment,.012);
+   panel(x+s*.133,-1.52,.329,.037,.957,.027,color.navy,equipment,.01);
+   panel(x,-1.098,.328,.287,.118,.031,color.pad,equipment,.023);
+   for(let i=0;i<6;i++)tube(V(x-.133,-1.16-i*.137,.335),V(x+.133,-1.16-i*.137,.335),.004,color.seam,equipment);
+   panel(x,-1.990,.29,.293,.04,.078,color.navy,equipment,.011);
   }
-  // Left: rounded catcher pocket with lace/detail. Right: broad flat blocker.
-  oval(-.57,-.398,.22,.184,.162,.108,gloves);
-  oval(-.57,-.398,.318,.155,.124,.016,ink);
-  oval(-.57,-.398,.336,.126,.099,.010,white);
-  for(let i=-2;i<=2;i++)line(v(-.69,-.40+i*.032,.347),v(-.45,-.40+i*.032,.347),steel,.004);
-  box(.56,-.397,.25,.240,.255,.110,gloves,.028);
-  box(.56,-.397,.314,.221,.212,.016,white,.008);
-  box(.56,-.397,.332,.194,.166,.013,gloves,.011);
+  // Catch glove is a pocket, blocker is a broad angular slab.
+  ell(-.562,-.395,.234,.178,.156,.105,color.glove,equipment);
+  ell(-.562,-.395,.329,.142,.122,.016,color.ink,equipment);
+  ell(-.562,-.395,.345,.117,.096,.012,color.white,equipment);
+  for(let i=-2;i<=2;i++)tube(V(-.675,-.40+i*.029,.359),V(-.45,-.40+i*.029,.359),.003,color.steel,equipment);
+  panel(.568,-.395,.249,.236,.258,.114,color.glove,equipment,.024);
+  panel(.568,-.395,.313,.211,.217,.017,color.white,equipment,.009);
+  const shaft=e.stick==='White'?'#f4f4f2':e.stick==='Natural'?'#c09b67':color.ink;
+  tube(V(.595,-.35,.32),V(.627,-1.18,.34),.021,shaft,equipment);
+  panel(.625,-1.477,.34,.082,.60,.053,shaft,equipment,.011);
+  panel(.471,-1.948,.35,.386,.068,.082,shaft,equipment,.018);
  }else{
   for(const s of [-1,1]){
-   oval(s*.432,-.500,.090,.120,.136,.130,gloves);
-   box(s*.442,-.495,.202,.175,.175,.028,gloves,.032);
-   for(let i=0;i<3;i++)line(v(s*.465,-.555+i*.047,.225),v(s*.505,-.555+i*.047,.225),stripe,.004);
+   panel(s*.426,-.461,.102,.175,.212,.196,color.glove,equipment,.045);
+   for(let i=0;i<3;i++)tube(V(s*.348,-.490+i*.041,.209),V(s*.506,-.490+i*.041,.209),.004,color.white,equipment);
   }
+  const shaft=e.stick==='White'?'#f4f4f2':e.stick==='Natural'?'#c09b67':color.ink;
+  tube(V(.505,-.452,.245),V(.553,-1.913,.25),.020,shaft,equipment);
+  const blade=panel(.411,-1.957,.26,.310,.058,.078,shaft,equipment,.015);blade.rotation.z=-.06;
  }
-
- // A goalie stick has a widened paddle; a skater stick has a narrow shaft.
- // The stick sits next to the right glove, not detached in front of the body.
- const stick=e.stick==='White'?'#e8eef2':e.stick==='Natural'?'#b99462':'#20262f';
- if(goalie){
-  line(v(.58,-.37,.30),v(.62,-1.20,.33),stick,.022);
-  const paddle=box(.62,-1.48,.33,.085,.57,.055,stick,.016);
-  paddle.rotation.z=-.045;
-  const blade=box(.46,-1.94,.34,.38,.065,.095,stick,.022);
-  blade.rotation.z=-.055;
-  box(.58,-.39,.30,.058,.14,.063,gloves,.02);
- }else{
-  line(v(.50,-.47,.245),v(.56,-1.94,.255),stick,.022);
-  const blade=box(.420,-1.974,.264,.315,.048,.071,stick,.015);
-  blade.rotation.z=-.08;
-  box(.50,-.52,.246,.045,.13,.045,gloves,.017);
- }
- // Subtle jersey stitching and sleeve trim on the rear of the player.
- for(const s of [-1,1]){
-  seam(v(s*.290,.30,-.148),v(s*.278,-.39,-.151));
-  box(s*.408,-.245,-.145,.211,.019,.014,stripe,.005);
- }
- // A faint vertical centre seam avoids a completely blank back.
- seam(v(0,.34,-.224),v(0,-.53,-.201));
  return root;
 }
-
-/** Release all GPU allocations on edit, mode switch, and navigating away. */
-export function disposeHockeyPlayerModel(group:THREE.Group):void {
- const geometries=new Set<THREE.BufferGeometry>();
- const materials=new Set<THREE.Material>();
- group.traverse(obj=>{
-  if(obj instanceof THREE.Mesh){
-   geometries.add(obj.geometry);
-   for(const mat of Array.isArray(obj.material)?obj.material:[obj.material])materials.add(mat);
-  }
- });
+export function disposeHockeyPlayerModel(root:THREE.Group):void{
+ const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
+ root.traverse(x=>{if(x instanceof THREE.Mesh){geometries.add(x.geometry);(Array.isArray(x.material)?x.material:[x.material]).forEach(m=>materials.add(m));}});
  geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
 }
