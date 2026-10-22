@@ -23,33 +23,53 @@ export function createGoalieMask(shellColor:string):THREE.Group {
  const rings=[
   // Full, closed crown.
   {y:1.192,rx:.030,rz:.037,z:-.041,open:0},
-  {y:1.174,rx:.125,rz:.127,z:-.042,open:0},
-  {y:1.128,rx:.193,rz:.190,z:-.043,open:0},
-  {y:1.078,rx:.221,rz:.220,z:-.037,open:.35},
+  {y:1.174,rx:.125,rz:.121,z:-.027,open:0},
+  {y:1.128,rx:.193,rz:.178,z:-.025,open:0},
+  {y:1.078,rx:.221,rz:.203,z:-.023,open:.35},
   // The ONLY open area is the eye/cage window. Solid shell surrounds it.
-  {y:1.038,rx:.238,rz:.244,z:-.025,open:.62},
-  {y:.990,rx:.237,rz:.252,z:-.021,open:.70},
-  {y:.943,rx:.231,rz:.247,z:-.017,open:.63},
-  {y:.900,rx:.223,rz:.240,z:-.011,open:.45},
-  {y:.857,rx:.211,rz:.233,z:.002,open:.21},
+  {y:1.038,rx:.238,rz:.224,z:-.013,open:.62},
+  {y:.990,rx:.237,rz:.232,z:-.010,open:.70},
+  {y:.943,rx:.231,rz:.231,z:-.007,open:.63},
+  {y:.900,rx:.223,rz:.225,z:.000,open:.45},
+  {y:.857,rx:.211,rz:.224,z:.010,open:.21},
   // Continuous cheek and jaw protection closes under the cage.
-  {y:.826,rx:.192,rz:.226,z:.022,open:0},
-  {y:.787,rx:.166,rz:.218,z:.042,open:0},
-  {y:.751,rx:.139,rz:.205,z:.057,open:0},
+  {y:.826,rx:.192,rz:.224,z:.033,open:0},
+  {y:.787,rx:.169,rz:.218,z:.052,open:0},
+  {y:.751,rx:.147,rz:.211,z:.068,open:0},
   // Long tapered chin is part of the SAME shell, not a hanging oval.
-  {y:.714,rx:.113,rz:.181,z:.078,open:0},
-  {y:.678,rx:.084,rz:.150,z:.088,open:0},
-  {y:.640,rx:.052,rz:.115,z:.091,open:0},
-  {y:.619,rx:.016,rz:.067,z:.091,open:0}
+  {y:.714,rx:.122,rz:.195,z:.092,open:0},
+  {y:.678,rx:.095,rz:.165,z:.106,open:0},
+  {y:.640,rx:.063,rz:.126,z:.114,open:0},
+  {y:.619,rx:.024,rz:.074,z:.116,open:0}
  ];
- const n=64,verts:number[]=[],indices:number[]=[];
- for(const ring of rings){
+ // Subdivide the longitudinal profile so the shell doesn't show ring bands.
+ // Catmull-Rom interpolation softens the rear while keeping the angular chin taper.
+ const smooth=(a:number,b:number,c:number,d:number,t:number)=>{
+  const t2=t*t,t3=t2*t;
+  return .5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);
+ };
+ const profile:typeof rings=[];
+ for(let j=0;j<rings.length-1;j++){
+  for(let step=0;step<4;step++){
+   const t=step/4,p=rings[Math.max(0,j-1)],q=rings[j],r=rings[j+1],s=rings[Math.min(rings.length-1,j+2)];
+   profile.push({
+    y:smooth(p.y,q.y,r.y,s.y,t),
+    rx:Math.max(.009,smooth(p.rx,q.rx,r.rx,s.rx,t)),
+    rz:Math.max(.015,smooth(p.rz,q.rz,r.rz,s.rz,t)),
+    z:smooth(p.z,q.z,r.z,s.z,t),
+    open:Math.max(0,smooth(p.open,q.open,r.open,s.open,t))
+   });
+  }
+ }
+ profile.push(rings[rings.length-1]);
+ const n=72,verts:number[]=[],indices:number[]=[];
+ for(const ring of profile){
   for(let i=0;i<=n;i++){
    const t=ring.open+(Math.PI*2-ring.open*2)*i/n;
    verts.push(Math.sin(t)*ring.rx,ring.y,Math.cos(t)*ring.rz+ring.z);
   }
  }
- for(let j=0;j<rings.length-1;j++)for(let i=0;i<n;i++){
+ for(let j=0;j<profile.length-1;j++)for(let i=0;i<n;i++){
   const a=j*(n+1)+i,b=a+1,c=a+n+1,d=c+1;
   indices.push(a,c,b,b,c,d);
  }
