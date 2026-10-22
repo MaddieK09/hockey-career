@@ -25,43 +25,48 @@ export function createGoalieMask(shellColor:string):THREE.Group {
  const wire=(points:THREE.Vector3[],radius=.0048)=>{
   add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),Math.max(16,points.length*9),radius,8,false),metalMat,cage);
  };
- // Skull-following rear and crown: broader than the face, deep enough to wrap the occiput.
- oval(0,.944,-.057,.229,.244,.205,shellMat);
- // The front brow is a solid arc; leave the lower face open behind the cage.
- const brow=add(new THREE.TorusGeometry(.173,.027,10,36,Math.PI),shellMat);
- brow.position.set(0,1.055,.147);brow.rotation.z=Math.PI;
- for(const side of [-1,1]){
-  const s=side;
-  // Thin, sloped shell wings hug cheeks; avoid oversized spherical ear cups.
-  const cheek=oval(s*.165,.885,.065,.065,.139,.129,shellMat);
-  cheek.rotation.z=-s*.18;
-  const jaw=oval(s*.111,.800,.135,.078,.081,.096,shellMat);
-  jaw.rotation.z=s*.23;
-  // Liner and rear straps show from profile without leaving a bare neck.
-  oval(s*.175,.925,-.077,.013,.083,.093,linerMat);
-  panel(s*.190,1.003,-.035,.010,.012,.050,linerMat,.004);
-  panel(s*.194,1.029,-.032,.010,.012,.048,linerMat,.004);
-  panel(s*.195,1.054,-.025,.010,.011,.044,linerMat,.004);
- }
- // Chin cup and padded lower rim visually meet the chest/neck protector.
- oval(0,.765,.146,.140,.073,.105,shellMat);
- oval(0,.750,.209,.101,.030,.032,linerMat);
- // The wirework curves forward in three dimensions; no straight square grille.
- wire([v(-.170,1.070,.185),v(-.105,1.090,.219),v(0,1.094,.233),v(.105,1.090,.219),v(.170,1.070,.185)],.007);
+ // Final fit: mask sits around the face, not out in front of it.
+ // The back shell is a compact, sculpted skull wrap with integrated cheek wings.
+ const crown=oval(0,.947,-.065,.237,.250,.203,shellMat);
+ crown.name='fitted-crown-shell';
+ const rear=oval(0,.906,-.166,.205,.177,.098,shellMat);
+ rear.name='rear-occipital-protection';
+ // An inset front brow follows the forehead rather than forming a floating ring.
+ const brow=oval(0,1.073,.116,.185,.054,.092,shellMat);
+ brow.name='integrated-brow';
  for(const s of [-1,1]){
-  wire([v(s*.174,1.070,.183),v(s*.181,.993,.220),v(s*.173,.889,.254),v(s*.117,.802,.239)],.007);
+  const temple=oval(s*.170,.935,-.002,.060,.145,.153,shellMat);
+  temple.rotation.z=-s*.13;
+  const cheek=oval(s*.142,.837,.106,.072,.101,.109,shellMat);
+  cheek.rotation.z=s*.24;
+  const jaw=oval(s*.094,.795,.132,.069,.069,.078,shellMat);
+  jaw.rotation.z=s*.21;
+  oval(s*.183,.927,-.084,.011,.075,.085,linerMat);
+  // Small vent slots, cutout-style dark insets along the temples.
+  for(let i=0;i<3;i++)panel(s*.196,.987+i*.023,-.059,.010,.009,.039,linerMat,.004);
+ }
+ // Chin protection is tucked into the jaw wings, not stacked on the face.
+ const chin=oval(0,.769,.142,.126,.070,.088,shellMat);
+ chin.name='integrated-chin-cup';
+ oval(0,.761,.214,.095,.021,.018,linerMat);
+ // Cage profile: reduced projection and curved bar paths follow the shell.
+ wire([v(-.163,1.064,.166),v(-.096,1.081,.195),v(0,1.087,.206),v(.096,1.081,.195),v(.163,1.064,.166)],.0065);
+ for(const s of [-1,1]){
+  wire([v(s*.166,1.063,.168),v(s*.177,.989,.205),v(s*.169,.889,.227),v(s*.116,.806,.215)],.0065);
  }
  for(let row=0;row<5;row++){
-  const y=.831+row*.049,spread=.125+.047*Math.sin((row+1)*Math.PI/6);
-  const z=.252+(row===2?.021:row===1||row===3?.014:0);
-  wire([v(-spread,y,.207),v(-spread*.55,y-.004,z),v(0,y-.008,z+.009),v(spread*.55,y-.004,z),v(spread,y,.207)]);
+  const y=.832+row*.047,spread=.121+.046*Math.sin((row+1)*Math.PI/6);
+  const z=.225+(row===2?.015:row===1||row===3?.010:0);
+  wire([v(-spread,y,.190),v(-spread*.55,y-.004,z),v(0,y-.007,z+.008),v(spread*.55,y-.004,z),v(spread,y,.190)],.0046);
  }
  for(let i=-2;i<=2;i++){
-  const x=i*.056;
-  wire([v(x*.88,1.080,.225),v(x,1.002,.261),v(x*.92,.919,.281),v(x*.74,.827,.250)]);
+  const x=i*.054;
+  wire([v(x*.88,1.076,.195),v(x,1.001,.230),v(x*.93,.920,.246),v(x*.75,.829,.222)],.0044);
  }
- wire([v(-.126,.810,.226),v(0,.790,.258),v(.126,.810,.226)],.0065);
- // A padded throat bib is a separate model part, tucked below the chin.
- const bib=oval(0,.686,.062,.159,.102,.118,padMat);bib.name='padded-throat-guard';
+ wire([v(-.115,.811,.211),v(0,.794,.234),v(.115,.811,.211)],.006);
+ // A flexible dangler-style throat shield sits directly under the chin.
+ const shield=oval(0,.692,.105,.144,.105,.090,padMat);
+ shield.name='throat-and-neck-shield';
+ oval(0,.635,.026,.135,.075,.113,padMat);
  return root;
 }
