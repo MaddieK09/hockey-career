@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { bodyDimensions } from './playerBody';
+import {createGoalieMask} from './goalieMask';
 import type {PlayerAppearance} from '../player/appearance';
 import type {Equipment} from '../player/equipment';
 import {COLORS} from '../player/equipment';
@@ -43,6 +44,14 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  const tapered=(a:THREE.Vector3,b:THREE.Vector3,ra:number,rb:number,c:string,parent:THREE.Group)=>{const d=b.clone().sub(a);const m=mesh(new THREE.CylinderGeometry(rb,ra,d.length(),20,1),c,parent);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());return m;};
  // The jersey is a connected cloth-like shape, not an assembly of capsules.
  mesh(loft([{y:-.64,rx:.273,rz:.197,z:.01},{y:-.55,rx:.289,rz:.208,z:.01},{y:-.36,rx:.283,rz:.206},{y:-.09,rx:isGoalie?.327:.296,rz:isGoalie?.251:.211},{y:.24,rx:isGoalie?.366:.325,rz:isGoalie?.267:.223},{y:.37,rx:.328,rz:.219},{y:.48,rx:.205,rz:.146}]),color.shirt,jersey,.98);
+ // Goalie neck/collar equipment bridges the chest protector and helmet.
+ if(isGoalie){
+  const collar=group('goalie-chest-collar');
+  mesh(loft([{y:.424,rx:.218,rz:.182,z:.018},{y:.498,rx:.175,rz:.145,z:.018},{y:.569,rx:.131,rz:.112,z:.005}]),color.navy,collar,.92);
+  ell(0,.574,.042,.139,.058,.127,color.ink,collar);
+  panel(0,.493,.179,.255,.066,.063,color.white,collar,.026);
+  for(const s of [-1,1])panel(s*.176,.487,.076,.112,.084,.162,color.navy,collar,.035);
+ }
  // Upper-body yoke and cloth trims.
  mesh(loft([{y:.42,rx:.205,rz:.153},{y:.465,rx:.174,rz:.129},{y:.487,rx:.122,rz:.101}]),color.navy,jersey);
  mesh(loft([{y:-.659,rx:.275,rz:.199},{y:-.632,rx:.281,rz:.208}]),color.white,jersey);
@@ -86,45 +95,7 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  panel(0,.772,.178,.073,.009,.011,'#955e5c',head,.004);
  // Goal mask is a dedicated contoured assembly. The skater helmet stays unchanged.
  if(isGoalie){
-  const mask=new THREE.Group();mask.name='contoured-goalie-mask';head.add(mask);
-  const cage=new THREE.Group();cage.name='curved-cat-eye-cage';mask.add(cage);
-  const wire=(points:THREE.Vector3[],radius=.0055)=>{
-   mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),Math.max(10,points.length*6),radius,7,false),color.steel,cage,.35,.62);
-  };
-  // Helmet shell hugs the skull; the rear wrap covers the exposed ear/occipital area.
-  const crown=mesh(new THREE.SphereGeometry(1,40,24,0,Math.PI*2,0,1.46),color.shell,mask,.42);
-  crown.position.set(0,.942,-.016);crown.scale.set(.226,.254,.216);
-  const backShell=ell(0,.917,-.131,.214,.194,.122,color.shell,mask);
-  backShell.scale.z=.115;
-  // Smooth side shells replace the protruding round ear cups.
-  for(const s of [-1,1]){
-   const temple=ell(s*.174,.928,.005,.064,.154,.159,color.shell,mask);
-   temple.rotation.z=-s*.09;
-   const cheek=ell(s*.148,.831,.115,.061,.102,.116,color.shell,mask);
-   cheek.rotation.z=s*.24;
-   panel(s*.187,.926,-.063,.009,.052,.043,color.ink,mask,.005);
-   // Slots stay small and flush to the helmet surface.
-   for(let i=0;i<3;i++)panel(s*.187,1.012+i*.023,-.072,.008,.009,.034,color.ink,mask,.003);
-   wire([V(s*.176,1.068,.177),V(s*.178,.976,.220),V(s*.163,.880,.239),V(s*.103,.800,.221)],.006);
-  }
-  // Integrated chin cup and throat protector close the formerly floating lower jaw.
-  ell(0,.772,.125,.132,.082,.107,color.shell,mask);
-  panel(0,.766,.220,.166,.025,.032,color.ink,mask,.012);
-  panel(0,.705,.099,.170,.104,.118,color.navy,mask,.033);
-  // Mask cage sits closer to the face, with a shallow rounded projection.
-  wire([V(-.162,1.070,.174),V(-.092,1.087,.209),V(0,1.093,.222),V(.092,1.087,.209),V(.162,1.070,.174)],.007);
-  for(const s of [-1,1])wire([V(s*.165,1.067,.180),V(s*.181,.987,.216),V(s*.171,.889,.247),V(s*.121,.799,.232)],.007);
-  for(let row=0;row<5;row++){
-   const y=.834+row*.049,spread=.126+.048*Math.sin((row+1)*Math.PI/6);
-   const front=.241+(row===2?.018:row===1||row===3?.012:0);
-   wire([V(-spread,y,.203),V(-spread*.53,y-.004,front),V(0,y-.007,front+.008),V(spread*.53,y-.004,front),V(spread,y,.203)],.0045);
-  }
-  for(let i=-2;i<=2;i++){
-   const x=i*.056;
-   wire([V(x*.89,1.081,.213),V(x,1.006,.247),V(x*.94,.917,.265),V(x*.75,.830,.244)],.0045);
-  }
-  wire([V(-.127,.807,.225),V(0,.791,.245),V(.127,.807,.225)],.006);
-  panel(0,1.116,.002,.075,.012,.036,color.ink,mask,.005);
+  head.add(createGoalieMask(color.shell));
  }else{
   const verts:number[]=[],indices:number[]=[];
   for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
