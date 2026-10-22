@@ -44,13 +44,16 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  const tapered=(a:THREE.Vector3,b:THREE.Vector3,ra:number,rb:number,c:string,parent:THREE.Group)=>{const d=b.clone().sub(a);const m=mesh(new THREE.CylinderGeometry(rb,ra,d.length(),20,1),c,parent);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());return m;};
  // The jersey is a connected cloth-like shape, not an assembly of capsules.
  mesh(loft([{y:-.64,rx:.273,rz:.197,z:.01},{y:-.55,rx:.289,rz:.208,z:.01},{y:-.36,rx:.283,rz:.206},{y:-.09,rx:isGoalie?.327:.296,rz:isGoalie?.251:.211},{y:.24,rx:isGoalie?.366:.325,rz:isGoalie?.267:.223},{y:.37,rx:.328,rz:.219},{y:.48,rx:.205,rz:.146}]),color.shirt,jersey,.98);
- // Goalie neck/collar equipment bridges the chest protector and helmet.
+ // A high padded collar meets the helmet throat shield and hides the exposed neck.
  if(isGoalie){
   const collar=group('goalie-chest-collar');
-  mesh(loft([{y:.424,rx:.218,rz:.182,z:.018},{y:.498,rx:.175,rz:.145,z:.018},{y:.569,rx:.131,rz:.112,z:.005}]),color.navy,collar,.92);
-  ell(0,.574,.042,.139,.058,.127,color.ink,collar);
-  panel(0,.493,.179,.255,.066,.063,color.white,collar,.026);
-  for(const s of [-1,1])panel(s*.176,.487,.076,.112,.084,.162,color.navy,collar,.035);
+  mesh(loft([{y:.416,rx:.236,rz:.198,z:.020},{y:.499,rx:.194,rz:.165,z:.017},{y:.593,rx:.141,rz:.121,z:.004},{y:.646,rx:.118,rz:.102,z:.004}]),color.navy,collar,.92);
+  ell(0,.617,.059,.148,.061,.132,color.ink,collar);
+  panel(0,.516,.187,.277,.073,.065,color.white,collar,.026);
+  for(const s of [-1,1]){
+   panel(s*.177,.496,.075,.123,.091,.175,color.navy,collar,.035);
+   ell(s*.102,.615,.037,.058,.073,.093,color.navy,collar);
+  }
  }
  // Upper-body yoke and cloth trims.
  mesh(loft([{y:.42,rx:.205,rz:.153},{y:.465,rx:.174,rz:.129},{y:.487,rx:.122,rz:.101}]),color.navy,jersey);
