@@ -28,12 +28,15 @@ export function createGoalieMask(shellColor:string):THREE.Group {
   {y:1.018,rx:.230,rz:.211,z:-.044,open:1.03},
   {y:.957,rx:.226,rz:.214,z:-.047,open:1.12},
   {y:.895,rx:.215,rz:.204,z:-.047,open:1.08},
-  {y:.840,rx:.194,rz:.191,z:-.035,open:.92},
-  {y:.804,rx:.165,rz:.171,z:-.016,open:.65},
-  {y:.773,rx:.134,rz:.155,z:.002,open:.32},
-  {y:.739,rx:.103,rz:.139,z:.014,open:0},
-  {y:.702,rx:.065,rz:.114,z:.016,open:0},
-  {y:.686,rx:.025,rz:.073,z:.014,open:0}
+  {y:.840,rx:.192,rz:.192,z:-.029,open:.92},
+  {y:.802,rx:.162,rz:.180,z:.001,open:.68},
+  // Angled chin projects forward as the jaw narrows, then sweeps down to a point.
+  {y:.766,rx:.130,rz:.174,z:.033,open:.40},
+  {y:.729,rx:.108,rz:.167,z:.058,open:.12},
+  {y:.693,rx:.088,rz:.153,z:.074,open:0},
+  {y:.654,rx:.065,rz:.127,z:.081,open:0},
+  {y:.622,rx:.041,rz:.091,z:.080,open:0},
+  {y:.608,rx:.016,rz:.046,z:.077,open:0}
  ];
  const n=64,verts:number[]=[],indices:number[]=[];
  for(const ring of rings){
@@ -58,11 +61,11 @@ export function createGoalieMask(shellColor:string):THREE.Group {
   const m=add(new THREE.SphereGeometry(1,20,12),dark);m.position.set(x,y,z);m.scale.set(sx,sy,sz);
  };
  for(const s of [-1,1]){
-  vent(s*.049,.754,.164,.011,.014,.003);
+  vent(s*.051,.687,.221,.010,.014,.004);
   vent(s*.051,1.124,.135,.013,.023,.005);
   vent(s*.142,1.080,.101,.009,.021,.004);
  }
- vent(0,.749,.163,.011,.014,.003);
+ vent(0,.666,.222,.010,.013,.004);
  // Rounded cage profile, with gently bowed vertical and horizontal wires.
  const cage=new THREE.Group();cage.name='rounded-goalie-cage';root.add(cage);
  wire([V(-.168,1.073,.154),V(-.100,1.090,.205),V(0,1.093,.221),V(.100,1.090,.205),V(.168,1.073,.154)],.008,cage);
@@ -78,9 +81,9 @@ export function createGoalieMask(shellColor:string):THREE.Group {
   const x=i*.057;
   wire([V(x*.88,1.086,.209),V(x,1.016,.254),V(x*.94,.925,.266),V(x*.73,.827,.221)],.0046,cage);
  }
- wire([V(-.116,.814,.186),V(-.065,.783,.203),V(0,.757,.201),V(.065,.783,.203),V(.116,.814,.186)],.006,cage);
+ wire([V(-.116,.814,.186),V(-.083,.764,.213),V(-.049,.715,.231),V(0,.675,.231),V(.049,.715,.231),V(.083,.764,.213),V(.116,.814,.186)],.006,cage);
  // Small flexible throat bib follows the pointed shell, without replacing it.
  const bib=add(new THREE.SphereGeometry(1,28,20),padding);
- bib.name='throat-guard';bib.position.set(0,.659,.015);bib.scale.set(.121,.067,.108);
+ bib.name='throat-guard';bib.position.set(0,.578,-.012);bib.scale.set(.115,.058,.095);
  return root;
 }
