@@ -8,14 +8,14 @@ const HAIR:Record<string,string>={Black:'#1e2026','Dark brown':'#352720',Brown:'
 const EYES:Record<string,string>={Brown:'#6b4a34',Blue:'#568eb2',Green:'#56846b',Hazel:'#8b8554',Grey:'#788b9c',Amber:'#ba8545'};
 let portraitSequence=0;
 
-/** Studio-inspired vector portrait, with hairstyle layers anchored to one head silhouette. */
+/** V3 broadcast-style vector portrait, with hairstyle layers anchored to one head silhouette. */
 export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
- const id='headshot-'+(++portraitSequence);
+ const id='headshot-v3-'+(++portraitSequence);
  const skin=SKIN[p.skinTone]??SKIN.Fair,hair=HAIR[p.hairColor]??HAIR.Brown,iris=EYES[p.eyeColor]??EYES.Blue;
  const jersey=COLORS[e.jersey]??'#9b2836';
  const round=p.faceShape==='Round',square=p.faceShape==='Square',heart=p.faceShape==='Heart',angular=p.faceShape==='Angular';
- const cheek=round?70:square?73:angular?64:heart?68:67;
- const jaw=round?57:square?64:heart?48:angular?51:55;
+ const cheek=round?67:square?70:angular?61:heart?64:63;
+ const jaw=round?56:square?61:heart?47:angular?49:53;
  const chinY=round?278:283;
  const face=`M160 91 C119 89 ${160-cheek+5} 113 ${160-cheek} 163 C${160-cheek-1} 218 ${160-jaw-3} 254 160 ${chinY} C${160+jaw+3} 254 ${160+cheek+1} 218 ${160+cheek} 163 C${160+cheek-5} 113 201 89 160 91Z`;
  const {back:longBack,front:cap}=portraitHair(p.hairStyle,hair,`${id}-hair`);
@@ -43,8 +43,8 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
  <path d="M114 158 Q160 145 206 158" stroke="#fff" stroke-opacity=".055" stroke-width="12" fill="none"/>
  </g>
  <path d="M108 174 Q127 165 145 174 M175 174 Q194 165 212 174" stroke="#3a2827" stroke-opacity=".52" stroke-width="3.5" stroke-linecap="round" fill="none"/>
- <path d="M109 190 Q128 182 147 189 Q127 198 109 190Z M173 189 Q192 182 211 190 Q192 198 173 189Z" fill="#e5e5e0"/>
- <circle cx="129" cy="190" r="5.8" fill="${iris}"/><circle cx="191" cy="190" r="5.8" fill="${iris}"/><circle cx="129" cy="190" r="2.8" fill="#15191e"/><circle cx="191" cy="190" r="2.8" fill="#15191e"/>
+ <path d="M109 190 Q128 185 147 189 Q127 195 109 190Z M173 189 Q192 185 211 190 Q192 195 173 189Z" fill="#e5e5e0"/>
+ <circle cx="129" cy="190" r="4.8" fill="${iris}"/><circle cx="191" cy="190" r="4.8" fill="${iris}"/><circle cx="129" cy="190" r="2.4" fill="#15191e"/><circle cx="191" cy="190" r="2.4" fill="#15191e"/>
  <circle cx="131" cy="188" r="1.6" fill="#fff"/><circle cx="193" cy="188" r="1.6" fill="#fff"/>
  <path d="M109 189 Q129 180 147 189 M173 189 Q192 180 211 189" stroke="#45302a" stroke-opacity=".72" stroke-width="2.1" stroke-linecap="round" fill="none"/>
  <path d="M160 194 Q159 211 154 226 Q160 231 168 226" stroke="#6c433a" stroke-opacity=".43" stroke-width="2.2" stroke-linecap="round" fill="none"/>
