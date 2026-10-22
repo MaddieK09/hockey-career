@@ -93,9 +93,17 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   for(let i=0;i<3;i++)panel(s*.144,1.118-i*.024,-.081,.059,.007,.009,color.ink,head,.002);
  }
  if(isGoalie){
-  for(let i=-3;i<=3;i++)tube(V(i*.055,1.040,.223),V(i*.052,.785,.232),.005,color.steel,head);
-  for(let i=0;i<5;i++){const y=.804+i*.054;tube(V(-.182,y,.238),V(.182,y,.238),.005,color.steel,head);}
-  panel(0,.780,.228,.287,.023,.026,color.shell,head,.006);
+  // Goal mask: chin cup, side posts, open cage and horizontal crossbars.
+  panel(0,.775,.240,.300,.093,.100,color.shell,head,.030);
+  panel(0,.802,.299,.238,.025,.022,color.ink,head,.009);
+  for(const s of [-1,1]){
+   panel(s*.199,.934,.093,.060,.172,.117,color.shell,head,.022);
+   tube(V(s*.188,1.069,.248),V(s*.164,.805,.293),.008,color.steel,head);
+   for(let i=0;i<3;i++)panel(s*.217,.917+i*.051,-.020,.009,.014,.052,color.ink,head,.004);
+  }
+  for(let i=-3;i<=3;i++)tube(V(i*.051,1.066,.260),V(i*.043,.810,.305),.0055,color.steel,head);
+  for(let i=0;i<6;i++){const y=.819+i*.045;const spread=.162+.035*Math.sin(i*Math.PI/5);tube(V(-spread,y,.311),V(spread,y,.311),.005,color.steel,head);}
+  tube(V(-.180,1.076,.253),V(.180,1.076,.253),.008,color.steel,head);
  }else{
   const verts:number[]=[],indices:number[]=[];
   for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
@@ -105,23 +113,42 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   tube(V(-.205,1.008,.215),V(.205,1.008,.215),.005,color.steel,head);
  }
  if(isGoalie){
-  // Tall flat-front pads, with articulated knee blocks and binding sides.
+  // Separate goalie pad assemblies: face, thigh rise, knee block, sliding edge and boot.
   for(const s of [-1,1]){
    const x=s*.230;
-   panel(x,-1.520,.165,.331,1.01,.272,color.pad,equipment,.033);
-   panel(x,-1.503,.311,.278,.912,.023,color.white,equipment,.012);
-   panel(x+s*.133,-1.52,.329,.037,.957,.027,color.navy,equipment,.01);
-   panel(x,-1.098,.328,.287,.118,.031,color.pad,equipment,.023);
-   for(let i=0;i<6;i++)tube(V(x-.133,-1.16-i*.137,.335),V(x+.133,-1.16-i*.137,.335),.004,color.seam,equipment);
-   panel(x,-1.990,.29,.293,.04,.078,color.navy,equipment,.011);
+   const pad=new THREE.Group();pad.name=s<0?'left-leg-pad':'right-leg-pad';equipment.add(pad);
+   panel(x,-1.520,.165,.337,1.025,.278,color.pad,pad,.034);
+   panel(x,-1.505,.313,.289,.934,.030,color.white,pad,.014);
+   panel(x-s*.144,-1.53,.332,.046,.951,.045,color.navy,pad,.010);
+   panel(x+s*.145,-1.53,.324,.038,.954,.038,color.pad,pad,.010);
+   panel(x,-1.087,.333,.302,.150,.057,color.pad,pad,.028);
+   panel(x,-1.346,.344,.291,.130,.037,color.white,pad,.018);
+   panel(x-s*.185,-1.355,.169,.123,.179,.231,color.white,pad,.019);
+   panel(x,-1.990,.291,.299,.064,.105,color.navy,pad,.020);
+   for(let i=0;i<6;i++)tube(V(x-.132,-1.17-i*.137,.352),V(x+.132,-1.17-i*.137,.352),.004,color.seam,pad);
+   for(let i=0;i<3;i++)panel(x+s*.174,-1.20-i*.28,.14,.022,.045,.234,color.ink,pad,.007);
   }
-  // Catch glove is a pocket, blocker is a broad angular slab.
-  ell(-.562,-.395,.234,.178,.156,.105,color.glove,equipment);
-  ell(-.562,-.395,.329,.142,.122,.016,color.ink,equipment);
-  ell(-.562,-.395,.345,.117,.096,.012,color.white,equipment);
-  for(let i=-2;i<=2;i++)tube(V(-.675,-.40+i*.029,.359),V(-.45,-.40+i*.029,.359),.003,color.steel,equipment);
-  panel(.568,-.395,.249,.236,.258,.114,color.glove,equipment,.024);
-  panel(.568,-.395,.313,.211,.217,.017,color.white,equipment,.009);
+  // Real catcher silhouette: wrist cuff, thumb wing, finger wing, recessed pocket and crossed web laces.
+  const trapper=new THREE.Group();trapper.name='trapper-catcher';equipment.add(trapper);
+  const mitt=panel(-.562,-.390,.230,.278,.306,.128,color.glove,trapper,.060);mitt.rotation.z=-.15;
+  ell(-.668,-.298,.247,.081,.115,.067,color.glove,trapper);
+  ell(-.453,-.470,.244,.091,.110,.064,color.glove,trapper);
+  ell(-.561,-.383,.330,.127,.123,.017,color.ink,trapper);
+  ell(-.561,-.383,.348,.108,.102,.011,color.white,trapper);
+  for(let i=-2;i<=2;i++){
+   const y=-.383+i*.035;
+   tube(V(-.657,y,.362),V(-.466,y,.362),.0035,color.steel,trapper);
+   tube(V(-.657,y,.362),V(-.466,-.383-i*.035,.362),.0025,color.steel,trapper);
+  }
+  panel(-.565,-.554,.193,.201,.092,.119,color.glove,trapper,.024);
+  // Blocker is a large flat board, with its actual gripping glove underneath.
+  const blocker=new THREE.Group();blocker.name='blocker-glove';equipment.add(blocker);
+  panel(.568,-.396,.219,.204,.209,.137,color.glove,blocker,.034);
+  for(let i=0;i<3;i++)panel(.493+i*.075,-.530,.222,.062,.083,.094,color.glove,blocker,.015);
+  panel(.568,-.394,.303,.294,.328,.065,color.glove,blocker,.025);
+  panel(.568,-.394,.343,.251,.284,.012,color.white,blocker,.010);
+  panel(.568,-.394,.353,.217,.247,.009,color.glove,blocker,.010);
+  panel(.568,-.570,.226,.212,.087,.122,color.navy,blocker,.021);
   const shaft=e.stick==='White'?'#f4f4f2':e.stick==='Natural'?'#c09b67':color.ink;
   tube(V(.595,-.35,.32),V(.627,-1.18,.34),.021,shaft,equipment);
   panel(.625,-1.477,.34,.082,.60,.053,shaft,equipment,.011);
