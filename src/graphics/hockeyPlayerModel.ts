@@ -84,26 +84,52 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  }
  ell(0,.851,.194,.023,.045,.035,color.skin,head);
  panel(0,.772,.178,.073,.009,.011,'#955e5c',head,.004);
- // Complete shell rim with a genuine open face and goalie-only wire cage.
- const cap=mesh(new THREE.SphereGeometry(1,36,20,0,Math.PI*2,0,1.25),color.shell,head,.46);
- cap.position.set(0,.947,-.01);cap.scale.set(.221,.255,.216);
- for(const s of [-1,1]){
-  panel(s*.195,.926,.002,.056,.16,.149,color.shell,head,.024,.45);
-  tube(V(s*.192,.872,.129),V(s*.125,.785,.191),.009,color.ink,head);
-  for(let i=0;i<3;i++)panel(s*.144,1.118-i*.024,-.081,.059,.007,.009,color.ink,head,.002);
- }
+ // Goal mask is a dedicated contoured assembly. The skater helmet stays unchanged.
  if(isGoalie){
-  // Goal mask: chin cup, side posts, open cage and horizontal crossbars.
-  panel(0,.775,.240,.300,.093,.100,color.shell,head,.030);
-  panel(0,.802,.299,.238,.025,.022,color.ink,head,.009);
+  const mask=new THREE.Group();mask.name='contoured-goalie-mask';head.add(mask);
+  const cage=new THREE.Group();cage.name='curved-cat-eye-cage';mask.add(cage);
+  const wire=(points:THREE.Vector3[],radius=.0055)=>{
+   mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),Math.max(10,points.length*6),radius,7,false),color.steel,cage,.35,.62);
+  };
+  // Low-profile crown and occipital shell. Front is left open for the cage.
+  const crown=mesh(new THREE.SphereGeometry(1,40,24,0,Math.PI*2,0,1.38),color.shell,mask,.38);
+  crown.position.set(0,.955,-.029);crown.scale.set(.224,.250,.213);
+  // Contoured cheek and jaw wings narrow toward a protective chin cup.
   for(const s of [-1,1]){
-   panel(s*.199,.934,.093,.060,.172,.117,color.shell,head,.022);
-   tube(V(s*.188,1.069,.248),V(s*.164,.805,.293),.008,color.steel,head);
-   for(let i=0;i<3;i++)panel(s*.217,.917+i*.051,-.020,.009,.014,.052,color.ink,head,.004);
+   const cheek=ell(s*.183,.905,.056,.053,.146,.144,color.shell,mask);
+   cheek.rotation.z=-s*.19;
+   const jaw=panel(s*.125,.799,.128,.124,.105,.170,color.shell,mask,.041);
+   jaw.rotation.z=s*.28;
+   panel(s*.201,.943,-.040,.018,.075,.067,color.ink,mask,.008);
+   for(let i=0;i<3;i++){
+    const y=.976+i*.040;
+    panel(s*.208,y,-.066,.012,.012,.039,color.ink,mask,.005);
+   }
+   // Ear and chin straps sit behind the wire cage.
+   wire([V(s*.207,.876,.122),V(s*.172,.823,.178),V(s*.107,.781,.208)],.006);
   }
-  for(let i=-3;i<=3;i++)tube(V(i*.051,1.066,.260),V(i*.043,.810,.305),.0055,color.steel,head);
-  for(let i=0;i<6;i++){const y=.819+i*.045;const spread=.162+.035*Math.sin(i*Math.PI/5);tube(V(-spread,y,.311),V(spread,y,.311),.005,color.steel,head);}
-  tube(V(-.180,1.076,.253),V(.180,1.076,.253),.008,color.steel,head);
+  const chin=ell(0,.767,.150,.134,.078,.114,color.shell,mask);
+  chin.rotation.x=-.20;
+  panel(0,.754,.243,.169,.022,.019,color.ink,mask,.009);
+  // Rounded opening and forward-curving bars, rather than a square grid.
+  wire([V(-.176,1.074,.194),V(-.103,1.091,.241),V(0,1.098,.260),V(.103,1.091,.241),V(.176,1.074,.194)],.008);
+  for(const s of [-1,1]){
+   wire([V(s*.178,1.072,.199),V(s*.203,.989,.238),V(s*.195,.886,.267),V(s*.148,.797,.260)],.008);
+  }
+  for(let row=0;row<5;row++){
+   const y=.834+row*.050;
+   const spread=.144+.055*Math.sin((row+1)*Math.PI/6);
+   const front=.278+(row===2?.024:row===1||row===3?.015:0);
+   wire([V(-spread,y,.230),V(-spread*.53,y-.006,front),V(0,y-.009,front+.010),V(spread*.53,y-.006,front),V(spread,y,.230)]);
+  }
+  for(let i=-2;i<=2;i++){
+   const x=i*.064;
+   wire([V(x*.92,1.083,.248),V(x,1.010,.291),V(x*.94,.915,.311),V(x*.76,.826,.274)],.005);
+  }
+  // Raised centre brow and lower chin rails reinforce the mask profile.
+  wire([V(-.151,.810,.242),V(0,.794,.281),V(.151,.810,.242)],.007);
+  // Matte chin and side decals are distinct from the metal cage.
+  panel(0,1.122,.011,.080,.013,.047,color.ink,mask,.006);
  }else{
   const verts:number[]=[],indices:number[]=[];
   for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
