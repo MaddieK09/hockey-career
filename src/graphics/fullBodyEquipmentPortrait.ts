@@ -9,7 +9,7 @@ let seq=0;
  */
 export function fullBodyEquipmentPortrait(p:PlayerDraft):string {
  const id='equipment-figure-'+(++seq),g=p.position==='G';
- const jersey=COLORS[p.equipment.jersey]??'#b73348',helmet=COLORS[p.equipment.helmet]??'#182d42',glove=COLORS[p.equipment.gloves]??'#172d40',pad=COLORS[p.equipment.pads]??'#f2f4f5',stick=COLORS[p.equipment.stick]??'#ded9ca';
+ const jersey=COLORS[p.equipment.jersey]??'#b73348',helmet=COLORS[p.equipment.helmet]??'#182d42',glove=COLORS[p.equipment.gloves]??'#172d40',pad=COLORS[p.equipment.pads]??'#f2f4f5',stick=(p.equipment.stick==='Natural'?'#c9aa7b':COLORS[p.equipment.stick])??'#ded9ca';
  const skin=skinColors[p.appearance.skinTone]??'#eac1a7',hair=hairColors[p.appearance.hairColor]??'#704b36';
  const num=Number.isFinite(p.jerseyNumber)?p.jerseyNumber:0;
  const cage=g?`<path d="M151 83 Q170 65 189 83 L187 132 Q170 154 153 132Z" fill="#111e2d" stroke="#e4e8ed" stroke-width="4"/><g fill="none" stroke="#c8d2dc" stroke-width="2.8"><path d="M152 91Q170 84 188 91 M151 103Q170 97 189 103 M152 116Q170 110 188 116 M154 129Q170 124 186 129 M161 82L159 132 M170 78L170 141 M179 82L181 132"/></g>`:`<path d="M143 104Q170 116 197 104" fill="none" stroke="#d9e4ec" stroke-width="3"/>`;
