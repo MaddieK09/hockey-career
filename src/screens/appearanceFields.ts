@@ -12,7 +12,7 @@ export function appearanceFields(p:PlayerAppearance):string {
  </div></fieldset>`;
 }
 export function appearancePreviewMarkup():string {
- return `<section class="appearance-preview appearance-preview-3d" aria-label="Player preview"><div class="creator-preview-switch" role="group" aria-label="Creator editing mode"><button type="button" class="secondary-action" data-mode="appearance" aria-pressed="true">Appearance · 2D</button><button type="button" class="secondary-action" data-mode="equipment" aria-pressed="false">Equipment · 2D</button></div><div class="player-portrait-host" data-portrait-host></div><div class="player-3d-host" data-3d-host hidden></div><p class="preview-title" data-preview-title>2D player portrait</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Edit appearance and equipment with live 2D previews</p></section>`;
+ return `<section class="appearance-preview appearance-preview-2d" aria-label="Player preview"><div class="creator-preview-switch" role="group" aria-label="Creator editing mode"><button type="button" class="secondary-action" data-mode="appearance" aria-pressed="true">Appearance · 2D</button><button type="button" class="secondary-action" data-mode="equipment" aria-pressed="false">Equipment · 2D</button></div><div class="player-portrait-host" data-portrait-host></div><div class="player-3d-host" data-3d-host hidden></div><p class="preview-title" data-preview-title>2D player portrait</p><p class="preview-details" data-appearance-details></p><p class="preview-note">Edit appearance and equipment with live 2D previews</p></section>`;
 }
 export function renderAppearanceDetails(root:HTMLElement,p:PlayerAppearance):void {
  const detail=root.querySelector<HTMLElement>('[data-appearance-details]');
