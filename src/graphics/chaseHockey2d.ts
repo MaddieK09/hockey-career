@@ -12,7 +12,7 @@ const oval=(c:CanvasRenderingContext2D,x:number,y:number,rx:number,ry:number,col
 };
 let cameraDepth=0,cameraLateral=220,previousMode='';
 export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'player'|'goalie',time:number):void{
- const goalieMode=mode==='goalie'||m.goalieCareer;
+ const goalieMode=mode==='goalie';
  const controlled=goalieMode?m.goalies[0]:m.skaters[m.selected];
  // Always look toward the opposing end from behind the controlled player.
  const direction=goalieMode?1:(m.skaters[m.selected].team===0?1:-1);
@@ -20,14 +20,14 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(previousMode!==mode){cameraDepth=goalDepth;cameraLateral=controlled.y;previousMode=mode;}
  cameraDepth+=(goalDepth-cameraDepth)*.13;
  cameraLateral+=(controlled.y-cameraLateral)*.1;
- const eye=goalieMode?Math.max(0,cameraDepth-48):Math.max(0,cameraDepth-55);
- const horizon=goalieMode?109:117;
+ const eye=goalieMode?Math.max(0,cameraDepth-125):Math.max(0,cameraDepth-55);
+ const horizon=goalieMode?95:117;
  // Perspective: width grows toward camera. Near bodies are much larger.
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
-  const z=clamp(260/(260+depth),.27,1.15);
-  return {x:400+(y-cameraLateral)*z*1.52,y:horizon+300*z,scale:z*1.45,behind:along< -25};
+  const z=clamp((goalieMode?360:260)/((goalieMode?360:260)+depth),goalieMode?.42:.27,1.15);
+  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75:1.52),y:horizon+300*z,scale:z*(goalieMode?1.7:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
@@ -92,12 +92,11 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(selectedGoalie){
   // Near goalie stays anchored in the foreground as the camera follows the crease.
   const p=project(selectedGoalie.x,selectedGoalie.y);
-  drawActor(c,400+(selectedGoalie.y-cameraLateral)*1.25,420,1.65,selectedGoalie,time,true);
+  drawActor(c,400+(selectedGoalie.y-cameraLateral)*1.25,433,2.1,selectedGoalie,time,true);
   // Goal frame behind goalie, NHL-style.
-  const gw=78,gy=405;
-  ln(c,400-gw,gy,400-gw,gy-88,5,'#ca3d4c');
-  ln(c,400+gw,gy,400+gw,gy-88,5,'#ca3d4c');
-  ln(c,400-gw,gy-88,400+gw,gy-88,5,'#ca3d4c');
+  const gw=94,gy=430;
+  // Near net is behind the camera/player: do not paint its crossbar over the goalie.
+  void gw;void gy;
   void p;
  }
  const puck=project(m.puck.x,m.puck.y);
