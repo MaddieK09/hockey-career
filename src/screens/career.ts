@@ -31,7 +31,6 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const startMatch=()=>{
   let active=true,finished=false,raf=0,last=performance.now(),elapsed=0,period=1,home=0,away=0,saves=0,goals=0,assists=0;
   const goalie=p.position==='G';
-  const W=800,H=440;
   const players:Skater[]=[
    {x:200,y:220,vx:0,vy:0,team:0},{x:320,y:130,vx:0,vy:0,team:0},{x:320,y:310,vx:0,vy:0,team:0},
    {x:590,y:220,vx:0,vy:0,team:1},{x:485,y:130,vx:0,vy:0,team:1},{x:485,y:310,vx:0,vy:0,team:1}
@@ -40,7 +39,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,aiShotCount=0,shotFeedback='';
   const previousPositions=players.map(a=>({x:a.x,y:a.y}));let previousGoalie={x:goalieX,y:goalieY},lastFrameDt=1/60,shotAnimation=0;
   const keys=new Set<string>();
-  root.innerHTML=`<main class="career-shell match-shell"><header class="career-top"><button data-exit>← Career</button><strong>HOME <span data-score>0 - 0</span> AWAY</strong><span data-clock>P1 · 1:00</span></header><canvas data-rink width="800" height="440" aria-label="Playable top-down hockey rink"></canvas><div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div><div class="action-pad"><button data-action="shoot">${goalie?'BUTTERFLY':'SHOOT'}</button><button data-action="pass">${goalie?'BLOCKER':'PASS'}</button><button data-action="switch">SWITCH</button></div></div><p class="career-muted" data-hint>${goalie?'Protect the left net. BUTTERFLY seals low shots; BLOCKER deflects high shots. Follow the puck with the movement pad.':'Attack the right net. Move, pass, shoot and switch skaters.'}</p><section class="match-result" data-result hidden></section></main>`;
+  root.innerHTML=`<main class="career-shell match-shell"><header class="career-top"><button data-exit>← Career</button><strong>HOME <span data-score>0 - 0</span> AWAY</strong><span data-clock>P1 · 1:00</span></header><div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Playable top-down hockey rink with animated players"></canvas><div class="rink-hud"><span>HOME · RED</span><span data-event>PUCK DROP</span><span>AWAY · BLUE</span></div></div><div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div><div class="action-pad"><button data-action="shoot">${goalie?'BUTTERFLY':'SHOOT'}</button><button data-action="pass">${goalie?'BLOCKER':'PASS'}</button><button data-action="switch">SWITCH</button></div></div><p class="career-muted" data-hint>${goalie?'Protect the left net. BUTTERFLY seals low shots; BLOCKER deflects high shots. Follow the puck with the movement pad.':'Attack the right net. Move, pass, shoot and switch skaters.'}</p><section class="match-result" data-result hidden></section></main>`;
   const canvas=root.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!;
   const clock=root.querySelector<HTMLElement>('[data-clock]')!,score=root.querySelector<HTMLElement>('[data-score]')!;
   const stick=root.querySelector<HTMLElement>('[data-stick]')!,knob=root.querySelector<HTMLElement>('[data-knob]')!;
@@ -118,6 +117,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    if(elapsed>=60){elapsed=0;period++;if(period>3){finish();return;}reset();}
    clock.textContent=`P${period} · ${Math.floor(60-elapsed)}s`;score.textContent=`${home} - ${away}`;
    const hint=root.querySelector<HTMLElement>('[data-hint]');
+   const event=root.querySelector<HTMLElement>('[data-event]');if(event)event.textContent=shotFeedback||'LIVE PLAY';
    if(hint&&goalie)hint.textContent=shotFeedback?shotFeedback+' · Butterfly for low saves, Blocker for high saves.':'Protect the left net · read the puck carrier and prepare for shots.';
    const speed=145+career.speed*1.25;
    let dx=moveX,dy=moveY;
