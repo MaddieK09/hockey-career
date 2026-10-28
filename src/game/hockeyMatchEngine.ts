@@ -145,7 +145,7 @@ export class HockeyMatch {
   const a=this.skaters[owner],b=this.skaters[to];
   this.release(owner,b.x+b.vx*.42,b.y+b.vy*.42,400+this.rating.handling*.4,false);
   this.puck.lock=.22;this.lastPasser=owner;
-  this.decisionCooldown[a.team]=1.6;
+  this.decisionCooldown[a.team]=2.2;
  }
  private closest(team:Team,x:number,y:number):number {
   let found=team===0?0:5,best=Infinity;
@@ -259,7 +259,7 @@ export class HockeyMatch {
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
   // Hold possession and carry the puck; pass only when genuinely trapped.
-  if(pressured&&carrier.carriedFor>2.1&&this.rng()<.34){
+  if(pressured&&carrier.carriedFor>3.1&&this.rng()<.20){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
