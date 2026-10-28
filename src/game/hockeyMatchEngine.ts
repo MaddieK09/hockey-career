@@ -217,6 +217,11 @@ export class HockeyMatch {
    }
    a.x=clamp(a.x+a.vx*dt,42,758);
    a.y=clamp(a.y+a.vy*dt,43,397);
+   // Goalies are physical obstacles: skaters cannot skate through the crease keeper.
+   for(const g of this.goalies){
+    const dx=a.x-g.x,dy=a.y-g.y,dist=Math.hypot(dx,dy);
+    if(dist>0&&dist<30){const push=30-dist;a.x=clamp(a.x+dx/dist*push,42,758);a.y=clamp(a.y+dy/dist*push,43,397);a.vx*=.55;a.vy*=.55;}
+   }
    if(Math.hypot(a.vx,a.vy)>9){
     const targetAngle=Math.atan2(a.vy,a.vx);
     const delta=Math.atan2(Math.sin(targetAngle-a.heading),Math.cos(targetAngle-a.heading));
@@ -371,7 +376,7 @@ export class HockeyMatch {
   if(this.puck.x>=754||this.puck.x<=46){
    const scoringRight=this.puck.x>=755;
    // Only actual shots may score, not passes, stick carries, or loose pucks.
-   if(Math.abs(this.puck.y-220)<=34&&this.puck.shotTeam!==null){
+   if(Math.abs(this.puck.y-220)<=34&&this.puck.height<=64&&this.puck.shotTeam!==null){
     const scorer:Team=scoringRight?0:1;
     this.scores[scorer]++;
     if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
@@ -382,6 +387,7 @@ export class HockeyMatch {
     return;
    }
    this.puck.x=clamp(this.puck.x,48,752);this.puck.vx*=-.56;this.puck.shotTeam=null;
+   this.puck.vz=Math.min(this.puck.vz,20);
   }
   this.intercept();
  }
