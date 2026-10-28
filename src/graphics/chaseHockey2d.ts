@@ -27,8 +27,8 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
-  const z=clamp((goalieMode?360/cameraFactor:260)/((goalieMode?360:260)+depth),goalieMode?.42:.27,1.15);
-  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+300*z,scale:z*(goalieMode?1.7*cameraFactor:1.45),behind:along< -25};
+  const z=clamp((goalieMode?360:260)/((goalieMode?360:260)+depth),goalieMode?.32:.27,1.15);
+  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+300*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.7*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
@@ -66,17 +66,30 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  }
  const center=project(400,220);
  if(!center.behind)oval(c,center.x,center.y,4*center.scale,2.5*center.scale,'#bb4356');
- // Opposing net and crease: net is at the far end of the visible rink.
- const farGoal=direction===1?740:60,net=project(farGoal,220);
- if(!net.behind){
-  oval(c,net.x,net.y,48*net.scale,17*net.scale,'rgba(78,160,208,.22)');
-  const w=38*net.scale,h=38*net.scale;
-  ln(c,net.x-w,net.y,net.x-w,net.y-h,4*net.scale,'#b94352');
-  ln(c,net.x+w,net.y,net.x+w,net.y-h,4*net.scale,'#b94352');
-  ln(c,net.x-w,net.y-h,net.x+w,net.y-h,4*net.scale,'#b94352');
-  for(let i=1;i<6;i++)ln(c,net.x-w+i*w*2/6,net.y-h,net.x-w+i*w*2/6,net.y,1,'#9cb8c9');
-  for(let i=1;i<5;i++)ln(c,net.x-w,net.y-h+i*h/5,net.x+w,net.y-h+i*h/5,1,'#9cb8c9');
- }
+ // Render both goals directly from the same world coordinates as puck physics.
+ // Post spacing: y=220±34; crossbar: z=64. None depends on goalie movement.
+ const drawGoal=(worldX:number,opacity:number)=>{
+  const base=project(worldX,220),l=project(worldX,186),r=project(worldX,254);
+  if(base.behind)return;
+  const top=base.y-64*base.scale*.8;
+  oval(c,base.x,base.y,Math.abs(r.x-l.x)*.63,Math.max(6,base.scale*12),'rgba(78,160,208,.18)');
+  c.save();c.globalAlpha=opacity;
+  const width=Math.max(1,3*base.scale);
+  ln(c,l.x,l.y,l.x,top,width,'#c53d4d');
+  ln(c,r.x,r.y,r.x,top,width,'#c53d4d');
+  ln(c,l.x,top,r.x,top,width,'#c53d4d');
+  for(let i=1;i<9;i++){
+   const x=l.x+(r.x-l.x)*i/9;
+   ln(c,x,top,x,base.y,.8,'#789eae');
+  }
+  for(let i=1;i<7;i++){
+   const y=top+(base.y-top)*i/7;
+   ln(c,l.x,y,r.x,y,.8,'#789eae');
+  }
+  c.restore();
+ };
+ drawGoal(direction===1?740:60,1);
+ if(goalieMode)drawGoal(60,.52);
  type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
  const actors:Actor[]=[
   ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0})),
@@ -91,25 +104,14 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
  }
  if(selectedGoalie){
-  // Fixed end-zone camera: only the goalie changes position, never the rink or net.
+  // Unlike the old manually anchored goalie, all bodies and puck share the
+  // exact same camera transform. The goal stays still when the goalie slides.
   const p=project(selectedGoalie.x,selectedGoalie.y);
-  drawActor(c,400+(selectedGoalie.y-220)*1.25*cameraFactor,433+(selectedGoalie.x-60)*.42*cameraFactor,2.1*cameraFactor,selectedGoalie,time,true);
-  void p;
- }
- // The home net is fixed in world space, not attached to the moving goalie.
- // Draw it as a translucent frame so the goalie remains visible through the mesh.
- if(goalieMode){
-  const n=project(60,220),w=76*cameraFactor,h=100*cameraFactor;
-  c.save();c.globalAlpha=.6;
-  ln(c,n.x-w,n.y,n.x-w,n.y-h,5,'#c53645');
-  ln(c,n.x+w,n.y,n.x+w,n.y-h,5,'#c53645');
-  ln(c,n.x-w,n.y-h,n.x+w,n.y-h,5,'#c53645');
-  for(let i=1;i<8;i++)ln(c,n.x-w+i*w*2/8,n.y-h,n.x-w+i*w*2/8,n.y,1,'#789eae');
-  for(let i=1;i<7;i++)ln(c,n.x-w,n.y-h+i*h/7,n.x+w,n.y-h+i*h/7,1,'#789eae');
-  c.restore();
+  drawActor(c,p.x,p.y,clamp(p.scale*1.24,.75,2.7),selectedGoalie,time,true);
  }
  const puck=project(m.puck.x,m.puck.y);
  if(!puck.behind){
+  oval(c,puck.x,puck.y,Math.max(3,5*puck.scale),Math.max(2,2*puck.scale),'rgba(19,42,59,.16)');
   oval(c,puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(3,8*puck.scale),Math.max(2,3*puck.scale),'#182631');
   c.beginPath();c.ellipse(puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(8,15*puck.scale),Math.max(5,9*puck.scale),0,0,TAU);
   c.strokeStyle='#ffd34f';c.lineWidth=2;c.stroke();
