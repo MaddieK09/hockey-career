@@ -21,6 +21,7 @@ export function mountHockeyMatch(
  let cameraZoom=false,cameraX=400;
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  let cameraNotice=0;
+ let arenaMode=false;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -28,7 +29,7 @@ export function mountHockeyMatch(
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<strong>HOME <span data-score>0 - 0</span> AWAY</strong>'
   +'<span data-clock>P1 · 1:00</span></header>'
-  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><span>5 ON 5 + GOALIES</span></div>'
+  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
@@ -56,12 +57,16 @@ export function mountHockeyMatch(
  const knob=root.querySelector<HTMLElement>('[data-knob]')!;
  const result=root.querySelector<HTMLElement>('[data-result]')!;
  const cameraButton=root.querySelector<HTMLButtonElement>('[data-camera]')!;
+ const arenaButton=root.querySelector<HTMLButtonElement>('[data-arena]')!;
+ const shell=root.querySelector<HTMLElement>('.match-shell')!;
+ arenaButton.addEventListener('click',()=>{arenaMode=!arenaMode;shell.classList.toggle('arena-expanded',arenaMode);arenaButton.textContent=arenaMode?'⤢ NORMAL VIEW':'⛶ BIG RINK';});
  const pausePanel=root.querySelector<HTMLElement>('[data-pause]')!;
  const viewButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
  function setPaused(next:boolean){
   paused=next;pausePanel.hidden=!paused;
   cameraButton.textContent=paused?'▶ RESUME':'Ⅱ PAUSE / CAMERA';
   if(paused){match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
+  shell.classList.toggle('match-is-paused',paused);
   last=performance.now();
  }
  viewButtons.forEach(b=>{
@@ -133,7 +138,7 @@ export function mountHockeyMatch(
   button.addEventListener('click',()=>action(button.dataset.action??'')));
  function stop(){
   if(!active)return;
-  active=false;cancelAnimationFrame(raf);
+  active=false;cancelAnimationFrame(raf);shell.classList.remove('arena-expanded');
   window.removeEventListener('keydown',keyDown);
   window.removeEventListener('keyup',keyUp);
   document.removeEventListener('visibilitychange',visibility);
