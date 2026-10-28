@@ -9,7 +9,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;
@@ -24,8 +24,8 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0},
-  {x:709,y:220,team:1,pose:'glide',poseTime:0}
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0},
+  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1};
  scores:[number,number]=[0,0];
@@ -66,11 +66,14 @@ export class HockeyMatch {
   if(this.phase!=='live')return;
   if(this.goalieCareer){
    const goalie=this.goalies[0];
-   if(this.goalieActionCooldown>0)return;
-   if(action==='butterfly'||action==='blocker'){
-    goalie.pose=action;goalie.poseTime=action==='butterfly'?.85:.47;
-    this.goalieActionCooldown=action==='butterfly'?.65:.26;
-   }else if(action==='poke'){
+   if(action==='butterfly'){
+    // Toggle a persistent stance. Recovery has a genuine movement penalty.
+    goalie.pose=goalie.pose==='butterfly'?'glide':'butterfly';
+    goalie.poseTime=0;goalie.actionTime=.18;
+   }else if(action==='blocker'&&this.goalieActionCooldown<=0){
+    goalie.pose='blocker';goalie.poseTime=.42;goalie.actionTime=.25;
+    this.goalieActionCooldown=.3;
+   }else if(action==='poke'&&this.goalieActionCooldown<=0){
     if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
      this.puck.owner=-1;this.puck.shotTeam=null;
      this.puck.x=goalie.x+27;this.puck.vx=320;
@@ -113,7 +116,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
@@ -220,28 +223,46 @@ export class HockeyMatch {
    a.shotAnimation=Math.max(0,a.shotAnimation-dt);
    a.carriedFor=this.puck.owner===i?a.carriedFor+dt:0;
   }
-  // Controlled goalie stays in the crease. Other goalie tracks the puck.
+  // Goalie locomotion uses velocity and constrained acceleration instead of teleport-like steps.
+  // Butterfly is a persistent stance with a slower, lateral push-based slide.
   for(const g of this.goalies){
-   let vy=0,vx=0;
-   if(g.team===0&&this.goalieCareer){vx=this.movement.x*(165+this.rating.speed*.45);vy=this.movement.y*(165+this.rating.speed*.45);}
-   else {
-    // Track the puck from inside the crease; anticipate only the final
-    // approach, not shots still travelling across the opposite half.
+   const user=g.team===0&&this.goalieCareer;
+   let targetX=0,targetY=0;
+   if(user){
+    targetX=this.movement.x;targetY=this.movement.y;
+   }else{
     const approaching=g.team===0?this.puck.vx<0:this.puck.vx>0;
-    const distanceToNet=Math.abs(this.puck.x-g.x);
-    const prediction=approaching&&distanceToNet<300
-     ?this.puck.y+this.puck.vy*Math.min(.35,distanceToNet/Math.max(160,Math.abs(this.puck.vx)))
+    const range=Math.abs(this.puck.x-g.x);
+    const predicted=approaching&&range<300
+     ?this.puck.y+this.puck.vy*Math.min(.28,range/Math.max(180,Math.abs(this.puck.vx)))
      :this.puck.y;
-    const targetY=clamp(220+(prediction-220)*.62,182,258);
-    vy=clamp((targetY-g.y)*3.4,-115,115);
+    targetY=clamp((220+(predicted-220)*.62-g.y)/30,-1,1);
+    const idealX=g.team===0?92:708;
+    targetX=clamp((idealX-g.x)/25,-1,1);
    }
-   const maxX=g.team===0?128:722,minX=g.team===0?72:672;
-   g.x=clamp(g.x+vx*dt,minX,maxX);
-   const gi=g.team;
-   this.creaseMomentum[gi]+=(vy-this.creaseMomentum[gi])*Math.min(1,dt*8);
-   g.y=clamp(g.y+this.creaseMomentum[gi]*dt,178,262);
+   const magnitude=Math.max(1,Math.hypot(targetX,targetY));
+   targetX/=magnitude;targetY/=magnitude;
+   const butterfly=g.pose==='butterfly';
+   const recovering=g.actionTime>0&&g.pose==='glide';
+   const topSpeed=butterfly?66:recovering?70:user?170+this.rating.speed*.28:123;
+   const accel=butterfly?250:recovering?300:640;
+   const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
+   const maxChange=accel*dt;
+   const dx=desiredX-g.vx,dy=desiredY-g.vy;
+   const change=Math.hypot(dx,dy);
+   g.vx+=change>maxChange?dx/change*maxChange:dx;
+   g.vy+=change>maxChange?dy/change*maxChange:dy;
+   const minX=g.team===0?72:672,maxX=g.team===0?128:728;
+   const nextX=clamp(g.x+g.vx*dt,minX,maxX);
+   const nextY=clamp(g.y+g.vy*dt,178,262);
+   if(nextX===g.x&&Math.sign(g.vx)===Math.sign(g.x-(minX+maxX)/2))g.vx=0;
+   if(nextY===g.y&&Math.sign(g.vy)===Math.sign(g.y-220))g.vy=0;
+   g.x=nextX;g.y=nextY;
+   const targetStance=butterfly?1:0;
+   g.stance+=clamp(targetStance-g.stance,-dt*5,dt*7);
+   g.actionTime=Math.max(0,g.actionTime-dt);
    g.poseTime=Math.max(0,g.poseTime-dt);
-   if(g.poseTime===0)g.pose='glide';
+   if(g.pose==='blocker'&&g.poseTime===0)g.pose='glide';
   }
  }
  private aiDecisions(dt:number):void {
@@ -294,7 +315,9 @@ export class HockeyMatch {
   const low=this.puck.shotHeight==='low';
   let reach:number;
   if(this.goalieCareer&&defender.team===0){
-   reach=defender.pose==='butterfly'?(low?46:9):defender.pose==='blocker'?(!low?40:14):15;
+   // Pad coverage grows with the actual butterfly transition, not a binary animation flag.
+   reach=low?15+31*defender.stance:15-6*defender.stance;
+   if(defender.pose==='blocker')reach=low?14:40;
   }else reach=low?29:24;
   if(gap>reach)return;
   const chance=(defender.team===0&&this.goalieCareer)?1:.76;
@@ -306,7 +329,9 @@ export class HockeyMatch {
   this.puck.shotTeam=null;this.puck.lock=.28;
   this.goalieSaveCooldown[defender.team]=.45;
   if(defender.team===0&&this.goalieCareer)this.saves++;
-  defender.pose=low?'butterfly':'blocker';defender.poseTime=.35;
+  if(!(this.goalieCareer&&defender.team===0&&defender.pose==='butterfly')){
+   defender.pose=low?'butterfly':'blocker';defender.poseTime=.35;
+  }
   this.emit('save',defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
  }
  private stepPuck(dt:number):void {
