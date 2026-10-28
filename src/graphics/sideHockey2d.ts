@@ -10,14 +10,26 @@ const ellipse=(c:CanvasRenderingContext2D,x:number,y:number,rx:number,ry:number,
 const line=(c:CanvasRenderingContext2D,x:number,y:number,ex:number,ey:number,width:number,color:string)=>{
  c.beginPath();c.moveTo(x,y);c.lineTo(ex,ey);c.lineWidth=width;c.lineCap='round';c.strokeStyle=color;c.stroke();
 };
+let smoothedCameraX=400,smoothedCameraY=220,lastCameraMode:CameraMode|null=null;
 export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode:CameraMode,time:number):void{
  const player=match.goalieCareer?match.goalies[0]:match.skaters[match.selected];
- const focus=mode==='broadcast'?400:mode==='sideline'?400:mode==='goalie'?match.goalies[0].x:player.x;
- const zoom=mode==='player'?1.65:mode==='goalie'?1.36:mode==='sideline'?1.12:1;
- const cameraX=clamp(focus,400/zoom,800-400/zoom);
+ // The camera angles must actually be different, not five names for the same
+ // flat side view. A following camera tracks the controlled player; goalie
+ // follows the crease and shot lane; broadcast keeps both nets in view.
+ const zoom=mode==='player'?2.18:mode==='goalie'?1.72:mode==='sideline'?1.22:1;
+ const focusX=mode==='broadcast'?400:mode==='sideline'?match.puck.x*.5+200:
+  mode==='goalie'?match.goalies[0].x*.7+match.puck.x*.3:player.x;
+ const focusY=mode==='player'?player.y:mode==='goalie'?220:mode==='sideline'?match.puck.y:220;
+ if(lastCameraMode!==mode){smoothedCameraX=focusX;smoothedCameraY=focusY;lastCameraMode=mode;}
+ smoothedCameraX+=(focusX-smoothedCameraX)*.075;
+ smoothedCameraY+=(focusY-smoothedCameraY)*.075;
+ const cameraX=clamp(smoothedCameraX,400/zoom,800-400/zoom);
  const project=(x:number,y:number)=>{
   const depth=clamp((y-24)/392,0,1);
-  return {x:400+(x-cameraX)*zoom,y:132+depth*210,scale:(.66+depth*.50)*(mode==='player'?1.07:1)};
+  const vertical=mode==='sideline'?235:mode==='goalie'?255:mode==='player'?290:210;
+  const base=mode==='player'?185:mode==='goalie'?155:132;
+  return {x:400+(x-cameraX)*zoom,y:base+(depth-(mode==='player'?(smoothedCameraY-24)/392:0))*vertical,
+   scale:(.60+depth*.55)*(mode==='player'?1.22:mode==='goalie'?1.12:1)};
  };
  // Arena backdrop: seating, glass, boards and a slanted ice plane.
  const sky=c.createLinearGradient(0,0,0,290);
@@ -27,13 +39,24 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   c.fillStyle=r%2?'#1a364b':'#193146';c.fillRect(0,18+r*27,800,21);
   for(let x=12;x<800;x+=24){ellipse(c,x+(r%2)*11,30+r*27,4,3,r%2?'#456478':'#527185');}
  }
- c.fillStyle='#d5e5ed';c.fillRect(0,110,800,9);
- c.fillStyle='rgba(205,236,249,.25)';c.fillRect(0,119,800,19);
+ // Overhead arena lamps and scoreboard ribbon.
+ c.fillStyle='#dbeaf5';for(let x=35;x<800;x+=135){c.fillRect(x,8,68,3);}
+ c.fillStyle='#0c1d2c';c.fillRect(0,101,800,16);
+ c.fillStyle='#e6f6ff';c.font='bold 11px system-ui';c.textAlign='center';
+ c.fillText('HOCKEY CAREER   •   HOME  '+match.scores[0]+'  :  '+match.scores[1]+'  AWAY',400,113);
+ c.fillStyle='#d5e5ed';c.fillRect(0,120,800,9);
+ c.fillStyle='rgba(205,236,249,.25)';c.fillRect(0,129,800,19);
  c.strokeStyle='rgba(238,249,255,.5)';c.lineWidth=1;
  for(let x=0;x<=800;x+=70){c.beginPath();c.moveTo(x,113);c.lineTo(x,158);c.stroke();}
  const ice=c.createLinearGradient(0,135,0,440);
  ice.addColorStop(0,'#d5ebf5');ice.addColorStop(.5,'#f4fcff');ice.addColorStop(1,'#c6e4f2');
- c.fillStyle=ice;c.beginPath();c.moveTo(0,132);c.lineTo(800,132);c.lineTo(800,440);c.lineTo(0,440);c.closePath();c.fill();
+ c.fillStyle=ice;c.fillRect(0,132,800,308);
+ // Ice skate scratches and long arena reflections, subtle enough to preserve puck visibility.
+ c.strokeStyle='rgba(255,255,255,.42)';c.lineWidth=1;
+ for(let i=0;i<18;i++){const y=166+i*15;c.beginPath();c.moveTo((i*137)%500,y);c.lineTo(800,y+3);c.stroke();}
+ const sheen=c.createLinearGradient(0,130,0,440);
+ sheen.addColorStop(0,'rgba(255,255,255,.35)');sheen.addColorStop(.5,'rgba(255,255,255,0)');sheen.addColorStop(1,'rgba(43,124,168,.1)');
+ c.fillStyle=sheen;c.fillRect(0,132,800,308);
  const rinkLine=(x:number,color:string,width:number)=>{
   const p=project(x,24),q=project(x,416);line(c,p.x,p.y,q.x,q.y,width*zoom,color);
  };
@@ -65,10 +88,17 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   const p=project(a.x,a.y),s=p.scale*zoom*(mode==='player'?.98:1);
   const red=a.team===0,shirt=red?'#c63c50':'#245c9a',trim=red?'#fff3e9':'#dbeefa';
   c.save();c.translate(p.x,p.y);c.scale(s,s);
+  // Body direction changes with team and attacking direction.
+  // Goalie always faces toward center ice.
+  const facing=a.goalie?(a.team===0?1:-1):(a.team===0?1:-1);
+  c.scale(facing,1);
   ellipse(c,2,2,18,5,'rgba(16,43,64,.22)');
   const step=Math.sin(time*12+a.number)*Math.min(1,a.speed/160)*7;
   const low=a.pose==='butterfly';
   // Upright skates, trousers, padded legs and a real torso silhouette.
+  // Knee flex and skate push are phase-shifted for each player.
+  const crouch=a.goalie?(low?12:4):Math.min(7,a.speed/35);
+  c.translate(0,crouch*.35);
   for(const side of [-1,1]){
    const offset=side*9;
    const stride=a.goalie?0:step*side;
@@ -80,27 +110,39 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
     for(let j=0;j<3;j++)line(c,offset-5+(low?side*5:0),-22+j*7,offset+5+(low?side*5:0),-22+j*7,1,'#9caebd');
    }
   }
-  c.fillStyle='#132c42';c.fillRect(-13,-35,26,17);
-  c.fillStyle=shirt;c.beginPath();c.moveTo(-18,-66);c.lineTo(18,-66);c.lineTo(16,-32);c.lineTo(-16,-32);c.closePath();c.fill();
+  c.fillStyle='#132c42';c.beginPath();c.moveTo(-14,-35);c.lineTo(15,-35);c.lineTo(12,-18);c.lineTo(-11,-18);c.closePath();c.fill();
+  line(c,-12,-25,12,-25,2,'#526f85');
+  // Shoulder pads, tapered jersey and colored elbow bands.
+  c.fillStyle='#0d2436';c.beginPath();c.moveTo(-13,-67);c.lineTo(15,-67);c.lineTo(21,-57);c.lineTo(14,-33);c.lineTo(-15,-33);c.lineTo(-21,-57);c.closePath();c.fill();
+  c.fillStyle=shirt;c.beginPath();c.moveTo(-13,-66);c.lineTo(15,-66);c.lineTo(19,-56);c.lineTo(14,-35);c.lineTo(-14,-35);c.lineTo(-19,-56);c.closePath();c.fill();
+  line(c,-16,-51,17,-51,1.5,'rgba(255,255,255,.28)');
   line(c,-16,-39,16,-39,3,trim);line(c,-17,-60,17,-60,3,trim);
-  line(c,-17,-61,-26,-43,a.goalie?12:9,shirt);
-  line(c,17,-61,27,-43,a.goalie?12:9,shirt);
+  const armSwing=a.goalie?0:step*.65;
+  line(c,-17,-61,-26+armSwing,-43,a.goalie?12:9,shirt);
+  line(c,17,-61,27-armSwing,-43,a.goalie?12:9,shirt);
+  line(c,-24+armSwing,-46,-27+armSwing,-42,4,trim);
+  line(c,25-armSwing,-46,28-armSwing,-42,4,trim);
   if(a.goalie){
    ellipse(c,-28,-42,11,10,'#f4f8fb');
    c.strokeStyle='#829aa9';c.lineWidth=1.4;c.strokeRect(20,-50,15,16);
   }else{
    ellipse(c,-26,-42,5,6,'#1c2d40');ellipse(c,27,-42,5,6,'#1c2d40');
   }
-  // Helmet encloses the head, cage wraps the face.
-  ellipse(c,0,-75,12,14,red?'#f6f6f2':'#183d67');
-  c.fillStyle='#d8e6ef';c.fillRect(-9,-77,18,12);
-  for(const x of [-7,0,7])line(c,x,-77,x,-65,1.5,'#5e798c');
-  for(const y of [-74,-68])line(c,-9,y,9,y,1.3,'#5e798c');
-  if(a.goalie){line(c,0,-87,0,-64,1.6,'#69889d');}
+  // Side-profile helmet: domed shell, rear ear cup, face opening and cage.
+  ellipse(c,-2,-76,13,14,red?'#f1f3f5':'#173b62');
+  ellipse(c,-10,-74,5,6,'#8ba6b9');
+  ellipse(c,8,-72,7,9,'#c9d9e4');
+  c.strokeStyle='#49657a';c.lineWidth=2;c.beginPath();c.arc(-2,-76,13,Math.PI*1.18,Math.PI*1.91);c.stroke();
+  line(c,10,-82,17,-76,2,'#6e8597');
+  line(c,17,-76,15,-65,2,'#6e8597');
+  for(const y of [-78,-73,-68])line(c,9,y,17,y+1,1.5,'#4e697c');
+  line(c,13,-79,13,-66,1.5,'#4e697c');
+  if(a.goalie){line(c,6,-88,13,-65,2,'#718b9e');}
   c.fillStyle=trim;c.font='bold 12px system-ui';c.textAlign='center';c.fillText(String(a.number),0,-45);
   // Stick, catcher and blocker are visually distinct.
-  line(c,27,-44,33,-5,3.4,'#b78d61');
-  line(c,33,-5,51,-3,5,'#1a2b3a');
+  line(c,27,-44,31,-10,3.4,'#b78d61');
+  line(c,31,-10,45,-7,5,'#1a2b3a');
+  line(c,45,-7,52,-9,3,'#182b3c');
   if(a.selected){
    c.strokeStyle='#ffd24d';c.lineWidth=3;c.beginPath();c.ellipse(0,2,29,8,0,0,Math.PI*2);c.stroke();
    c.fillStyle='#ffd24d';c.beginPath();c.moveTo(0,-102);c.lineTo(-8,-113);c.lineTo(8,-113);c.closePath();c.fill();
@@ -114,4 +156,19 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  c.fillStyle='rgba(8,30,49,.76)';c.fillRect(12,12,185,30);
  c.fillStyle='#e7f6ff';c.font='bold 13px system-ui';c.textAlign='left';
  c.fillText(mode==='player'?'PLAYER FOLLOW':mode==='goalie'?'GOALIE CREASE':mode==='broadcast'?'TV BROADCAST':'SIDE BOARDS',24,32);
+ // Small rink radar keeps the puck visible when the player-follow camera zooms.
+ if(mode==='player'||mode==='goalie'){
+  c.fillStyle='rgba(9,33,51,.85)';c.fillRect(618,12,169,84);
+  c.strokeStyle='#a7d6e9';c.lineWidth=1.5;c.strokeRect(629,23,147,61);
+  line(c,702.5,23,702.5,84,1,'#bd6070');
+  for(const a of match.skaters){
+   ellipse(c,629+a.x/800*147,23+a.y/440*61,2.8,2.8,a.team===0?'#f06070':'#6ebdff');
+  }
+  ellipse(c,629+match.puck.x/800*147,23+match.puck.y/440*61,3.5,3.5,'#ffda50');
+  const you=project(player.x,player.y);
+  if(you.x<0||you.x>800){
+   c.fillStyle='#ffda50';c.font='bold 13px system-ui';
+   c.fillText(you.x<0?'◀ PLAYER':'PLAYER ▶',you.x<0?25:680,105);
+  }
+ }
 }
