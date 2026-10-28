@@ -76,10 +76,10 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   for(let i=1;i<6;i++)ln(c,net.x-w+i*w*2/6,net.y-h,net.x-w+i*w*2/6,net.y,1,'#9cb8c9');
   for(let i=1;i<5;i++)ln(c,net.x-w,net.y-h+i*h/5,net.x+w,net.y-h+i*h/5,1,'#9cb8c9');
  }
- type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number};
+ type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number;stance:number};
  const actors:Actor[]=[
-  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10})),
-  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:0,num:30+i}))
+  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10,stance:0})),
+  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vy,num:30+i,stance:g.stance}))
  ];
  // Distant skaters first; selected goalie drawn last, as an NHL goalie camera.
  actors.sort((a,b)=>(direction===1?b.x-a.x:a.x-b.x));
@@ -110,9 +110,9 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number},time:number,back:boolean){
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
- const dark='#193146',butterfly=a.goalie&&a.pose==='butterfly';
+ const dark='#193146',butterfly=a.goalie&&a.stance>.45;
  c.save();c.translate(x,y);c.scale(s,s);
  oval(c,0,0,butterfly?29:22,7,'rgba(21,53,77,.22)');
  const stride=a.goalie?0:Math.sin(time*12+a.num)*7;

@@ -45,7 +45,7 @@ export function mountHockeyMatch(
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
   +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
-  +(goalieCareer?'Move inside the crease · Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
+  +(goalieCareer?'Move inside the crease · Toggle Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
   +'</p><section class="match-result" data-result hidden></section></main>';
  const canvas=root.querySelector<HTMLCanvasElement>('[data-rink]')!;
  const ctx=canvas.getContext('2d')!;
@@ -245,8 +245,8 @@ export function mountHockeyMatch(
   event.textContent=match.message;
   if(goalieCareer){
    const danger=match.puck.shotTeam===1&&match.puck.owner<0;
-   hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then choose Butterfly (low) or Blocker (high).':
-    match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly = low · Blocker = high · Poke = close range.';
+   hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then use Butterfly (low) or Blocker (high).':
+    match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly toggles stance · Move to slide · Blocker = high · Poke = close range.';
   }
   render(now/1000);
   if(cameraNotice>0&&!paused){
