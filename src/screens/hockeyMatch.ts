@@ -33,8 +33,7 @@ export function mountHockeyMatch(
   +(goalieCareer?'Move inside the crease · Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
   +'</p><section class="match-result" data-result hidden></section></main>';
  const canvas=root.querySelector<HTMLCanvasElement>('[data-rink]')!;
- const ctx=canvas.getContext('2d');
- if(!ctx)throw new Error('Canvas 2D is not supported on this device');
+ const ctx=canvas.getContext('2d')!;
  const score=root.querySelector<HTMLElement>('[data-score]')!;
  const clock=root.querySelector<HTMLElement>('[data-clock]')!;
  const shots=root.querySelector<HTMLElement>('[data-shots]')!;
