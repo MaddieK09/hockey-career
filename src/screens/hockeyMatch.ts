@@ -1,6 +1,8 @@
 import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
+import {drawSideHockey} from '../graphics/sideHockey2d';
+import type {CameraMode} from '../graphics/sideHockey2d';
 
 export interface MatchSummary {
  home:number;away:number;goals:number;assists:number;saves:number;
@@ -17,6 +19,7 @@ export function mountHockeyMatch(
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
  let cameraZoom=false,cameraX=400;
+ let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -24,13 +27,20 @@ export function mountHockeyMatch(
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<strong>HOME <span data-score>0 - 0</span> AWAY</strong>'
   +'<span data-clock>P1 · 1:00</span></header>'
-  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera aria-pressed="false">🔍 ZOOM: OFF</button><span>5 ON 5 + GOALIES</span></div>'
-  +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Top down animated five-on-five hockey game"></canvas>'
+  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><span>5 ON 5 + GOALIES</span></div>'
+  +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
   +'<button type="button" data-action="b">'+actB+'</button>'
   +'<button type="button" data-action="c">'+actC+'</button></div></div>'
+  +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Choose your camera angle. Changes apply immediately.</p><div class="camera-options">'
+  +'<button type="button" data-view="player">PLAYER FOLLOW</button>'
+  +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
+  +'<button type="button" data-view="sideline">SIDE BOARDS</button>'
+  +'<button type="button" data-view="goalie">GOALIE CREASE</button>'
+  +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
+  +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
   +(goalieCareer?'Move inside the crease · Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
   +'</p><section class="match-result" data-result hidden></section></main>';
@@ -45,12 +55,26 @@ export function mountHockeyMatch(
  const knob=root.querySelector<HTMLElement>('[data-knob]')!;
  const result=root.querySelector<HTMLElement>('[data-result]')!;
  const cameraButton=root.querySelector<HTMLButtonElement>('[data-camera]')!;
+ const pausePanel=root.querySelector<HTMLElement>('[data-pause]')!;
+ const viewButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
+ function setPaused(next:boolean){
+  paused=next;pausePanel.hidden=!paused;
+  cameraButton.textContent=paused?'▶ RESUME':'Ⅱ PAUSE / CAMERA';
+  if(paused){match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
+  last=performance.now();
+ }
+ viewButtons.forEach(b=>b.addEventListener('click',()=>{
+  cameraMode=b.dataset.view as CameraMode;
+  viewButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+ }));
+ root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
- cameraButton.addEventListener('click',()=>{cameraZoom=!cameraZoom;cameraButton.textContent=cameraZoom?'🔍 ZOOM: ON':'🔍 ZOOM: OFF';cameraButton.setAttribute('aria-pressed',String(cameraZoom));});
+ cameraButton.addEventListener('click',()=>setPaused(!paused));
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
  function syncMovement(){
   let x=touchX,y=touchY;
+  if(paused){match.setMovement(0,0);return;}
   if(controls.has('a')||controls.has('arrowleft'))x-=1;
   if(controls.has('d')||controls.has('arrowright'))x+=1;
   if(controls.has('w')||controls.has('arrowup'))y-=1;
@@ -77,12 +101,14 @@ export function mountHockeyMatch(
   pointerId=-1;touchX=touchY=0;knob.style.transform='translate(0,0)';syncMovement();
  }
  function action(key:string){
+  if(paused)return;
   if(key==='c'){if(goalieCareer)match.perform('poke');else match.switchSkater();return;}
   if(key==='a'){match.perform(goalieCareer?'butterfly':'shoot');return;}
   if(key==='b'){match.perform(goalieCareer?'blocker':'pass');}
  }
  function keyDown(e:KeyboardEvent){
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key))e.preventDefault();
+  if(e.key==='Escape'){setPaused(!paused);return;}
   controls.add(e.key.toLowerCase());syncMovement();
   if(e.repeat)return;
   if(e.code==='Space')action('a');
@@ -114,6 +140,14 @@ export function mountHockeyMatch(
  root.querySelector('[data-exit]')?.addEventListener('click',()=>{stop();onReturn();});
  function render(t:number){
   ctx.save();
+  if(cameraMode!=='overhead'){
+   drawSideHockey(ctx,match,cameraMode,t);
+   if(match.phase==='goal'||match.phase==='intermission'){
+    ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
+    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(match.message,400,225);
+   }
+   ctx.restore();return;
+  }
   // Camera zoom preserves simulation coordinates; only rendering changes.
   if(cameraZoom){
    const zoom=goalieCareer?1.32:1.45;
@@ -191,7 +225,8 @@ export function mountHockeyMatch(
  function frame(now:number){
   if(!active)return;
   const dt=Math.min((now-last)/1000,.04);last=now;
-  visualTime+=dt;match.step(dt);syncMovement();
+  if(!paused){visualTime+=dt;match.step(dt);}
+  syncMovement();
   score.textContent=match.scores[0]+' - '+match.scores[1];
   shots.textContent='Shots '+match.shots[0]+' - '+match.shots[1];
   clock.textContent='P'+match.period+' · '+Math.ceil(match.timeRemaining)+'s';
