@@ -296,8 +296,10 @@ export class HockeyMatch {
   if(this.shotClock[team]<=0&&offensive&&inShootingLane&&(team===0?carrier.x>515:carrier.x<285)){
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
-  // Hold possession and carry the puck; pass only when genuinely trapped.
-  if(pressured&&carrier.carriedFor>3.1&&this.rng()<.20){
+  // Longer periods need possession cycles, not skaters camping in the slot.
+  // Cycle the puck while the team's next shooting opportunity develops.
+  const cycling=offensive&&this.shotClock[team]>6&&carrier.carriedFor>3;
+  if((pressured||cycling)&&carrier.carriedFor>2.2&&this.rng()<(cycling?.07:.20)){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
