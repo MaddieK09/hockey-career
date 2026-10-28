@@ -1,3 +1,4 @@
+import {validPeriodMinutes} from '../config/matchSettings';
 import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
@@ -16,7 +17,7 @@ export function mountHockeyMatch(
  root:HTMLElement,goalieCareer:boolean,rating:MatchRating,
  onComplete:(result:MatchSummary)=>void,onReturn:()=>void
 ):{stop:()=>void}{
- const match=new HockeyMatch(goalieCareer,rating);
+ const match=new HockeyMatch(goalieCareer,rating,Math.random,validPeriodMinutes((rating as MatchRating & {periodMinutes?:number}).periodMinutes));
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
  let cameraZoom=false,cameraX=400;
@@ -30,7 +31,7 @@ export function mountHockeyMatch(
  root.innerHTML='<main class="career-shell match-shell">'
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<strong>HOME <span data-score>0 - 0</span> AWAY</strong>'
-  +'<span data-clock>P1 · 1:00</span></header>'
+  +'<span data-clock>P1 · '+match.periodMinutes+':00</span></header>'
   +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
@@ -261,7 +262,8 @@ export function mountHockeyMatch(
   syncMovement();
   score.textContent=match.scores[0]+' - '+match.scores[1];
   shots.textContent='Shots '+match.shots[0]+' - '+match.shots[1];
-  clock.textContent='P'+match.period+' · '+Math.ceil(match.timeRemaining)+'s';
+  const remaining=Math.ceil(match.timeRemaining);
+  clock.textContent='P'+match.period+' · '+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0');
   event.textContent=match.message;
   if(goalieCareer){
    const danger=match.puck.shotTeam===1&&match.puck.owner<0;
