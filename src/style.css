@@ -19,3 +19,12 @@
 .player-3d-host[data-3d-host] svg{display:block;width:min(100%,340px);height:auto;max-height:none;aspect-ratio:340/560}
 .player-review{scroll-margin-top:22px}
 .player-review .primary-action{display:block;width:100%;margin-top:14px}
+
+/* 2D gameplay v2: larger rink presentation and readable game feedback. */
+.rink-stage{position:relative;border-radius:15px;overflow:hidden;border:2px solid #5f9dbb;box-shadow:0 12px 35px #0006}
+.match-shell .rink-stage canvas{border:0;border-radius:0;display:block;width:100%;height:auto;aspect-ratio:800/440}
+.rink-hud{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 9px;background:linear-gradient(0deg,#08253bd9,#08253b00);color:#fff;font-size:clamp(8px,1.8vw,12px);font-weight:800;letter-spacing:.04em;pointer-events:none}
+.rink-hud [data-event]{color:#ffe2a0;text-align:center}
+.match-shell .career-top{padding:6px 0}
+.match-shell .action-pad button:active{transform:scale(.94);filter:brightness(1.25)}
+@media (max-width:480px){.match-shell{padding:10px 8px}.match-shell .career-top{font-size:11px;gap:5px}.match-shell .career-top button{padding:8px 6px}.match-shell .match-controls{margin:12px 0;gap:12px}}
