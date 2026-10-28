@@ -28,3 +28,18 @@
 .match-shell .career-top{padding:6px 0}
 .match-shell .action-pad button:active{transform:scale(.94);filter:brightness(1.25)}
 @media (max-width:480px){.match-shell{padding:10px 8px}.match-shell .career-top{font-size:11px;gap:5px}.match-shell .career-top button{padding:8px 6px}.match-shell .match-controls{margin:12px 0;gap:12px}}
+
+/* Match engine v3: full-rink presentation with readable period/shot indicators. */
+.match-shell .match-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:-5px 0 10px;font-size:11px;font-weight:750;letter-spacing:.07em;color:#b4d2e3}
+.match-shell .match-controls{margin-top:15px}
+.match-shell .rink-stage{border:2px solid #9ec6da}
+.match-shell [data-event]{max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match-shell .match-result{position:relative;z-index:1}
+.match-shell .action-pad button{user-select:none;-webkit-user-select:none;min-height:54px}
+.match-shell .move-pad{user-select:none;-webkit-user-select:none}
+@media(max-width:420px){
+ .match-shell .match-meta{font-size:9px;margin:0 0 7px}
+ .match-shell .action-pad{gap:7px}
+ .match-shell .action-pad button{font-size:11px;letter-spacing:0;padding:8px 4px}
+ .match-shell .rink-hud{padding:4px 6px}
+}
