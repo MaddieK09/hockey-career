@@ -2,6 +2,7 @@ import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 import {drawSideHockey} from '../graphics/sideHockey2d';
+import {drawChaseHockey} from '../graphics/chaseHockey2d';
 import type {CameraMode} from '../graphics/sideHockey2d';
 
 export interface MatchSummary {
@@ -37,10 +38,10 @@ export function mountHockeyMatch(
   +'<button type="button" data-action="b">'+actB+'</button>'
   +'<button type="button" data-action="c">'+actC+'</button></div></div>'
   +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Choose your camera angle. Changes apply immediately.</p><div class="camera-options">'
-  +'<button type="button" data-view="player">PLAYER FOLLOW</button>'
+  +'<button type="button" data-view="player">PLAYER CHASE (NHL)</button>'
   +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
   +'<button type="button" data-view="sideline">SIDE BOARDS</button>'
-  +'<button type="button" data-view="goalie">GOALIE CREASE</button>'
+  +'<button type="button" data-view="goalie">BEHIND GOALIE (NHL)</button>'
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
   +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
@@ -151,7 +152,8 @@ export function mountHockeyMatch(
  function render(t:number){
   ctx.save();
   if(cameraMode!=='overhead'){
-   drawSideHockey(ctx,match,cameraMode,t);
+   if(cameraMode==='player'||cameraMode==='goalie')drawChaseHockey(ctx,match,cameraMode,t);
+   else drawSideHockey(ctx,match,cameraMode,t);
    if(match.phase==='goal'||match.phase==='intermission'){
     ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
     ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(match.message,400,225);
