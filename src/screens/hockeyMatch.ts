@@ -22,7 +22,7 @@ export function mountHockeyMatch(
  let cameraZoom=false,cameraX=400;
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  let cameraNotice=0;
- let arenaMode=false;
+ let arenaMode=true;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -60,6 +60,8 @@ export function mountHockeyMatch(
  const cameraButton=root.querySelector<HTMLButtonElement>('[data-camera]')!;
  const arenaButton=root.querySelector<HTMLButtonElement>('[data-arena]')!;
  const shell=root.querySelector<HTMLElement>('.match-shell')!;
+ shell.classList.add('arena-expanded');
+ arenaButton.textContent='⤢ NORMAL VIEW';
  arenaButton.addEventListener('click',()=>{arenaMode=!arenaMode;shell.classList.toggle('arena-expanded',arenaMode);arenaButton.textContent=arenaMode?'⤢ NORMAL VIEW':'⛶ BIG RINK';});
  const pausePanel=root.querySelector<HTMLElement>('[data-pause]')!;
  const viewButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
@@ -80,6 +82,7 @@ export function mountHockeyMatch(
  });
  root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
+ const heldActions=new Set<string>();
  cameraButton.addEventListener('click',()=>setPaused(!paused));
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
@@ -135,8 +138,9 @@ export function mountHockeyMatch(
  window.addEventListener('keydown',keyDown);
  window.addEventListener('keyup',keyUp);
  document.addEventListener('visibilitychange',visibility);
- root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button=>
-  button.addEventListener('click',()=>action(button.dataset.action??'')));
+ root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button=>{
+  button.addEventListener('click',()=>action(button.dataset.action??''));
+ });
  function stop(){
   if(!active)return;
   active=false;cancelAnimationFrame(raf);shell.classList.remove('arena-expanded');
@@ -245,6 +249,9 @@ export function mountHockeyMatch(
   event.textContent=match.message;
   if(goalieCareer){
    const danger=match.puck.shotTeam===1&&match.puck.owner<0;
+   const inButterfly=match.goalies[0].pose==='butterfly';
+   const butterflyButton=root.querySelector<HTMLButtonElement>('[data-action="a"]');
+   if(butterflyButton){butterflyButton.setAttribute('aria-pressed',String(inButterfly));butterflyButton.textContent=inButterfly?'STAND UP':'BUTTERFLY';}
    hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then use Butterfly (low) or Blocker (high).':
     match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly toggles stance · Move to slide · Blocker = high · Poke = close range.';
   }
