@@ -36,7 +36,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    {x:590,y:220,vx:0,vy:0,team:1},{x:485,y:130,vx:0,vy:0,team:1},{x:485,y:310,vx:0,vy:0,team:1}
   ];
   const puck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0};
-  let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,aiShotCount=0,goalieTouches=0;
+  let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,aiShotCount=0;
   const keys=new Set<string>();
   root.innerHTML=`<main class="career-shell match-shell"><header class="career-top"><button data-exit>← Career</button><strong>HOME <span data-score>0 - 0</span> AWAY</strong><span data-clock>P1 · 1:00</span></header><canvas data-rink width="800" height="440" aria-label="Playable top-down hockey rink"></canvas><div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div><div class="action-pad"><button data-action="shoot">${goalie?'BUTTERFLY':'SHOOT'}</button><button data-action="pass">${goalie?'BLOCKER':'PASS'}</button><button data-action="switch">SWITCH</button></div></div><p class="career-muted" data-hint>${goalie?'Protect the left net. BUTTERFLY seals low shots; BLOCKER deflects high shots. Follow the puck with the movement pad.':'Attack the right net. Move, pass, shoot and switch skaters.'}</p><section class="match-result" data-result hidden></section></main>`;
   const canvas=root.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!;
@@ -137,7 +137,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    }
    if(puck.owner<0&&puck.x<112&&Math.abs(puck.y-goalieY)<(saveWindow>0?53:23)&&puck.vx<0){
     const stopped=saveWindow>0||Math.abs(puck.y-goalieY)<15;
-    if(stopped){puck.vx=Math.abs(puck.vx)*(.6+Math.random()*.25);puck.vy+=(puck.y-goalieY)*2;puck.x=113;puck.lock=.3;if(goalie){saves++;goalieTouches++;}}
+    if(stopped){puck.vx=Math.abs(puck.vx)*(.6+Math.random()*.25);puck.vy+=(puck.y-goalieY)*2;puck.x=113;puck.lock=.3;if(goalie){saves++;}}
    }
    if(puck.owner<0&&puck.x>691&&Math.abs(puck.y-220)<27&&puck.vx>0){const goalieBeat=Math.random()<(.24+career.shot*.004);if(!goalieBeat){puck.vx=-Math.abs(puck.vx)*.7;puck.x=689;}}
    if(puck.x>783||puck.x<17){const scoredRight=puck.x>783;if(Math.abs(puck.y-220)<47){if(scoredRight){home++;if(!goalie)goals++;}else away++;reset();}else{puck.x=clamp(puck.x,23,777);puck.vx*=-.65;}}
