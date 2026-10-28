@@ -1,3 +1,4 @@
+import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
 import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 /** Self-contained 5v5 hockey simulation. Coordinates use the 800x440 canvas.
  * All puck possession, team decisions, goals, periods and goalie saves run here.
@@ -49,6 +50,8 @@ export class HockeyMatch {
  private faceoffNext:Team=1;
  private possessionTime:[number,number]=[0,0];
  private goalieSaveCooldown:[number,number]=[0,0];
+ private lastSkaterDeflector=-1;
+ private skaterDeflectionTime=0;
  private creaseMomentum:[number,number]=[0,0];
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5){
   this.periodMinutes=validPeriodMinutes(periodMinutes);
@@ -122,6 +125,7 @@ export class HockeyMatch {
   this.goalies[1].x=709;this.goalies[1].y=220;
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
+  this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -345,128 +349,137 @@ export class HockeyMatch {
   }
   return false;
  }
- private saveContact(goalie:MatchGoalie):'pads'|'body'|'stick'|'glove'|'blocker'|null {
-  const lateral=this.puck.y-goalie.y;
-  const gap=Math.abs(lateral),z=this.puck.height;
-  // Geometry is expressed in the same rink units as the goal mouth.
-  // Low pads are wider in butterfly; standing body protects the middle.
-  if(z<=9&&gap<=20)return 'stick';
-  if(z<=18&&gap<=17+30*goalie.stance)return 'pads';
-  if(z<=58&&gap<=14)return 'body';
-  if(goalie.saveHand==='glove'&&goalie.saveReach>.08&&lateral>=-51&&lateral<=-12&&z>=9&&z<=78)return 'glove';
-  if(goalie.saveHand==='blocker'&&goalie.saveReach>.08&&lateral>=12&&lateral<=51&&z>=9&&z<=74)return 'blocker';
-  return null;
- }
+ /** Resolve the first physical puck contact against either goalie using a
+  * continuous 3D sweep, including glove, blocker, stick, pads, chest and mask.
+  * The same world coordinates also drive the camera.
+  */
  private collideGoalies(previousX:number):boolean {
   if(this.puck.owner>=0)return false;
-  // Sweep the complete puck segment through the goalie, not a single X plane.
-  // The previous implementation missed diagonal shots and pucks that started inside the keeper.
-  const x0=previousX,y0=this.previousPuckY,z0=this.previousPuckHeight;
-  const dx=this.puck.x-x0,dy=this.puck.y-y0,dz=this.puck.height-z0;
-  const length2=dx*dx+dy*dy;
-  if(length2<.00001)return false;
+  const from:PuckPoint={x:previousX,y:this.previousPuckY,z:this.previousPuckHeight};
+  const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
+  let first:{goalie:MatchGoalie;impact:EquipmentHit}|null=null;
   for(const goalie of this.goalies){
-   const towardsGoal=goalie.team===0?this.puck.vx<0:this.puck.vx>0;
-   if(!towardsGoal)continue;
-   // Project goalie onto shot path; clamp to this frame's segment.
-   const t=clamp(((goalie.x-x0)*dx+(goalie.y-y0)*dy)/length2,0,1);
-   const impactX=x0+dx*t,impactY=y0+dy*t,impactZ=z0+dz*t;
-   const lateral=impactY-goalie.y;
-   const along=Math.abs(impactX-goalie.x);
-   // Wider front-to-back body volume prevents pucks tunnelling through the pads.
-   if(along>18||Math.abs(lateral)>55)continue;
-   const endY=this.puck.y,endZ=this.puck.height;
-   this.puck.y=impactY;this.puck.height=impactZ;
-   const contact=this.saveContact(goalie);
-   this.puck.y=endY;this.puck.height=endZ;
-   if(!contact)continue;
-   const wasShot=this.puck.shotTeam!==null;
-   const caught=contact==='glove'&&impactZ>16;
-   goalie.reaction=contact;goalie.reactionTime=.52;goalie.reactionSide=impactY-goalie.y;
-   if(contact==='glove'||contact==='blocker'){
-    goalie.saveHand=contact;goalie.saveReach=1;
-   }
-   const direction=goalie.team===0?-1:1;
-   const speed=Math.hypot(this.puck.vx,this.puck.vy);
-   // Place puck outside goalie on the incoming side, so it cannot immediately score.
-   this.puck.x=goalie.x-direction*23;
-   this.puck.y=impactY;
-   this.puck.vx=-direction*Math.max(100,speed*(contact==='pads'?.43:.32));
-   this.puck.vy+=(impactY-goalie.y)*1.8+(this.rng()-.5)*26;
-   this.puck.height=caught?0:Math.max(0,impactZ);
-   this.puck.vz=caught?0:Math.max(0,this.puck.vz*.25);
-   this.puck.shotTeam=null;this.puck.lock=.20;
-   if(wasShot){
-    if(goalie.team===0&&this.goalieCareer)this.saves++;
-    this.emit('save',caught?'GLOVE SAVE!':contact==='pads'?'PAD SAVE!':contact==='blocker'?'BLOCKER SAVE!':contact==='stick'?'STICK SAVE!':'GOALIE SAVE!',goalie.team);
-   }
-   if(!(goalie.team===0&&this.goalieCareer)){
-    if(contact==='pads')goalie.pose='butterfly';
-    else if(contact==='glove'||contact==='blocker'){goalie.saveHand=contact;goalie.saveReach=1;}
-    goalie.poseTime=.38;
-   }
-   return true;
+   // A rebound must have time to clear equipment before colliding again.
+   if(this.goalieSaveCooldown[goalie.team]>0)continue;
+   const impact=findGoalieImpact(from,to,goalie as GoalieCollider);
+   if(impact&&(!first||impact.time<first.impact.time))first={goalie,impact};
   }
-  return false;
+  if(!first)return false;
+  const {goalie,impact}=first,contact=impact.surface;
+  const face=goalie.team===0?1:-1;
+  const caught=contact==='glove'&&impact.point.z>14;
+  const wasShot=this.puck.shotTeam!==null&&this.puck.shotTeam!==goalie.team;
+  const restitution=contact==='stick'?.65:contact==='pads'?.46:contact==='mask'?.31:.28;
+  // Send the puck back into play from the *incoming* side of the goalie,
+  // not through their body into the goal behind them.
+  const incomingSide=this.puck.vx<0?1:-1;
+  this.puck.x=goalie.x+incomingSide*24;
+  this.puck.y=impact.point.y;
+  this.puck.height=caught?0:Math.max(0,impact.point.z);
+  this.puck.vx=incomingSide*Math.max(90,Math.abs(this.puck.vx)*restitution);
+  this.puck.vy=(this.puck.vy*.35)+(impact.point.y-goalie.y)*1.8;
+  this.puck.vz=caught?0:Math.max(-42,this.puck.vz*.3);
+  this.puck.shotTeam=null;this.puck.lock=.20;
+  this.goalieSaveCooldown[goalie.team]=.22;
+  goalie.reaction=contact==='mask'?'body':contact;
+  goalie.reactionTime=.56;
+  goalie.reactionSide=impact.point.y-goalie.y;
+  if(contact==='glove'||contact==='blocker'){
+   goalie.saveHand=contact;goalie.saveReach=1;
+  }else if(contact==='pads'){
+   goalie.poseTime=.35;
+   if(!this.goalieCareer||goalie.team!==0)goalie.pose='butterfly';
+  }
+  if(wasShot){
+   if(goalie.team===0&&this.goalieCareer)this.saves++;
+   const label=contact==='pads'?'PAD SAVE!':contact==='mask'?'MASK SAVE!':
+    contact==='body'?'BODY SAVE!':contact==='glove'?'GLOVE SAVE!':
+    contact==='blocker'?'BLOCKER SAVE!':'STICK SAVE!';
+   this.emit('save',label,goalie.team);
+  }
+  if(caught){
+   // A clean glove catch stops play. Resume from a faceoff rather than
+   // pretending a trapped puck bounced through the glove.
+   this.puck.vx=this.puck.vy=this.puck.vz=0;
+   this.phase='intermission';this.phaseTime=.85;
+   this.faceoffNext=goalie.team===0?1:0;
+  }
+  return true;
  }
  private previousPuckY=220;
  private previousPuckHeight=0;
  private resolveGoalPlane(previousX:number,previousY:number,previousHeight:number):boolean {
-  const dir=Math.sign(this.puck.vx);
-  if(!dir)return false;
-  const line=dir>0?740:60;
-  if(dir*(previousX-line)>0||dir*(this.puck.x-line)<0)return false;
-  const t=clamp((line-previousX)/(this.puck.x-previousX||1),0,1);
-  const y=previousY+(this.puck.y-previousY)*t;
-  const z=previousHeight+(this.puck.height-previousHeight)*t;
-  const offset=Math.abs(y-220);
-  const postRadius=4,puckRadius=3;
-  const opening=34;
-  // Posts and crossbar are solid; a shot that touches metal cannot be a goal.
-  const hitsPost=Math.abs(offset-opening)<=postRadius+puckRadius&&z<=68;
-  const hitsCrossbar=offset<opening+postRadius&&Math.abs(z-64)<=postRadius+puckRadius;
-  if(hitsPost||hitsCrossbar){
-   this.puck.x=line-dir*6;this.puck.y=y;this.puck.height=z;
-   this.puck.vx=-this.puck.vx*.64;
-   this.puck.vy+=(y>220?1:-1)*85;
-   this.puck.vz=hitsCrossbar?Math.min(-65,this.puck.vz*.25):this.puck.vz*.65;
-   this.puck.shotTeam=null;this.puck.lock=.12;
-   this.announce(hitsCrossbar?'OFF THE CROSSBAR!':'OFF THE POST!');
-   return true;
-  }
-  if(offset<opening-postRadius-puckRadius&&z>=0&&z<64-postRadius-puckRadius){
-   // Any loose puck completely crossing the mouth counts, including rebounds
-   // and own goals; merely touching the side or outside of the mesh does not.
-   // The entire puck passed the goal line inside the frame. Net mesh absorbs it.
-   const scorer:Team=dir>0?0:1;
+  const from:PuckPoint={x:previousX,y:previousY,z:previousHeight};
+  const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
+  const left=findGoalFrameImpact(from,to,60,-1);
+  const right=findGoalFrameImpact(from,to,740,1);
+  const impact=left&&right?(left.time<=right.time?left:right):left??right;
+  if(!impact)return false;
+  if(impact.surface==='goal'){
+   // Both the puck and goal are world-space objects. A shot grazing
+   // the post or crossbar is rejected by the frame sweep before scoring.
+   const scorer:Team=to.x>from.x?0:1;
    this.scores[scorer]++;
    if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
    if(scorer===0&&this.lastPasser>=0&&this.lastPasser!==this.puck.lastShooter)this.assists++;
-   this.puck.x=line+dir*10;this.puck.y=y;this.puck.height=z;
+   this.puck.x=impact.point.x;this.puck.y=impact.point.y;this.puck.height=impact.point.z;
    this.puck.vx=this.puck.vy=this.puck.vz=0;this.puck.lock=2;
    this.phase='goal';this.phaseTime=1.5;this.faceoffNext=scorer===0?1:0;
    this.emit('goal',scorer===0?'HOME GOAL!':'AWAY GOAL!',scorer);
    return true;
   }
-  // A puck missing the opening passes behind the frame and contacts end boards.
-  return false;
+  const post=impact.surface==='post',crossbar=impact.surface==='crossbar';
+  this.puck.x=impact.point.x+impact.normal.x*4;
+  this.puck.y=impact.point.y+impact.normal.y*4;
+  this.puck.height=Math.max(0,impact.point.z+impact.normal.z*4);
+  const vx=this.puck.vx,vy=this.puck.vy,vz=this.puck.vz;
+  const normal=impact.normal;
+  const dot=vx*normal.x+vy*normal.y+vz*normal.z;
+  const bounce=post?.7:crossbar?.56:.19;
+  if(dot<0){
+   this.puck.vx=vx-(1+bounce)*dot*normal.x;
+   this.puck.vy=vy-(1+bounce)*dot*normal.y;
+   this.puck.vz=vz-(1+bounce)*dot*normal.z;
+  }else this.puck.vx=-vx*bounce;
+  if(post)this.puck.vy+=(impact.point.y>220?1:-1)*34;
+  this.puck.shotTeam=null;this.puck.lock=.12;
+  this.announce(post?'OFF THE POST!':crossbar?'OFF THE CROSSBAR!':'SIDE NETTING!');
+  return true;
  }
- private collideSkaterPuck():void {
-  if(this.puck.owner>=0||this.puck.lock>0||this.puck.height>26)return;
-  for(const skater of this.skaters){
-   const dx=this.puck.x-skater.x,dy=this.puck.y-skater.y;
-   const d=Math.hypot(dx,dy);
-   if(d>0&&d<15){
-    const nx=dx/d,ny=dy/d,normal=this.puck.vx*nx+this.puck.vy*ny;
-    if(normal>=0)continue;
-    this.puck.x=skater.x+nx*16;this.puck.y=skater.y+ny*16;
-    this.puck.vx-=1.4*normal*nx;this.puck.vy-=1.4*normal*ny;
-    this.puck.vx+=skater.vx*.25;this.puck.vy+=skater.vy*.25;
-    this.puck.vz=Math.max(this.puck.vz,25);
-    this.puck.shotTeam=null;this.puck.lock=.12;
-    return;
-   }
+ private collideSkaterPuck(previousX:number,previousY:number,previousHeight:number):boolean {
+  if(this.puck.owner>=0)return false;
+  const from:PuckPoint={x:previousX,y:previousY,z:previousHeight};
+  const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
+  let first:{index:number;hit:ReturnType<typeof findSkaterImpact>}|null=null;
+  for(let i=0;i<this.skaters.length;i++){
+   // Ignore the shooter's own stick until the puck has cleared their release.
+   if(i===this.puck.lastShooter&&this.puck.lock>0)continue;
+   if(i===this.lastSkaterDeflector&&this.skaterDeflectionTime>0)continue;
+   const hit=findSkaterImpact(from,to,this.skaters[i]);
+   if(hit&&(!first||!first.hit||hit.time<first.hit.time))first={index:i,hit};
   }
+  if(!first||!first.hit)return false;
+  const {hit,index}=first;
+  const skater=this.skaters[index];
+  const nx=hit.normal.x,ny=hit.normal.y,nz=hit.normal.z;
+  const dot=this.puck.vx*nx+this.puck.vy*ny+this.puck.vz*nz;
+  const restitution=hit.surface==='stick'?.52:.32;
+  this.puck.x=hit.point.x+nx*4;
+  this.puck.y=hit.point.y+ny*4;
+  this.puck.height=Math.max(0,hit.point.z+nz*4);
+  if(dot<0){
+   this.puck.vx-=(1+restitution)*dot*nx;
+   this.puck.vy-=(1+restitution)*dot*ny;
+   this.puck.vz-=(1+restitution)*dot*nz;
+  }else{
+   this.puck.vx=-this.puck.vx*restitution;
+   this.puck.vy=-this.puck.vy*restitution;
+  }
+  this.puck.vx+=skater.vx*.16;this.puck.vy+=skater.vy*.16;
+  this.puck.shotTeam=null;this.puck.lock=.18;
+  this.lastSkaterDeflector=index;this.skaterDeflectionTime=.18;
+  this.announce(hit.surface==='stick'?'STICK DEFLECTION!':'SHOT BLOCKED!');
+  return true;
  }
  private stepPuck(dt:number):void {
   if(this.puck.owner>=0){
@@ -508,9 +521,12 @@ export class HockeyMatch {
     this.puck.shotTeam=null;
    }
    if(this.collidePokeCheck())continue;
-   if(this.collideGoalies(previousX))continue;
+   if(this.collideGoalies(previousX)){
+    if(this.phase!=='live')return;
+    continue;
+   }
+   if(this.collideSkaterPuck(previousX,previousY,previousHeight))continue;
    if(this.resolveGoalPlane(previousX,previousY,previousHeight))return;
-   this.collideSkaterPuck();
    // Behind the nets, end boards absorb energy and send the puck back out.
    if(this.puck.x<43||this.puck.x>757){
     this.puck.x=clamp(this.puck.x,43,757);
@@ -527,6 +543,7 @@ export class HockeyMatch {
   if(this.messageTime===0&&this.phase==='live')this.message='LIVE PLAY';
   this.goalieActionCooldown=Math.max(0,this.goalieActionCooldown-dt);
   this.puck.lock=Math.max(0,this.puck.lock-dt);
+  this.skaterDeflectionTime=Math.max(0,this.skaterDeflectionTime-dt);
   for(const team of [0,1] as Team[])this.goalieSaveCooldown[team]=Math.max(0,this.goalieSaveCooldown[team]-dt);
   if(this.puck.owner>=0)this.possessionTime[this.skaters[this.puck.owner].team]+=dt;
   if(this.phase==='goal'||this.phase==='intermission'){
