@@ -328,40 +328,51 @@ export class HockeyMatch {
  }
  private collideGoalies(previousX:number):boolean {
   if(this.puck.owner>=0)return false;
-  const direction=Math.sign(this.puck.vx);
-  if(direction===0)return false;
-  const goalie=direction>0?this.goalies[1]:this.goalies[0];
-  // Swept crossing of the front of the goalie; no random "save chance".
-  const plane=goalie.x-direction*14;
-  if(direction*(previousX-plane)>0||direction*(this.puck.x-plane)<0)return false;
-  const t=clamp((plane-previousX)/(this.puck.x-previousX||1),0,1);
-  const impactY=this.previousPuckY+(this.puck.y-this.previousPuckY)*t;
-  const impactZ=this.previousPuckHeight+(this.puck.height-this.previousPuckHeight)*t;
-  const finalY=this.puck.y,finalZ=this.puck.height;
-  this.puck.y=impactY;this.puck.height=impactZ;
-  const contact=this.saveContact(goalie);
-  this.puck.y=finalY;this.puck.height=finalZ;
-  if(!contact)return false;
-  const wasShot=this.puck.shotTeam!==null;
-  const caught=contact==='glove'&&impactZ>16;
-  const speed=Math.hypot(this.puck.vx,this.puck.vy);
-  this.puck.x=plane-direction*5;
-  this.puck.y=impactY;
-  this.puck.vx=-direction*Math.max(85,speed*(contact==='pads'?.42:.30));
-  this.puck.vy+=(impactY-goalie.y)*2.1+(this.rng()-.5)*35;
-  this.puck.height=caught?0:Math.max(0,impactZ);
-  this.puck.vz=caught?0:Math.max(0,this.puck.vz*.3);
-  this.puck.shotTeam=null;this.puck.lock=.16;
-  if(wasShot){
-   if(goalie.team===0&&this.goalieCareer)this.saves++;
-   this.emit('save',caught?'GLOVE SAVE!':contact==='pads'?'PAD SAVE!':contact==='blocker'?'BLOCKER SAVE!':contact==='stick'?'STICK SAVE!':'GOALIE SAVE!',goalie.team);
+  // Sweep the complete puck segment through the goalie, not a single X plane.
+  // The previous implementation missed diagonal shots and pucks that started inside the keeper.
+  const x0=previousX,y0=this.previousPuckY,z0=this.previousPuckHeight;
+  const dx=this.puck.x-x0,dy=this.puck.y-y0,dz=this.puck.height-z0;
+  const length2=dx*dx+dy*dy;
+  if(length2<.00001)return false;
+  for(const goalie of this.goalies){
+   const towardsGoal=goalie.team===0?this.puck.vx<0:this.puck.vx>0;
+   if(!towardsGoal)continue;
+   // Project goalie onto shot path; clamp to this frame's segment.
+   const t=clamp(((goalie.x-x0)*dx+(goalie.y-y0)*dy)/length2,0,1);
+   const impactX=x0+dx*t,impactY=y0+dy*t,impactZ=z0+dz*t;
+   const lateral=impactY-goalie.y;
+   const along=Math.abs(impactX-goalie.x);
+   // Wider front-to-back body volume prevents pucks tunnelling through the pads.
+   if(along>18||Math.abs(lateral)>55)continue;
+   const endY=this.puck.y,endZ=this.puck.height;
+   this.puck.y=impactY;this.puck.height=impactZ;
+   const contact=this.saveContact(goalie);
+   this.puck.y=endY;this.puck.height=endZ;
+   if(!contact)continue;
+   const wasShot=this.puck.shotTeam!==null;
+   const caught=contact==='glove'&&impactZ>16;
+   const direction=goalie.team===0?-1:1;
+   const speed=Math.hypot(this.puck.vx,this.puck.vy);
+   // Place puck outside goalie on the incoming side, so it cannot immediately score.
+   this.puck.x=goalie.x-direction*23;
+   this.puck.y=impactY;
+   this.puck.vx=-direction*Math.max(100,speed*(contact==='pads'?.43:.32));
+   this.puck.vy+=(impactY-goalie.y)*1.8+(this.rng()-.5)*26;
+   this.puck.height=caught?0:Math.max(0,impactZ);
+   this.puck.vz=caught?0:Math.max(0,this.puck.vz*.25);
+   this.puck.shotTeam=null;this.puck.lock=.20;
+   if(wasShot){
+    if(goalie.team===0&&this.goalieCareer)this.saves++;
+    this.emit('save',caught?'GLOVE SAVE!':contact==='pads'?'PAD SAVE!':contact==='blocker'?'BLOCKER SAVE!':contact==='stick'?'STICK SAVE!':'GOALIE SAVE!',goalie.team);
+   }
+   if(!(goalie.team===0&&this.goalieCareer)){
+    if(contact==='pads')goalie.pose='butterfly';
+    else if(contact==='glove'||contact==='blocker'){goalie.saveHand=contact;goalie.saveReach=1;}
+    goalie.poseTime=.38;
+   }
+   return true;
   }
-  if(!(goalie.team===0&&this.goalieCareer)){
-   if(contact==='pads')goalie.pose='butterfly';
-   else if(contact==='glove'||contact==='blocker'){goalie.saveHand=contact;goalie.saveReach=1;}
-   goalie.poseTime=.38;
-  }
-  return true;
+  return false;
  }
  private previousPuckY=220;
  private previousPuckHeight=0;
@@ -389,6 +400,8 @@ export class HockeyMatch {
    return true;
   }
   if(offset<opening-postRadius-puckRadius&&z>=0&&z<64-postRadius-puckRadius){
+   // Any loose puck completely crossing the mouth counts, including rebounds
+   // and own goals; merely touching the side or outside of the mesh does not.
    // The entire puck passed the goal line inside the frame. Net mesh absorbs it.
    const scorer:Team=dir>0?0:1;
    this.scores[scorer]++;
