@@ -43,6 +43,7 @@ export class HockeyMatch {
  private goalieActionCooldown=0;
  private rating:MatchRating;
  private faceoffNext:Team=1;
+ private creaseMomentum:[number,number]=[0,0];
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random){
   this.goalieCareer=goalieCareer;this.rating=rating;this.rng=rng;
   for(const team of [0,1] as Team[])for(let i=0;i<5;i++){
@@ -107,6 +108,7 @@ export class HockeyMatch {
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;});
+  this.creaseMomentum=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1};
@@ -164,11 +166,17 @@ export class HockeyMatch {
    return {x:clamp(px-sign*30,130,670),y:lane};
   }
   const first=this.closest(a.team,this.puck.x,this.puck.y);
-  if(i===first)return {x:this.puck.x,y:this.puck.y};
+  // Only one forechecker pressures the puck. The other forwards hold lanes,
+  // while defensemen protect the slot instead of collapsing into a pile.
+  if(i===first&&a.role!=='LD'&&a.role!=='RD'){
+   const owner=this.puck.owner>=0?this.skaters[this.puck.owner]:null;
+   return {x:clamp(this.puck.x+(owner?owner.vx*.16:0),110,690),
+    y:clamp(this.puck.y+(owner?owner.vy*.16:0),58,382)};
+  }
   if(otherHasPuck){
-   if(a.role==='LD'||a.role==='RD')return {x:ownGoal+sign*100,y:lane};
-   const interceptX=clamp(this.puck.x-sign*68,ownGoal-260,ownGoal+260);
-   return {x:clamp(interceptX,110,690),y:lane};
+   if(a.role==='LD'||a.role==='RD')return {x:ownGoal+sign*(a.role==='LD'?110:150),y:lane};
+   const interceptX=clamp(this.puck.x-sign*(a.role==='C'?92:135),110,690);
+   return {x:interceptX,y:lane};
   }
   if(a.role==='LD'||a.role==='RD')return {x:ownGoal+sign*132,y:lane};
   return {x:clamp(this.puck.x-sign*75,110,690),y:lane};
@@ -184,18 +192,22 @@ export class HockeyMatch {
    const mag=Math.hypot(dx,dy),speed=controlled?185+this.rating.speed*.55:175;
    const desiredX=mag<4?0:dx/Math.max(1,mag)*Math.min(speed,mag*2.8);
    const desiredY=mag<4?0:dy/Math.max(1,mag)*Math.min(speed,mag*2.8);
-   const accel=controlled?7:4.6;
+   const accel=controlled?8:4.3;
    a.vx+=(desiredX-a.vx)*Math.min(1,accel*dt);
    a.vy+=(desiredY-a.vy)*Math.min(1,accel*dt);
    // Short-range separation prevents players forming overlapping piles.
    for(let j=0;j<10;j++){
     if(i===j)continue;
     const b=this.skaters[j],r=distance(a.x,a.y,b.x,b.y);
-    if(r>0&&r<33){a.vx+=(a.x-b.x)/r*(33-r)*dt*7;a.vy+=(a.y-b.y)/r*(33-r)*dt*7;}
+    if(r>0&&r<46){const push=(46-r)*dt*(a.team===b.team?13:8);a.vx+=(a.x-b.x)/r*push;a.vy+=(a.y-b.y)/r*push;}
    }
    a.x=clamp(a.x+a.vx*dt,42,758);
    a.y=clamp(a.y+a.vy*dt,43,397);
-   if(Math.hypot(a.vx,a.vy)>9)a.heading=Math.atan2(a.vy,a.vx);
+   if(Math.hypot(a.vx,a.vy)>9){
+    const targetAngle=Math.atan2(a.vy,a.vx);
+    const delta=Math.atan2(Math.sin(targetAngle-a.heading),Math.cos(targetAngle-a.heading));
+    a.heading+=clamp(delta,-dt*8,dt*8);
+   }
    a.shotAnimation=Math.max(0,a.shotAnimation-dt);
    a.carriedFor=this.puck.owner===i?a.carriedFor+dt:0;
   }
@@ -203,9 +215,22 @@ export class HockeyMatch {
   for(const g of this.goalies){
    let vy=0,vx=0;
    if(g.team===0&&this.goalieCareer){vx=this.movement.x*(165+this.rating.speed*.45);vy=this.movement.y*(165+this.rating.speed*.45);}
-   else {vy=clamp((this.puck.y-g.y)*4,-120,120);}
-   g.x=clamp(g.x+vx*dt,g.team===0?65:687,g.team===0?142:729);
-   g.y=clamp(g.y+vy*dt,177,263);
+   else {
+    // Track the puck from inside the crease; anticipate only the final
+    // approach, not shots still travelling across the opposite half.
+    const approaching=g.team===0?this.puck.vx<0:this.puck.vx>0;
+    const distanceToNet=Math.abs(this.puck.x-g.x);
+    const prediction=approaching&&distanceToNet<300
+     ?this.puck.y+this.puck.vy*Math.min(.35,distanceToNet/Math.max(160,Math.abs(this.puck.vx)))
+     :this.puck.y;
+    const targetY=clamp(220+(prediction-220)*.62,182,258);
+    vy=clamp((targetY-g.y)*3.4,-115,115);
+   }
+   const maxX=g.team===0?128:722,minX=g.team===0?72:672;
+   g.x=clamp(g.x+vx*dt,minX,maxX);
+   const gi=g.team;
+   this.creaseMomentum[gi]+=(vy-this.creaseMomentum[gi])*Math.min(1,dt*8);
+   g.y=clamp(g.y+this.creaseMomentum[gi]*dt,178,262);
    g.poseTime=Math.max(0,g.poseTime-dt);
    if(g.poseTime===0)g.pose='glide';
   }
@@ -250,7 +275,7 @@ export class HockeyMatch {
  private collideGoalies():void {
   if(this.puck.owner>=0||this.puck.shotTeam===null)return;
   const team=this.puck.shotTeam,defender=team===0?this.goalies[1]:this.goalies[0];
-  const nearX=team===0?this.puck.x>=defender.x-25:this.puck.x<=defender.x+25;
+  const nearX=Math.abs(this.puck.x-defender.x)<=24;
   const advancing=team===0?this.puck.vx>0:this.puck.vx<0;
   if(!nearX||!advancing)return;
   const gap=Math.abs(this.puck.y-defender.y);
@@ -260,7 +285,7 @@ export class HockeyMatch {
    reach=defender.pose==='butterfly'?(low?46:9):defender.pose==='blocker'?(!low?40:14):15;
   }else reach=low?29:24;
   if(gap>reach)return;
-  const chance=(defender.team===0&&this.goalieCareer)?1:.76;
+  const chance=(defender.team===0&&this.goalieCareer)?1:.78;
   if(this.rng()>chance)return;
   const side=team===0?-1:1;
   this.puck.vx=side*Math.max(195,Math.abs(this.puck.vx)*.55);

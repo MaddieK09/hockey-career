@@ -14,7 +14,9 @@ export function drawHockeyCharacter(ctx:CanvasRenderingContext2D,p:CharacterFram
  const stripe=home?'#f3f5f6':'#e4edf7',gear='#f3f6f8';
  const motion=Math.min(1,p.speed/155),stride=Math.sin(p.time*12+((p.x+p.y)*.015))*motion;
  const goalie=!!p.goalie,pose=p.pose??'glide';
- ctx.save();ctx.translate(p.x,p.y);
+ const bob=goalie?Math.sin(p.time*6)*Math.min(1,p.speed/160)*1.5:
+   Math.abs(Math.sin(p.time*12))*Math.min(1,p.speed/180)*1.7;
+ ctx.save();ctx.translate(p.x,p.y-bob);
  // Ground contact and selection are visible even at the iPhone rink scale.
  ctx.fillStyle='rgba(12,30,49,.24)';ctx.beginPath();ctx.ellipse(2,6,goalie?26:19,goalie?22:14,0,0,PI*2);ctx.fill();
  if(p.selected){ctx.strokeStyle='#ffd65d';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,goalie?31:24,goalie?27:21,0,0,PI*2);ctx.stroke();}
@@ -28,7 +30,7 @@ export function drawHockeyCharacter(ctx:CanvasRenderingContext2D,p:CharacterFram
  if(goalie){
   // Mask, cage, leg pads, trapper, blocker and stick all remain distinct.
   const butterfly=pose==='butterfly';
-  const flare=butterfly?9:0;
+  const flare=butterfly?12:0;
   ctx.fillStyle=gear;ctx.strokeStyle='#8ea5b7';ctx.lineWidth=1.8;
   for(const s of [-1,1]){
    ctx.save();ctx.translate(-6,s*(10+flare));ctx.rotate(s*(butterfly?.36:.05));
@@ -37,6 +39,9 @@ export function drawHockeyCharacter(ctx:CanvasRenderingContext2D,p:CharacterFram
    ctx.restore();
   }
   ellipse(1,0,15,17,dark);ellipse(2,0,13,14,main);
+  // Raised chest/shoulder trim and a more legible goalie silhouette.
+  segment(-4,-13,8,-13,3,stripe);
+  segment(-4,13,8,13,3,stripe);
   segment(-3,-11,-3,11,2,stripe);
   // Glove: curved catcher's pocket. Blocker: squared paddle.
   ellipse(4,-23,pose==='save'?11:9,9,'#f0f3f7');
@@ -65,6 +70,9 @@ export function drawHockeyCharacter(ctx:CanvasRenderingContext2D,p:CharacterFram
   segment(23,-12,32,16+(pose==='shoot'?7:0),3.3,'#c19a65');
   segment(32,16+(pose==='shoot'?7:0),41,19+(pose==='shoot'?7:0),4.2,'#202b38');
   ellipse(5,0,9,9,'#e5ecf1');
+  // Helmet vents and a clear face-cage profile.
+  segment(1,-6,1,6,1.3,'#647b8c');
+  segment(4,-7,4,7,1.3,'#647b8c');
   segment(1,-5,1,5,1.3,'#647b8c');segment(6,-7,6,7,1.3,'#647b8c');
   ctx.fillStyle=dark;ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.fillText(String(p.number??(home?10:17)),-5,3);
  }

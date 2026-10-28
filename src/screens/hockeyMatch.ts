@@ -15,6 +15,7 @@ export function mountHockeyMatch(
 ):{stop:()=>void}{
  const match=new HockeyMatch(goalieCareer,rating);
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
+ let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -127,6 +128,26 @@ export function mountHockeyMatch(
    });
   }
   const puck=match.puck;
+  // A fading puck trail makes shots and rebounds legible on small screens.
+  if(match.phase==='live'&&Math.hypot(puck.vx,puck.vy)>75&&puck.owner<0){
+   puckTrail.push({x:puck.x,y:puck.y});
+   if(puckTrail.length>12)puckTrail.shift();
+  }else if(puckTrail.length)puckTrail.shift();
+  puckTrail.forEach((point,i)=>{
+   ctx.fillStyle='rgba(22,54,76,'+(i/puckTrail.length*.34)+')';
+   ctx.beginPath();ctx.arc(point.x,point.y,2+i/puckTrail.length*3,0,Math.PI*2);ctx.fill();
+  });
+  // Readable puck locator and a pulse on the selected player.
+  const pulse=1+Math.sin(visualTime*5)*.08;
+  ctx.strokeStyle='#f7c83b';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(puck.x,puck.y,11*pulse,0,Math.PI*2);ctx.stroke();
+  if(!goalieCareer){
+   const selected=match.skaters[match.selected];
+   ctx.fillStyle='#ffcf53';ctx.beginPath();
+   ctx.moveTo(selected.x,selected.y-31);
+   ctx.lineTo(selected.x-7,selected.y-42);
+   ctx.lineTo(selected.x+7,selected.y-42);ctx.closePath();ctx.fill();
+  }
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();
   ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y,6.7,5.5,0,0,Math.PI*2);ctx.fill();
@@ -156,12 +177,16 @@ export function mountHockeyMatch(
  function frame(now:number){
   if(!active)return;
   const dt=Math.min((now-last)/1000,.04);last=now;
-  match.step(dt);syncMovement();
+  visualTime+=dt;match.step(dt);syncMovement();
   score.textContent=match.scores[0]+' - '+match.scores[1];
   shots.textContent='Shots '+match.shots[0]+' - '+match.shots[1];
   clock.textContent='P'+match.period+' · '+Math.ceil(match.timeRemaining)+'s';
   event.textContent=match.message;
-  if(goalieCareer)hint.textContent=match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly = low · Blocker = high · Poke = close range.';
+  if(goalieCareer){
+   const danger=match.puck.shotTeam===1&&match.puck.owner<0;
+   hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then choose Butterfly (low) or Blocker (high).':
+    match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly = low · Blocker = high · Poke = close range.';
+  }
   render(now/1000);
   if(match.phase==='final'){completedMatch();return;}
   raf=requestAnimationFrame(frame);
