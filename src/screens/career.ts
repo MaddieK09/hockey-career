@@ -31,12 +31,14 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const startMatch=()=>{
   let active=true,finished=false,raf=0,last=performance.now(),elapsed=0,period=1,home=0,away=0,saves=0,goals=0,assists=0;
   const goalie=p.position==='G';
+  // Five skaters per team: center, two wings, and two defensemen.
+  const formation=[{x:290,y:220},{x:330,y:125},{x:330,y:315},{x:180,y:155},{x:180,y:285}];
   const players:Skater[]=[
-   {x:200,y:220,vx:0,vy:0,team:0},{x:320,y:130,vx:0,vy:0,team:0},{x:320,y:310,vx:0,vy:0,team:0},
-   {x:590,y:220,vx:0,vy:0,team:1},{x:485,y:130,vx:0,vy:0,team:1},{x:485,y:310,vx:0,vy:0,team:1}
+   ...formation.map(a=>({x:a.x,y:a.y,vx:0,vy:0,team:0 as const})),
+   ...formation.map(a=>({x:800-a.x,y:a.y,vx:0,vy:0,team:1 as const}))
   ];
   const puck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0};
-  let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,aiShotCount=0,shotFeedback='';
+  let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,homeCooldown=1.5,aiShotCount=0,shotFeedback='',goalPause=0,faceoffTeam:0|1=1;
   const previousPositions=players.map(a=>({x:a.x,y:a.y}));let previousGoalie={x:goalieX,y:goalieY},lastFrameDt=1/60,shotAnimation=0;
   const keys=new Set<string>();
   root.innerHTML=`<main class="career-shell match-shell"><header class="career-top"><button data-exit>← Career</button><strong>HOME <span data-score>0 - 0</span> AWAY</strong><span data-clock>P1 · 1:00</span></header><div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Playable top-down hockey rink with animated players"></canvas><div class="rink-hud"><span>HOME · RED</span><span data-event>PUCK DROP</span><span>AWAY · BLUE</span></div></div><div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div><div class="action-pad"><button data-action="shoot">${goalie?'BUTTERFLY':'SHOOT'}</button><button data-action="pass">${goalie?'BLOCKER':'PASS'}</button><button data-action="switch">SWITCH</button></div></div><p class="career-muted" data-hint>${goalie?'Protect the left net. BUTTERFLY seals low shots; BLOCKER deflects high shots. Follow the puck with the movement pad.':'Attack the right net. Move, pass, shoot and switch skaters.'}</p><section class="match-result" data-result hidden></section></main>`;
@@ -52,13 +54,14 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   window.addEventListener('keydown',onKeyDown);window.addEventListener('keyup',onKeyUp);
   const stop=()=>{active=false;cancelAnimationFrame(raf);window.removeEventListener('keydown',onKeyDown);window.removeEventListener('keyup',onKeyUp);};
   const reset=()=>{
-   opponentCooldown=1.2;saveWindow=0;savePose=0;shotFeedback='';
-   players.forEach((a,i)=>{a.x=i<3?230+(i===0?0:80):570-(i===3?0:80);a.y=[220,130,310,220,130,310][i];});
+   opponentCooldown=1.2;homeCooldown=1.5;saveWindow=0;savePose=0;shotFeedback='';
+   players.forEach((a,i)=>{const spot=formation[i%5];a.x=i<5?spot.x:800-spot.x;a.y=spot.y;});
    goalieX=91;goalieY=220;
    // When playing goalie, begin the drill with the visiting team in possession:
    // an opponent must actually carry and release the puck toward the user's net.
-   puck.x=goalie?players[3].x+17:400;puck.y=goalie?players[3].y+10:220;
-   puck.vx=puck.vy=0;puck.owner=goalie?3:-1;puck.lock=goalie?.55:1;
+   const carrier=faceoffTeam===0?0:5;
+   puck.x=players[carrier].x+17;puck.y=players[carrier].y+10;
+   puck.vx=puck.vy=0;puck.owner=carrier;puck.lock=.7;
   };
   const fire=(owner:number,tx:number,ty:number,power:number)=>{
    const a=players[owner],dx=tx-a.x,dy=ty-a.y,d=Math.hypot(dx,dy)||1;
@@ -66,14 +69,14 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    puck.vx=dx/d*power;puck.vy=dy/d*power;
   };
   const action=(kind:string)=>{
-   if(finished)return;
-   if(kind==='switch'){if(!goalie)selected=(selected+1)%3;return;}
+   if(finished||goalPause>0)return;
+   if(kind==='switch'){if(!goalie)selected=(selected+1)%5;return;}
    if(cooldown>0)return;
    cooldown=.28;
    if(goalie){if(kind==='shoot'){saveWindow=.48;savePose=1;}else if(kind==='pass'){saveWindow=.38;savePose=2;if(puck.owner<0&&puck.x<145&&Math.abs(puck.y-goalieY)<46){puck.vx=370;puck.vy=(Math.random()-.5)*220;puck.lock=.5;}}return;}
    const a=players[selected];if(puck.owner!==selected&&Math.hypot(puck.x-a.x,puck.y-a.y)>32)return;
    if(kind==='shoot'){shotAnimation=.32;const spread=(Math.random()-.5)*(100-career.shot)*1.5;fire(selected,790,220+spread,630+career.shot*2);}
-   if(kind==='pass'){const teammate=players[(selected+1)%3];fire(selected,teammate.x,teammate.y,420+career.handling*2);selected=(selected+1)%3;}
+   if(kind==='pass'){const teammate=players[(selected+1)%5];fire(selected,teammate.x,teammate.y,420+career.handling*2);selected=(selected+1)%5;}
   };
   root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action!)));
   root.querySelector('[data-exit]')?.addEventListener('click',()=>{stop();drawHub();});
@@ -86,7 +89,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
     const speed=Math.min(230,dist/Math.max(.016,lastFrameDt));
     const angle=Math.atan2((puck.y-a.y)*.45,(puck.x-a.x)*.45);
     drawHockeyCharacter(ctx,{x:a.x,y:a.y,team:a.team,angle,time:t+i*.27,speed,
-     selected:i===selected&&!goalie,number:i<3?10+i:17+i,
+     selected:i===selected&&!goalie,number:i<5?10+i:17+i,
      pose:shotAnimation>0&&i===selected&&!goalie?'shoot':speed>12?'skate':'glide',
      hasPuck:puck.owner===i});
     old.x=a.x;old.y=a.y;
@@ -113,8 +116,9 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   };
   const tick=(now:number)=>{
    if(!active)return;
-   const dt=Math.min((now-last)/1000,.04);last=now;lastFrameDt=dt;shotAnimation=Math.max(0,shotAnimation-dt);elapsed+=dt;cooldown=Math.max(0,cooldown-dt);saveWindow=Math.max(0,saveWindow-dt);if(saveWindow===0)savePose=0;opponentCooldown=Math.max(0,opponentCooldown-dt);puck.lock=Math.max(0,puck.lock-dt);
-   if(elapsed>=60){elapsed=0;period++;if(period>3){finish();return;}reset();}
+   const dt=Math.min((now-last)/1000,.04);last=now;lastFrameDt=dt;shotAnimation=Math.max(0,shotAnimation-dt);elapsed+=dt;cooldown=Math.max(0,cooldown-dt);saveWindow=Math.max(0,saveWindow-dt);if(saveWindow===0)savePose=0;opponentCooldown=Math.max(0,opponentCooldown-dt);homeCooldown=Math.max(0,homeCooldown-dt);puck.lock=Math.max(0,puck.lock-dt);
+   if(goalPause>0){goalPause=Math.max(0,goalPause-dt);draw();if(goalPause===0)reset();raf=requestAnimationFrame(tick);return;}
+   if(elapsed>=60){elapsed=0;period++;if(period>3){finish();return;}faceoffTeam=period%2===0?0:1;reset();}
    clock.textContent=`P${period} · ${Math.floor(60-elapsed)}s`;score.textContent=`${home} - ${away}`;
    const hint=root.querySelector<HTMLElement>('[data-hint]');
    const event=root.querySelector<HTMLElement>('[data-event]');if(event)event.textContent=shotFeedback||'LIVE PLAY';
@@ -128,25 +132,28 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    else {const a=players[selected];a.x=clamp(a.x+dx*speed*dt,35,765);a.y=clamp(a.y+dy*speed*dt,35,405);}
    // Lane-aware positioning: puck carrier attacks, nearest teammate supports,
    // defenders cover lanes instead of six skaters chasing the same puck.
-   const nearest=(team:0|1)=>players.reduce((best,a,i)=>a.team===team&&Math.hypot(a.x-puck.x,a.y-puck.y)<Math.hypot(players[best].x-puck.x,players[best].y-puck.y)?i:best,team===0?0:3);
+   const nearest=(team:0|1)=>players.reduce((best,a,i)=>a.team===team&&Math.hypot(a.x-puck.x,a.y-puck.y)<Math.hypot(players[best].x-puck.x,players[best].y-puck.y)?i:best,team===0?0:5);
    const chaseHome=nearest(0),chaseAway=nearest(1);
    for(let i=0;i<players.length;i++){
     if(!goalie&&i===selected)continue;
     const a=players[i],attack=a.team===1,carrier=puck.owner===i;
-    const lane=i%3,offset=(lane===1?-105:lane===2?105:0);
+    const lane=i%5,offset=[0,-112,112,-72,72][lane];
     let tx:number,ty:number;
-    if(carrier){tx=attack?150:650;ty=220+offset*.32;}
-    else if(i===(attack?chaseAway:chaseHome)&&puck.owner<0){tx=puck.x;ty=puck.y;}
-    else if(attack){tx=puck.owner>=0&&players[puck.owner].team===1?Math.max(175,puck.x-105):Math.max(325,puck.x+75);ty=220+offset;}
-    else {tx=puck.owner>=0&&players[puck.owner].team===0?Math.min(620,puck.x+100):Math.max(135,Math.min(350,puck.x-95));ty=220+offset;}
-    const dist=Math.hypot(tx-a.x,ty-a.y)||1,spd=(carrier?200:attack?155:117)*dt;
+    if(carrier){tx=attack?155:645;ty=220+offset*.22;}
+    else if(i===(attack?chaseAway:chaseHome)&&(puck.owner<0||players[puck.owner].team!==a.team)){tx=puck.x;ty=puck.y;}
+    else if(attack){tx=puck.owner>=0&&players[puck.owner].team===1?Math.max(175,puck.x-105):Math.max(330,puck.x+80);ty=220+offset;}
+    else {tx=puck.owner>=0&&players[puck.owner].team===0?Math.min(620,puck.x+100):Math.max(135,Math.min(365,puck.x-95));ty=220+offset;}
+    const dist=Math.hypot(tx-a.x,ty-a.y)||1,spd=(carrier?185:attack?150:142)*dt;
     a.x=clamp(a.x+(tx-a.x)/dist*Math.min(spd,dist),36,764);
     a.y=clamp(a.y+(ty-a.y)/dist*Math.min(spd,dist),36,404);
    }
    if(puck.owner>=0){const a=players[puck.owner];puck.x=a.x+17;puck.y=a.y+10;
-    if(a.team===1&&a.x<400&&opponentCooldown<=0){
-     opponentCooldown=1.7+Math.random()*1.1;aiShotCount++;shotFeedback='INCOMING SHOT!';
-     fire(puck.owner,8,220+(Math.random()-.5)*82,500+Math.random()*150);
+    if(a.team===1&&a.x<395&&opponentCooldown<=0){
+     opponentCooldown=2.5+Math.random()*1.5;aiShotCount++;shotFeedback='AWAY SHOT!';
+     fire(puck.owner,8,220+(Math.random()-.5)*72,490+Math.random()*130);
+    }else if(a.team===0&&a.x>405&&homeCooldown<=0&&(!goalie||puck.owner!==selected)){
+     homeCooldown=2.3+Math.random()*1.4;shotFeedback='HOME SHOT!';
+     fire(puck.owner,792,220+(Math.random()-.5)*70,500+Math.random()*140);
     }
    }else{
     puck.x+=puck.vx*dt;puck.y+=puck.vy*dt;puck.vx*=Math.pow(.991,dt*60);puck.vy*=Math.pow(.991,dt*60);
@@ -160,7 +167,17 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
     if(stopped){puck.vx=Math.abs(puck.vx)*(.6+Math.random()*.25);puck.vy+=(puck.y-goalieY)*2;puck.x=113;puck.lock=.5;if(goalie){saves++;shotFeedback='SAVE!';}}
    }
    if(puck.owner<0&&puck.x>691&&Math.abs(puck.y-220)<27&&puck.vx>0){const goalieBeat=Math.random()<(.24+career.shot*.004);if(!goalieBeat){puck.vx=-Math.abs(puck.vx)*.7;puck.x=689;}}
-   if(puck.x>783||puck.x<17){const scoredRight=puck.x>783;if(Math.abs(puck.y-220)<47){if(scoredRight){home++;if(!goalie)goals++;}else away++;reset();}else{puck.x=clamp(puck.x,23,777);puck.vx*=-.65;}}
+   // Score only a free-moving puck, then freeze briefly for the goal celebration.
+   // Never score a carried puck, which previously caused apparent freezes.
+   if(puck.owner<0&&(puck.x>783||puck.x<17)){
+    const scoredRight=puck.x>783;
+    if(Math.abs(puck.y-220)<39){
+     if(scoredRight){home++;if(!goalie)goals++;faceoffTeam=1;shotFeedback='HOME GOAL!';}
+     else {away++;faceoffTeam=0;shotFeedback='AWAY GOAL!';}
+     score.textContent=`${home} - ${away}`;goalPause=1.35;
+     puck.vx=puck.vy=0;puck.lock=2;
+    }else{puck.x=clamp(puck.x,23,777);puck.vx*=-.65;}
+   }
    draw();raf=requestAnimationFrame(tick);
   };
   reset();raf=requestAnimationFrame(tick);
