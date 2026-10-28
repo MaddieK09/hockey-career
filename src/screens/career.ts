@@ -1,5 +1,6 @@
 import type {PlayerDraft} from '../player/types';
 import {playerPortrait} from '../graphics/playerPortrait';
+import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
  player:PlayerDraft; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
@@ -37,6 +38,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   ];
   const puck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0};
   let selected=0,moveX=0,moveY=0,stickPointer=-1,stickOrigin={x:0,y:0},cooldown=0,goalieX=91,goalieY=220,saveWindow=0,savePose=0,opponentCooldown=1.2,aiShotCount=0,shotFeedback='';
+  const previousPositions=players.map(a=>({x:a.x,y:a.y}));let previousGoalie={x:goalieX,y:goalieY},lastFrameDt=1/60,shotAnimation=0;
   const keys=new Set<string>();
   root.innerHTML=`<main class="career-shell match-shell"><header class="career-top"><button data-exit>← Career</button><strong>HOME <span data-score>0 - 0</span> AWAY</strong><span data-clock>P1 · 1:00</span></header><canvas data-rink width="800" height="440" aria-label="Playable top-down hockey rink"></canvas><div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div><div class="action-pad"><button data-action="shoot">${goalie?'BUTTERFLY':'SHOOT'}</button><button data-action="pass">${goalie?'BLOCKER':'PASS'}</button><button data-action="switch">SWITCH</button></div></div><p class="career-muted" data-hint>${goalie?'Protect the left net. BUTTERFLY seals low shots; BLOCKER deflects high shots. Follow the puck with the movement pad.':'Attack the right net. Move, pass, shoot and switch skaters.'}</p><section class="match-result" data-result hidden></section></main>`;
   const canvas=root.querySelector<HTMLCanvasElement>('canvas')!,ctx=canvas.getContext('2d')!;
@@ -71,36 +73,35 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    cooldown=.28;
    if(goalie){if(kind==='shoot'){saveWindow=.48;savePose=1;}else if(kind==='pass'){saveWindow=.38;savePose=2;if(puck.owner<0&&puck.x<145&&Math.abs(puck.y-goalieY)<46){puck.vx=370;puck.vy=(Math.random()-.5)*220;puck.lock=.5;}}return;}
    const a=players[selected];if(puck.owner!==selected&&Math.hypot(puck.x-a.x,puck.y-a.y)>32)return;
-   if(kind==='shoot'){const spread=(Math.random()-.5)*(100-career.shot)*1.5;fire(selected,790,220+spread,630+career.shot*2);}
+   if(kind==='shoot'){shotAnimation=.32;const spread=(Math.random()-.5)*(100-career.shot)*1.5;fire(selected,790,220+spread,630+career.shot*2);}
    if(kind==='pass'){const teammate=players[(selected+1)%3];fire(selected,teammate.x,teammate.y,420+career.handling*2);selected=(selected+1)%3;}
   };
   root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(b=>b.addEventListener('click',()=>action(b.dataset.action!)));
   root.querySelector('[data-exit]')?.addEventListener('click',()=>{stop();drawHub();});
   const draw=()=>{
-   ctx.clearRect(0,0,W,H);ctx.fillStyle='#dceef4';ctx.fillRect(0,0,W,H);
-   ctx.strokeStyle='#1b4967';ctx.lineWidth=6;ctx.strokeRect(17,17,766,406);
-   ctx.strokeStyle='#d14e56';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(400,20);ctx.lineTo(400,420);ctx.stroke();
-   ctx.strokeStyle='#3980ba';ctx.lineWidth=3;for(const x of [260,540]){ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,420);ctx.stroke();}
-   ctx.strokeStyle='#b63b47';ctx.lineWidth=3;ctx.beginPath();ctx.arc(400,220,58,0,Math.PI*2);ctx.stroke();
-   for(const x of [165,635])for(const y of [125,315]){ctx.beginPath();ctx.arc(x,y,42,0,Math.PI*2);ctx.stroke();}
-   ctx.fillStyle='#b63b47';for(const x of [48,752]){ctx.fillRect(x-5,173,10,94);ctx.fillStyle='#9ec4d8';ctx.fillRect(x===48?27:757,184,16,72);ctx.fillStyle='#b63b47';}
-   const sk=(x:number,y:number,team:number,focus=false)=>{ctx.fillStyle=team===0?'#b52f47':'#1b4d83';ctx.beginPath();ctx.arc(x,y,15,0,Math.PI*2);ctx.fill();ctx.strokeStyle=focus?'#f8b42c':'#ffffff';ctx.lineWidth=focus?5:2;ctx.stroke();ctx.strokeStyle='#15283a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+8,y+8);ctx.lineTo(x+19,y+17);ctx.stroke();};
-   players.forEach((a,i)=>sk(a.x,a.y,a.team,i===selected&&!goalie));
-   // A goalie silhouette, distinct from round skaters: pads, mask, glove and blocker.
-   const drawGoalie=(x:number,y:number,team:0|1,pose=0)=>{
-    ctx.save();ctx.translate(x,y);
-    ctx.fillStyle=team===0?'#b52f47':'#1b4d83';ctx.strokeStyle='#e8f3fa';ctx.lineWidth=2.5;
-    ctx.fillRect(-12,-16,24,32);ctx.strokeRect(-12,-16,24,32);
-    ctx.fillStyle='#f1f4f6';ctx.fillRect(-18,-19,10,14);ctx.fillRect(-18,5,10,14);ctx.fillRect(8,-19,10,14);ctx.fillRect(8,5,10,14);
-    ctx.fillStyle='#dce5ed';ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();ctx.stroke();
-    ctx.strokeStyle='#647d91';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-6,-3);ctx.lineTo(6,-3);ctx.moveTo(-6,3);ctx.lineTo(6,3);ctx.moveTo(0,-8);ctx.lineTo(0,8);ctx.stroke();
-    ctx.fillStyle='#eef3f7';ctx.fillRect(-26,pose===1?-22:-12,10,15);ctx.fillStyle='#293e54';ctx.fillRect(16,pose===2?-22:-12,12,18);
-    if(pose){ctx.strokeStyle='#f9c14a';ctx.lineWidth=3;ctx.strokeRect(-28,-24,56,48);}
-    ctx.restore();
-   };
-   drawGoalie(goalieX,goalieY,0,goalie?savePose:0);
-   drawGoalie(709,220,1);
-   ctx.fillStyle='#14171b';ctx.beginPath();ctx.arc(puck.x,puck.y,7,0,Math.PI*2);ctx.fill();
+   drawRink(ctx,elapsed);
+   const t=performance.now()/1000;
+   // All six skaters are animated vector characters, not circles.
+   players.forEach((a,i)=>{
+    const old=previousPositions[i],dist=Math.hypot(a.x-old.x,a.y-old.y);
+    const speed=Math.min(230,dist/Math.max(.016,lastFrameDt));
+    const angle=Math.atan2((puck.y-a.y)*.45,(puck.x-a.x)*.45);
+    drawHockeyCharacter(ctx,{x:a.x,y:a.y,team:a.team,angle,time:t+i*.27,speed,
+     selected:i===selected&&!goalie,number:i<3?10+i:17+i,
+     pose:shotAnimation>0&&i===selected&&!goalie?'shoot':speed>12?'skate':'glide',
+     hasPuck:puck.owner===i});
+    old.x=a.x;old.y=a.y;
+   });
+   const goalieSpeed=Math.hypot(goalieX-previousGoalie.x,goalieY-previousGoalie.y)/Math.max(.016,lastFrameDt);
+   drawHockeyCharacter(ctx,{x:goalieX,y:goalieY,team:0,goalie:true,angle:0,time:t,
+    speed:goalieSpeed,selected:goalie,number:10,
+    pose:goalie&&savePose===1?'butterfly':goalie&&savePose===2?'blocker':'glide'});
+   drawHockeyCharacter(ctx,{x:709,y:220,team:1,goalie:true,angle:Math.PI,time:t,speed:0});
+   previousGoalie={x:goalieX,y:goalieY};
+   // Puck casts a small shadow and is always painted on top of the skaters.
+   ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle='#131c25';ctx.beginPath();ctx.ellipse(puck.x,puck.y,6.5,5,0,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle='#677786';ctx.lineWidth=1;ctx.stroke();
   };
   const finish=()=>{
    finished=true;stop();
@@ -113,7 +114,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   };
   const tick=(now:number)=>{
    if(!active)return;
-   const dt=Math.min((now-last)/1000,.04);last=now;elapsed+=dt;cooldown=Math.max(0,cooldown-dt);saveWindow=Math.max(0,saveWindow-dt);if(saveWindow===0)savePose=0;opponentCooldown=Math.max(0,opponentCooldown-dt);puck.lock=Math.max(0,puck.lock-dt);
+   const dt=Math.min((now-last)/1000,.04);last=now;lastFrameDt=dt;shotAnimation=Math.max(0,shotAnimation-dt);elapsed+=dt;cooldown=Math.max(0,cooldown-dt);saveWindow=Math.max(0,saveWindow-dt);if(saveWindow===0)savePose=0;opponentCooldown=Math.max(0,opponentCooldown-dt);puck.lock=Math.max(0,puck.lock-dt);
    if(elapsed>=60){elapsed=0;period++;if(period>3){finish();return;}reset();}
    clock.textContent=`P${period} · ${Math.floor(60-elapsed)}s`;score.textContent=`${home} - ${away}`;
    const hint=root.querySelector<HTMLElement>('[data-hint]');
