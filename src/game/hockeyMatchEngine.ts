@@ -400,10 +400,8 @@ export class HockeyMatch {
    return true;
   }
   if(offset<opening-postRadius-puckRadius&&z>=0&&z<64-postRadius-puckRadius){
-   // Only shots travelling toward the opposing net are goals. Deflections and
-   // rebounds are physical puck contacts, not automatic scores.
-   const attackingTeam:Team=dir>0?0:1;
-   if(this.puck.shotTeam!==attackingTeam)return false;
+   // Any loose puck completely crossing the mouth counts, including rebounds
+   // and own goals; merely touching the side or outside of the mesh does not.
    // The entire puck passed the goal line inside the frame. Net mesh absorbs it.
    const scorer:Team=dir>0?0:1;
    this.scores[scorer]++;
