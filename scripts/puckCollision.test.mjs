@@ -29,9 +29,10 @@ const shoot=(m,fromX,y,z=3,vx=-700,vy=0)=>{
  for(let i=0;i<25&&m.phase==='live';i++)m.stepPuck(.02);
 };
 test('direct low shot touches equipment, returns as save and never scores',()=>{
- const m=setup();shoot(m,175,220);
+ const m=setup();m.puck.x=175;m.puck.y=220;
+ for(let i=0;i<16&&m.saves===0;i++)m.stepPuck(.02);
  assert.equal(m.saves,1);assert.equal(m.scores[1],0);
- assert.ok(m.puck.vx>=0,'the puck must rebound toward the shooter');
+ assert.ok(m.puck.vx>0,'the first rebound must travel back toward the shooter');
 });
 test('diagonal fast puck cannot tunnel through the goalie',()=>{
  const g={...home,saveHand:null};
