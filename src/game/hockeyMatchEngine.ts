@@ -314,43 +314,116 @@ export class HockeyMatch {
    this.skaters[nearest].carriedFor=0;
   }
  }
- private collideGoalies(previousX:number):void {
-  if(this.puck.owner>=0||this.puck.shotTeam===null)return;
-  const team=this.puck.shotTeam,defender=team===0?this.goalies[1]:this.goalies[0];
-  const attackingRight=team===0;
-  const nearX=attackingRight?previousX<=defender.x+20&&this.puck.x>=defender.x-20:previousX>=defender.x-20&&this.puck.x<=defender.x+20;
-  if(!nearX||this.goalieSaveCooldown[defender.team]>0)return;
-  const gap=this.puck.y-defender.y,absGap=Math.abs(gap),height=this.puck.height;
-  // Separate pad, torso, blocker and catching-glove volumes; high shots can pass above pads.
-  const pads=height<14&&absGap<17+31*defender.stance;
-  const body=height<38&&absGap<15;
-  const blocker=defender.saveHand==='blocker'&&defender.saveReach>.1&&gap>3&&gap<49&&height<68;
-  const glove=defender.saveHand==='glove'&&defender.saveReach>.1&&gap< -3&&gap> -49&&height<75;
-  const stick=height<7&&absGap<20;
-  if(!(pads||body||blocker||glove||stick))return;
-  if(!(defender.team===0&&this.goalieCareer)&&this.rng()>.83)return;
-  const caught=glove&&height>16;
-  const side=attackingRight?-1:1;
-  this.puck.vx=side*Math.max(190,Math.abs(this.puck.vx)*.46);
-  this.puck.vy+=gap*2+(this.rng()-.5)*120;
-  this.puck.x=defender.x+side*27;
-  this.puck.shotTeam=null;this.puck.lock=.3;
-  this.puck.vz=caught?0:Math.max(0,this.puck.vz*.2);
-  if(caught)this.puck.height=0;
-  this.goalieSaveCooldown[defender.team]=.3;
-  if(defender.team===0&&this.goalieCareer)this.saves++;
-  if(!(this.goalieCareer&&defender.team===0)){
-   if(height<15)defender.pose='butterfly';
-   else {defender.saveHand=gap<0?'glove':'blocker';defender.saveReach=1;}
-   defender.poseTime=.45;
+ private saveContact(goalie:MatchGoalie):'pads'|'body'|'stick'|'glove'|'blocker'|null {
+  const lateral=this.puck.y-goalie.y;
+  const gap=Math.abs(lateral),z=this.puck.height;
+  // Geometry is expressed in the same rink units as the goal mouth.
+  // Low pads are wider in butterfly; standing body protects the middle.
+  if(z<=9&&gap<=20)return 'stick';
+  if(z<=18&&gap<=17+30*goalie.stance)return 'pads';
+  if(z<=58&&gap<=14)return 'body';
+  if(goalie.saveHand==='glove'&&goalie.saveReach>.08&&lateral>=-51&&lateral<=-12&&z>=9&&z<=78)return 'glove';
+  if(goalie.saveHand==='blocker'&&goalie.saveReach>.08&&lateral>=12&&lateral<=51&&z>=9&&z<=74)return 'blocker';
+  return null;
+ }
+ private collideGoalies(previousX:number):boolean {
+  if(this.puck.owner>=0)return false;
+  const direction=Math.sign(this.puck.vx);
+  if(direction===0)return false;
+  const goalie=direction>0?this.goalies[1]:this.goalies[0];
+  // Swept crossing of the front of the goalie; no random "save chance".
+  const plane=goalie.x-direction*14;
+  if(direction*(previousX-plane)>0||direction*(this.puck.x-plane)<0)return false;
+  const t=clamp((plane-previousX)/(this.puck.x-previousX||1),0,1);
+  const impactY=this.previousPuckY+(this.puck.y-this.previousPuckY)*t;
+  const impactZ=this.previousPuckHeight+(this.puck.height-this.previousPuckHeight)*t;
+  const finalY=this.puck.y,finalZ=this.puck.height;
+  this.puck.y=impactY;this.puck.height=impactZ;
+  const contact=this.saveContact(goalie);
+  this.puck.y=finalY;this.puck.height=finalZ;
+  if(!contact)return false;
+  const wasShot=this.puck.shotTeam!==null;
+  const caught=contact==='glove'&&impactZ>16;
+  const speed=Math.hypot(this.puck.vx,this.puck.vy);
+  this.puck.x=plane-direction*5;
+  this.puck.y=impactY;
+  this.puck.vx=-direction*Math.max(85,speed*(contact==='pads'?.42:.30));
+  this.puck.vy+=(impactY-goalie.y)*2.1+(this.rng()-.5)*35;
+  this.puck.height=caught?0:Math.max(0,impactZ);
+  this.puck.vz=caught?0:Math.max(0,this.puck.vz*.3);
+  this.puck.shotTeam=null;this.puck.lock=.16;
+  if(wasShot){
+   if(goalie.team===0&&this.goalieCareer)this.saves++;
+   this.emit('save',caught?'GLOVE SAVE!':contact==='pads'?'PAD SAVE!':contact==='blocker'?'BLOCKER SAVE!':contact==='stick'?'STICK SAVE!':'GOALIE SAVE!',goalie.team);
   }
-  this.emit('save',caught?'GLOVE SAVE!':defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
+  if(!(goalie.team===0&&this.goalieCareer)){
+   if(contact==='pads')goalie.pose='butterfly';
+   else if(contact==='glove'||contact==='blocker'){goalie.saveHand=contact;goalie.saveReach=1;}
+   goalie.poseTime=.38;
+  }
+  return true;
+ }
+ private previousPuckY=220;
+ private previousPuckHeight=0;
+ private resolveGoalPlane(previousX:number,previousY:number,previousHeight:number):boolean {
+  const dir=Math.sign(this.puck.vx);
+  if(!dir)return false;
+  const line=dir>0?740:60;
+  if(dir*(previousX-line)>0||dir*(this.puck.x-line)<0)return false;
+  const t=clamp((line-previousX)/(this.puck.x-previousX||1),0,1);
+  const y=previousY+(this.puck.y-previousY)*t;
+  const z=previousHeight+(this.puck.height-previousHeight)*t;
+  const offset=Math.abs(y-220);
+  const postRadius=4,puckRadius=3;
+  const opening=34;
+  // Posts and crossbar are solid; a shot that touches metal cannot be a goal.
+  const hitsPost=Math.abs(offset-opening)<=postRadius+puckRadius&&z<=68;
+  const hitsCrossbar=offset<opening+postRadius&&Math.abs(z-64)<=postRadius+puckRadius;
+  if(hitsPost||hitsCrossbar){
+   this.puck.x=line-dir*6;this.puck.y=y;this.puck.height=z;
+   this.puck.vx=-this.puck.vx*.64;
+   this.puck.vy+=(y>220?1:-1)*85;
+   this.puck.vz=hitsCrossbar?Math.min(-65,this.puck.vz*.25):this.puck.vz*.65;
+   this.puck.shotTeam=null;this.puck.lock=.12;
+   this.announce(hitsCrossbar?'OFF THE CROSSBAR!':'OFF THE POST!');
+   return true;
+  }
+  if(offset<opening-postRadius-puckRadius&&z>=0&&z<64-postRadius-puckRadius){
+   // The entire puck passed the goal line inside the frame. Net mesh absorbs it.
+   const scorer:Team=dir>0?0:1;
+   this.scores[scorer]++;
+   if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
+   if(scorer===0&&this.lastPasser>=0&&this.lastPasser!==this.puck.lastShooter)this.assists++;
+   this.puck.x=line+dir*10;this.puck.y=y;this.puck.height=z;
+   this.puck.vx=this.puck.vy=this.puck.vz=0;this.puck.lock=2;
+   this.phase='goal';this.phaseTime=1.5;this.faceoffNext=scorer===0?1:0;
+   this.emit('goal',scorer===0?'HOME GOAL!':'AWAY GOAL!',scorer);
+   return true;
+  }
+  // A puck missing the opening passes behind the frame and contacts end boards.
+  return false;
+ }
+ private collideSkaterPuck():void {
+  if(this.puck.owner>=0||this.puck.lock>0||this.puck.height>26)return;
+  for(const skater of this.skaters){
+   const dx=this.puck.x-skater.x,dy=this.puck.y-skater.y;
+   const d=Math.hypot(dx,dy);
+   if(d>0&&d<15){
+    const nx=dx/d,ny=dy/d,normal=this.puck.vx*nx+this.puck.vy*ny;
+    if(normal>=0)continue;
+    this.puck.x=skater.x+nx*16;this.puck.y=skater.y+ny*16;
+    this.puck.vx-=1.4*normal*nx;this.puck.vy-=1.4*normal*ny;
+    this.puck.vx+=skater.vx*.25;this.puck.vy+=skater.vy*.25;
+    this.puck.vz=Math.max(this.puck.vz,25);
+    this.puck.shotTeam=null;this.puck.lock=.12;
+    return;
+   }
+  }
  }
  private stepPuck(dt:number):void {
   if(this.puck.owner>=0){
    const a=this.skaters[this.puck.owner],sign=a.team===0?1:-1;
    this.puck.x=a.x+sign*22;this.puck.y=a.y+7;this.puck.height=0;this.puck.vz=0;
-   // Stick checks produce occasional loose pucks, not automatic turnovers.
    if(this.puck.lock<=0){
     const opponent=this.closest(a.team===0?1:0,a.x,a.y);
     const defender=this.skaters[opponent];
@@ -363,31 +436,38 @@ export class HockeyMatch {
    }
    return;
   }
-  const previousX=this.puck.x;
-  this.puck.x+=this.puck.vx*dt;this.puck.y+=this.puck.vy*dt;
-  this.puck.height=Math.max(0,this.puck.height+this.puck.vz*dt);
-  this.puck.vz-=320*dt;
-  if(this.puck.height===0){if(this.puck.vz< -35)this.puck.vz=-this.puck.vz*.28;else this.puck.vz=0;}
-  this.puck.vx*=Math.pow(.996,dt*60);this.puck.vy*=Math.pow(.996,dt*60);
-  if(this.puck.y<32||this.puck.y>408){
-   this.puck.y=clamp(this.puck.y,32,408);this.puck.vy*=-.68;
-  }
-  this.collideGoalies(previousX);
-  if(this.puck.x>=754||this.puck.x<=46){
-   const scoringRight=this.puck.x>=755;
-   // Only actual shots may score, not passes, stick carries, or loose pucks.
-   if(Math.abs(this.puck.y-220)<=34&&this.puck.height<=64&&this.puck.shotTeam!==null){
-    const scorer:Team=scoringRight?0:1;
-    this.scores[scorer]++;
-    if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
-    if(scorer===0&&this.lastPasser>=0&&this.lastPasser!==this.puck.lastShooter)this.assists++;
-    this.phase='goal';this.phaseTime=1.5;this.faceoffNext=scorer===0?1:0;
-    this.puck.vx=this.puck.vy=0;this.puck.lock=2;
-    this.emit('goal',scorer===0?'HOME GOAL!':'AWAY GOAL!',scorer);
-    return;
+  // Substep travel: fast shots must not tunnel through a pad, post or goal line.
+  const speed=Math.hypot(this.puck.vx,this.puck.vy);
+  const steps=Math.min(16,Math.max(1,Math.ceil(speed*dt/8)));
+  const h=dt/steps;
+  for(let i=0;i<steps;i++){
+   const previousX=this.puck.x,previousY=this.puck.y,previousHeight=this.puck.height;
+   this.previousPuckY=previousY;this.previousPuckHeight=previousHeight;
+   this.puck.x+=this.puck.vx*h;this.puck.y+=this.puck.vy*h;
+   this.puck.height+=this.puck.vz*h-.5*320*h*h;
+   this.puck.vz-=320*h;
+   if(this.puck.height<=0){
+    this.puck.height=0;
+    if(this.puck.vz< -38)this.puck.vz=-this.puck.vz*.27;
+    else this.puck.vz=0;
    }
-   this.puck.x=clamp(this.puck.x,48,752);this.puck.vx*=-.56;this.puck.shotTeam=null;
-   this.puck.vz=Math.min(this.puck.vz,20);
+   const drag=Math.pow(this.puck.height>0?.9985:.994,h*60);
+   this.puck.vx*=drag;this.puck.vy*=drag;
+   if(this.puck.y<32||this.puck.y>408){
+    this.puck.y=clamp(this.puck.y,32,408);
+    this.puck.vy*=-.66;
+    this.puck.vx*=.91;
+    this.puck.shotTeam=null;
+   }
+   if(this.collideGoalies(previousX))continue;
+   if(this.resolveGoalPlane(previousX,previousY,previousHeight))return;
+   this.collideSkaterPuck();
+   // Behind the nets, end boards absorb energy and send the puck back out.
+   if(this.puck.x<43||this.puck.x>757){
+    this.puck.x=clamp(this.puck.x,43,757);
+    this.puck.vx*=-.58;this.puck.vy*=.9;
+    this.puck.shotTeam=null;
+   }
   }
   this.intercept();
  }
