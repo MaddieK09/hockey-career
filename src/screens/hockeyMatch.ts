@@ -16,6 +16,7 @@ export function mountHockeyMatch(
  const match=new HockeyMatch(goalieCareer,rating);
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
+ let cameraZoom=false,cameraX=400;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -23,7 +24,7 @@ export function mountHockeyMatch(
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<strong>HOME <span data-score>0 - 0</span> AWAY</strong>'
   +'<span data-clock>P1 · 1:00</span></header>'
-  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><span>5 ON 5 + GOALIES</span></div>'
+  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera aria-pressed="false">🔍 ZOOM: OFF</button><span>5 ON 5 + GOALIES</span></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Top down animated five-on-five hockey game"></canvas>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
@@ -43,7 +44,9 @@ export function mountHockeyMatch(
  const stick=root.querySelector<HTMLElement>('[data-stick]')!;
  const knob=root.querySelector<HTMLElement>('[data-knob]')!;
  const result=root.querySelector<HTMLElement>('[data-result]')!;
+ const cameraButton=root.querySelector<HTMLButtonElement>('[data-camera]')!;
  const controls=new Set<string>();
+ cameraButton.addEventListener('click',()=>{cameraZoom=!cameraZoom;cameraButton.textContent=cameraZoom?'🔍 ZOOM: ON':'🔍 ZOOM: OFF';cameraButton.setAttribute('aria-pressed',String(cameraZoom));});
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
  function syncMovement(){
@@ -110,6 +113,16 @@ export function mountHockeyMatch(
  }
  root.querySelector('[data-exit]')?.addEventListener('click',()=>{stop();onReturn();});
  function render(t:number){
+  ctx.save();
+  // Camera zoom preserves simulation coordinates; only rendering changes.
+  if(cameraZoom){
+   const zoom=goalieCareer?1.32:1.45;
+   const focus=goalieCareer?195:match.puck.x;
+   cameraX+=(focus-cameraX)*Math.min(1,1/60*5);
+   const cx=Math.max(400/zoom,Math.min(800-400/zoom,cameraX));
+   const cy=220+(match.puck.y-220)*(goalieCareer?.15:.36);
+   ctx.translate(400,220);ctx.scale(zoom,zoom);ctx.translate(-cx,-cy);
+  }
   drawRink(ctx,t);
   for(let i=0;i<match.skaters.length;i++){
    const s=match.skaters[i],moving=Math.hypot(s.vx,s.vy);
@@ -158,6 +171,7 @@ export function mountHockeyMatch(
    ctx.fillText(match.message,400,229);
    ctx.font='14px system-ui';ctx.fillText('Next faceoff',400,253);
   }
+  ctx.restore();
  }
  function completedMatch(){
   if(completed)return;completed=true;stop();
