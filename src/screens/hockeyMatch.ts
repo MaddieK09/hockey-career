@@ -82,7 +82,6 @@ export function mountHockeyMatch(
  });
  root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
- const heldActions=new Set<string>();
  cameraButton.addEventListener('click',()=>setPaused(!paused));
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
