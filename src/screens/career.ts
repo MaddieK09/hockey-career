@@ -16,6 +16,10 @@ export function startCareer(p:PlayerDraft):CareerSave {
  const s:CareerSave={player:p,periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
+export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
+ const career=loadCareer();if(!career)return;
+ career.periodMinutes=validPeriodMinutes(minutes);saveCareer(career);
+}
 function saveCareer(s:CareerSave){localStorage.setItem(KEY,JSON.stringify(s));}
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void):void {
