@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
+    "test:physics": "node --test scripts/puckCollision.test.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {
