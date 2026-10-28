@@ -77,10 +77,10 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   for(let i=1;i<6;i++)ln(c,net.x-w+i*w*2/6,net.y-h,net.x-w+i*w*2/6,net.y,1,'#9cb8c9');
   for(let i=1;i<5;i++)ln(c,net.x-w,net.y-h+i*h/5,net.x+w,net.y-h+i*h/5,1,'#9cb8c9');
  }
- type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number};
+ type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
  const actors:Actor[]=[
-  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0})),
-  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vy,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime}))
+  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0})),
+  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vy,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide}))
  ];
  // Distant skaters first; selected goalie drawn last, as an NHL goalie camera.
  actors.sort((a,b)=>(direction===1?b.x-a.x:a.x-b.x));
@@ -118,10 +118,12 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number},time:number,back:boolean){
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
- const dark='#193146',drop=a.goalie?clamp(a.stance,0,1):0;
- c.save();c.translate(x,y);c.scale(s,s);
+ const dark='#193146',drop=a.goalie?clamp(a.stance+(a.reaction==='pads'?Math.sin((.52-a.reactionTime)/.52*Math.PI)*.32:0),0,1):0;
+ const impact=a.goalie&&a.reactionTime>0?Math.sin((.52-a.reactionTime)/.52*Math.PI):0;
+ const lean=impact*(a.reactionSide>=0?-1:1)*.10;
+ c.save();c.translate(x+impact*(a.reactionSide>=0?-5:5)*s,y+impact*3*s);c.scale(s,s);
  oval(c,0,0,22+drop*15,7,'rgba(21,53,77,.22)');
  const stride=a.goalie?0:Math.sin(time*12+a.num)*7;
  // Butterfly mechanics: knees close together, shins and pads flare outward to seal ice.
@@ -144,11 +146,11 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  }
  // Pants, jersey, shoulders.
  c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+drop*5,30,19,5);c.fill();
- c.save();c.translate(0,drop*7);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
+ c.save();c.translate(lean*15,drop*7+impact*3);c.rotate(lean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
  ln(c,-17,-41,17,-41,3,trim);ln(c,-18,-64,18,-64,2,trim);
  const armY=-43+drop*8;
- const gloveLift=a.saveHand==='glove'?a.saveReach*29:0;
- const blockerLift=a.saveHand==='blocker'?a.saveReach*29:0;
+ const gloveLift=(a.saveHand==='glove'?a.saveReach*29:0)+(a.reaction==='glove'?impact*22:0);
+ const blockerLift=(a.saveHand==='blocker'?a.saveReach*29:0)+(a.reaction==='blocker'?impact*22:0);
  ln(c,-19,-64,-31-gloveLift*.2,armY-gloveLift,12,jersey);ln(c,19,-64,31+blockerLift*.2,armY-blockerLift,12,jersey);
  if(a.goalie){
   // Left hand: open catcher pocket with webbing. Right: rectangular blocker.
@@ -160,7 +162,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  }else{oval(c,-31,armY,6,6,dark);oval(c,31,armY,6,6,dark);}
  // Poke check: extend the stick toward the shooter, then pull it back.
  const poke=a.goalie&&a.pokeTime>0?Math.sin((.34-a.pokeTime)/.34*Math.PI):0;
- const bladeY=-3-poke*52,bladeX=57+poke*10;
+ const stickSave=a.reaction==='stick'?impact*.75:0;
+ const bladeY=-3-poke*52-stickSave*28,bladeX=57+poke*10+stickSave*9;
  ln(c,35,armY,42+poke*6,bladeY-4,3,'#ad865c');
  ln(c,42+poke*6,bladeY-4,bladeX,bladeY,5,'#182b3a');
  if(poke>.15)oval(c,bladeX,bladeY,4,2,'#d5e8f3');
