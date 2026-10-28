@@ -369,7 +369,7 @@ export class HockeyMatch {
   const restitution=contact==='stick'?.65:contact==='pads'?.46:contact==='mask'?.31:.28;
   // Send the puck back into play from the *incoming* side of the goalie,
   // not through their body into the goal behind them.
-  const incomingSide=previousX>=goalie.x?1:-1;
+  const incomingSide=this.puck.vx<0?1:-1;
   this.puck.x=goalie.x+incomingSide*24;
   this.puck.y=impact.point.y;
   this.puck.height=caught?0:Math.max(0,impact.point.z);
@@ -500,7 +500,10 @@ export class HockeyMatch {
     this.puck.shotTeam=null;
    }
    if(this.collidePokeCheck())continue;
-   if(this.collideGoalies(previousX))continue;
+   if(this.collideGoalies(previousX)){
+    if(this.phase!=='live')return;
+    continue;
+   }
    if(this.resolveGoalPlane(previousX,previousY,previousHeight))return;
    this.collideSkaterPuck();
    // Behind the nets, end boards absorb energy and send the puck back out.
