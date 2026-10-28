@@ -9,10 +9,10 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
- shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;
+ shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
 }
 export interface MatchEvent {kind:'goal'|'save'|'shot'|'faceoff'|'period'|'final';team?:Team;message:string}
 export interface MatchControls {x:number;y:number}
@@ -24,10 +24,10 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0},
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0},
   {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0}
  ];
- puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1};
+ puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
  scores:[number,number]=[0,0];
  shots:[number,number]=[0,0];
  saves=0;goals=0;assists=0;
@@ -62,7 +62,7 @@ export class HockeyMatch {
    .filter(a=>a.i<5&&a.i!==this.selected).sort((a,b)=>a.d-b.d);
   this.selected=nearest[0]?.i??(this.selected+1)%5;
  }
- perform(action:'shoot'|'pass'|'butterfly'|'blocker'|'poke'):void {
+ perform(action:'shoot'|'pass'|'butterfly'|'blocker'|'glove'|'poke'):void {
   if(this.phase!=='live')return;
   if(this.goalieCareer){
    const goalie=this.goalies[0];
@@ -70,15 +70,15 @@ export class HockeyMatch {
     // Toggle a persistent stance. Recovery has a genuine movement penalty.
     goalie.pose=goalie.pose==='butterfly'?'glide':'butterfly';
     goalie.poseTime=0;goalie.actionTime=.18;
-   }else if(action==='blocker'&&this.goalieActionCooldown<=0){
-    goalie.pose='blocker';goalie.poseTime=.42;goalie.actionTime=.25;
-    this.goalieActionCooldown=.3;
+   }else if((action==='blocker'||action==='glove')&&this.goalieActionCooldown<=0){
+    goalie.saveHand=action;goalie.saveReach=1;goalie.poseTime=.46;goalie.actionTime=.46;
+    this.goalieActionCooldown=.38;
    }else if(action==='poke'&&this.goalieActionCooldown<=0){
     if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
      this.puck.owner=-1;this.puck.shotTeam=null;
      this.puck.x=goalie.x+27;this.puck.vx=320;
      this.puck.vy=(this.rng()-.5)*210;this.puck.lock=.5;
-     goalie.pose='blocker';goalie.poseTime=.28;
+     goalie.saveHand='blocker';goalie.saveReach=1;goalie.poseTime=.28;
      this.emit('save','POKE CHECK!');
     }
     this.goalieActionCooldown=.45;
@@ -116,11 +116,11 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
-   vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1};
+   vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
   this.lastPasser=-1;this.decisionCooldown=[1.5,1.5];this.possessionTime=[0,0];
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
  }
@@ -131,7 +131,9 @@ export class HockeyMatch {
   this.puck.vx=nx*power;this.puck.vy=ny*power;this.puck.lock=.33;
   this.puck.shotTeam=shot?a.team:null;
   this.puck.lastShooter=shot?owner:-1;
-  this.puck.shotHeight=this.rng()<.58?'low':'high';
+  this.puck.shotHeight=shot&&this.rng()<.58?'low':'high';
+  this.puck.height=shot?(this.puck.shotHeight==='high'?13:3):0;
+  this.puck.vz=shot?(this.puck.shotHeight==='high'?155:48):0;
   a.shotAnimation=.3;a.carriedFor=0;
  }
  private shoot(owner:number,targetY:number,user=false):void {
@@ -261,6 +263,8 @@ export class HockeyMatch {
    const targetStance=butterfly?1:0;
    g.stance+=clamp(targetStance-g.stance,-dt*5,dt*7);
    g.actionTime=Math.max(0,g.actionTime-dt);
+   g.saveReach=Math.max(0,g.saveReach-dt*2.5);
+   if(g.saveReach===0)g.saveHand=null;
    g.poseTime=Math.max(0,g.poseTime-dt);
    if(g.pose==='blocker'&&g.poseTime===0)g.pose='glide';
   }
@@ -298,46 +302,49 @@ export class HockeyMatch {
    if(r<21&&r<best){best=r;nearest=i;}
   }
   if(nearest>=0){
-   this.puck.owner=nearest;this.puck.vx=this.puck.vy=0;
+   if(this.puck.height>9)return;
+   this.puck.owner=nearest;this.puck.vx=this.puck.vy=0;this.puck.height=this.puck.vz=0;
    this.puck.shotTeam=null;
    this.puck.lock=.32;
    this.skaters[nearest].carriedFor=0;
   }
  }
- private collideGoalies():void {
+ private collideGoalies(previousX:number):void {
   if(this.puck.owner>=0||this.puck.shotTeam===null)return;
   const team=this.puck.shotTeam,defender=team===0?this.goalies[1]:this.goalies[0];
-  // Collision is valid only as the shot actually crosses the crease.
-  const nearX=Math.abs(this.puck.x-defender.x)<=22&&this.goalieSaveCooldown[defender.team]===0;
-  const advancing=team===0?this.puck.vx>0:this.puck.vx<0;
-  if(!nearX||!advancing)return;
-  const gap=Math.abs(this.puck.y-defender.y);
-  const low=this.puck.shotHeight==='low';
-  let reach:number;
-  if(this.goalieCareer&&defender.team===0){
-   // Pad coverage grows with the actual butterfly transition, not a binary animation flag.
-   reach=low?15+31*defender.stance:15-6*defender.stance;
-   if(defender.pose==='blocker')reach=low?14:40;
-  }else reach=low?29:24;
-  if(gap>reach)return;
-  const chance=(defender.team===0&&this.goalieCareer)?1:.76;
-  if(this.rng()>chance)return;
-  const side=team===0?-1:1;
-  this.puck.vx=side*Math.max(195,Math.abs(this.puck.vx)*.55);
-  this.puck.vy+=(this.puck.y-defender.y)*2+(this.rng()-.5)*135;
+  const attackingRight=team===0;
+  const nearX=attackingRight?previousX<=defender.x+20&&this.puck.x>=defender.x-20:previousX>=defender.x-20&&this.puck.x<=defender.x+20;
+  if(!nearX||this.goalieSaveCooldown[defender.team]>0)return;
+  const gap=this.puck.y-defender.y,absGap=Math.abs(gap),height=this.puck.height;
+  // Separate pad, torso, blocker and catching-glove volumes; high shots can pass above pads.
+  const pads=height<14&&absGap<17+31*defender.stance;
+  const body=height<38&&absGap<15;
+  const blocker=defender.saveHand==='blocker'&&defender.saveReach>.1&&gap>3&&gap<49&&height<68;
+  const glove=defender.saveHand==='glove'&&defender.saveReach>.1&&gap< -3&&gap> -49&&height<75;
+  const stick=height<7&&absGap<20;
+  if(!(pads||body||blocker||glove||stick))return;
+  if(!(defender.team===0&&this.goalieCareer)&&this.rng()>.83)return;
+  const caught=glove&&height>16;
+  const side=attackingRight?-1:1;
+  this.puck.vx=side*Math.max(190,Math.abs(this.puck.vx)*.46);
+  this.puck.vy+=gap*2+(this.rng()-.5)*120;
   this.puck.x=defender.x+side*27;
-  this.puck.shotTeam=null;this.puck.lock=.28;
-  this.goalieSaveCooldown[defender.team]=.45;
+  this.puck.shotTeam=null;this.puck.lock=.3;
+  this.puck.vz=caught?0:Math.max(0,this.puck.vz*.2);
+  if(caught)this.puck.height=0;
+  this.goalieSaveCooldown[defender.team]=.3;
   if(defender.team===0&&this.goalieCareer)this.saves++;
   if(!(this.goalieCareer&&defender.team===0)){
-   defender.pose=low?'butterfly':'blocker';defender.poseTime=.35;
+   if(height<15)defender.pose='butterfly';
+   else {defender.saveHand=gap<0?'glove':'blocker';defender.saveReach=1;}
+   defender.poseTime=.45;
   }
-  this.emit('save',defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
+  this.emit('save',caught?'GLOVE SAVE!':defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
  }
  private stepPuck(dt:number):void {
   if(this.puck.owner>=0){
    const a=this.skaters[this.puck.owner],sign=a.team===0?1:-1;
-   this.puck.x=a.x+sign*22;this.puck.y=a.y+7;
+   this.puck.x=a.x+sign*22;this.puck.y=a.y+7;this.puck.height=0;this.puck.vz=0;
    // Stick checks produce occasional loose pucks, not automatic turnovers.
    if(this.puck.lock<=0){
     const opponent=this.closest(a.team===0?1:0,a.x,a.y);
@@ -351,12 +358,16 @@ export class HockeyMatch {
    }
    return;
   }
+  const previousX=this.puck.x;
   this.puck.x+=this.puck.vx*dt;this.puck.y+=this.puck.vy*dt;
+  this.puck.height=Math.max(0,this.puck.height+this.puck.vz*dt);
+  this.puck.vz-=320*dt;
+  if(this.puck.height===0){if(this.puck.vz< -35)this.puck.vz=-this.puck.vz*.28;else this.puck.vz=0;}
   this.puck.vx*=Math.pow(.996,dt*60);this.puck.vy*=Math.pow(.996,dt*60);
   if(this.puck.y<32||this.puck.y>408){
    this.puck.y=clamp(this.puck.y,32,408);this.puck.vy*=-.68;
   }
-  this.collideGoalies();
+  this.collideGoalies(previousX);
   if(this.puck.x>=754||this.puck.x<=46){
    const scoringRight=this.puck.x>=755;
    // Only actual shots may score, not passes, stick carries, or loose pucks.
