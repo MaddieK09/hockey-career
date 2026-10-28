@@ -43,3 +43,12 @@
  .match-shell .action-pad button{font-size:11px;letter-spacing:0;padding:8px 4px}
  .match-shell .rink-hud{padding:4px 6px}
 }
+
+/* V5 arena HUD: game controls stay legible on small iPhone viewports. */
+.match-shell .match-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:5px 2px}
+.match-shell .match-meta [data-camera]{font:700 11px system-ui;color:#e6f6ff;background:#173e5a;border:1px solid #5b95b8;border-radius:8px;padding:8px 10px;touch-action:manipulation}
+.match-shell .match-meta [data-camera][aria-pressed=true]{color:#0c293c;background:#b2eaff;border-color:#e5f8ff}
+.match-shell .rink-stage{box-shadow:0 16px 38px #0008,inset 0 0 0 2px #d1eaf8}
+.match-shell .action-pad button{box-shadow:0 3px 0 #082338;transition:transform .08s ease,background .1s ease}
+.match-shell .action-pad button:active{transform:translateY(2px);box-shadow:0 1px 0 #082338}
+@media(max-width:430px){.match-shell .match-meta{font-size:9px}.match-shell .match-meta [data-camera]{font-size:10px;padding:7px 8px}}
