@@ -9,7 +9,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
@@ -24,7 +24,7 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0},
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0},
   {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -74,14 +74,10 @@ export class HockeyMatch {
     goalie.saveHand=action;goalie.saveReach=1;goalie.poseTime=.46;goalie.actionTime=.46;
     this.goalieActionCooldown=.38;
    }else if(action==='poke'&&this.goalieActionCooldown<=0){
-    if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
-     this.puck.owner=-1;this.puck.shotTeam=null;
-     this.puck.x=goalie.x+27;this.puck.vx=320;
-     this.puck.vy=(this.rng()-.5)*210;this.puck.lock=.5;
-     goalie.saveHand='blocker';goalie.saveReach=1;goalie.poseTime=.28;
-     this.emit('save','POKE CHECK!');
-    }
-    this.goalieActionCooldown=.45;
+    // Start an actual stick thrust. Contact is evaluated during the animation,
+    // not only on the button's first frame.
+    goalie.pokeTime=.34;goalie.actionTime=.34;
+    this.goalieActionCooldown=.42;
    }
    return;
   }
@@ -116,7 +112,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
@@ -268,6 +264,7 @@ export class HockeyMatch {
    const targetStance=butterfly?1:0;
    g.stance+=clamp(targetStance-g.stance,-dt*5,dt*7);
    g.actionTime=Math.max(0,g.actionTime-dt);
+   g.pokeTime=Math.max(0,g.pokeTime-dt);
    g.saveReach=Math.max(0,g.saveReach-dt*2.5);
    if(g.saveReach===0)g.saveHand=null;
    g.poseTime=Math.max(0,g.poseTime-dt);
@@ -313,6 +310,27 @@ export class HockeyMatch {
    this.puck.lock=.32;
    this.skaters[nearest].carriedFor=0;
   }
+ }
+ private collidePokeCheck():boolean {
+  if(this.puck.owner>=0||this.puck.height>13)return false;
+  for(const g of this.goalies){
+   if(g.pokeTime<=.06||g.pokeTime>=.33)continue;
+   const direction=g.team===0?1:-1;
+   // Extend the stick out from the goalie toward the incoming shooter.
+   const reach=32+Math.sin((.34-g.pokeTime)/.34*Math.PI)*50;
+   const forward=(this.puck.x-g.x)*direction;
+   if(forward<8||forward>reach+12||Math.abs(this.puck.y-g.y)>20)continue;
+   const shot=this.puck.shotTeam!==null;
+   this.puck.x=g.x+direction*(reach+14);
+   this.puck.vx=direction*Math.max(230,Math.abs(this.puck.vx)*.68);
+   this.puck.vy+=(this.puck.y-g.y)*3;
+   this.puck.vz=42;this.puck.shotTeam=null;this.puck.lock=.2;
+   g.pokeTime=.06;
+   if(shot){if(g.team===0&&this.goalieCareer)this.saves++;this.emit('save','POKE CHECK SAVE!',g.team);}
+   else this.announce('POKE CHECK!');
+   return true;
+  }
+  return false;
  }
  private saveContact(goalie:MatchGoalie):'pads'|'body'|'stick'|'glove'|'blocker'|null {
   const lateral=this.puck.y-goalie.y;
@@ -472,6 +490,7 @@ export class HockeyMatch {
     this.puck.vx*=.91;
     this.puck.shotTeam=null;
    }
+   if(this.collidePokeCheck())continue;
    if(this.collideGoalies(previousX))continue;
    if(this.resolveGoalPlane(previousX,previousY,previousHeight))return;
    this.collideSkaterPuck();
