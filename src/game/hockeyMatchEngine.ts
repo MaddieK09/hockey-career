@@ -9,7 +9,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
@@ -24,7 +24,7 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0},
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0},
   {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -112,7 +112,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
@@ -250,7 +250,8 @@ export class HockeyMatch {
    const topSpeed=butterfly?66:recovering?70:user?170+this.rating.speed*.28:123;
    const accel=butterfly?250:recovering?300:640;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
-   const maxChange=accel*dt;
+   // Braking is stronger than acceleration to keep small crease corrections precise.
+   const maxChange=(Math.hypot(targetX,targetY)<.08?accel*1.8:accel)*dt;
    const dx=desiredX-g.vx,dy=desiredY-g.vy;
    const change=Math.hypot(dx,dy);
    g.vx+=change>maxChange?dx/change*maxChange:dx;
@@ -264,6 +265,8 @@ export class HockeyMatch {
    const targetStance=butterfly?1:0;
    g.stance+=clamp(targetStance-g.stance,-dt*5,dt*7);
    g.actionTime=Math.max(0,g.actionTime-dt);
+   g.reactionTime=Math.max(0,g.reactionTime-dt);
+   if(g.reactionTime===0)g.reaction=null;
    g.pokeTime=Math.max(0,g.pokeTime-dt);
    g.saveReach=Math.max(0,g.saveReach-dt*2.5);
    if(g.saveReach===0)g.saveHand=null;
@@ -325,7 +328,7 @@ export class HockeyMatch {
    this.puck.vx=direction*Math.max(230,Math.abs(this.puck.vx)*.68);
    this.puck.vy+=(this.puck.y-g.y)*3;
    this.puck.vz=42;this.puck.shotTeam=null;this.puck.lock=.2;
-   g.pokeTime=.06;
+   g.pokeTime=.06;g.reaction='stick';g.reactionTime=.45;g.reactionSide=this.puck.y-g.y;
    if(shot){if(g.team===0&&this.goalieCareer)this.saves++;this.emit('save','POKE CHECK SAVE!',g.team);}
    else this.announce('POKE CHECK!');
    return true;
@@ -369,6 +372,10 @@ export class HockeyMatch {
    if(!contact)continue;
    const wasShot=this.puck.shotTeam!==null;
    const caught=contact==='glove'&&impactZ>16;
+   goalie.reaction=contact;goalie.reactionTime=.52;goalie.reactionSide=impactY-goalie.y;
+   if(contact==='glove'||contact==='blocker'){
+    goalie.saveHand=contact;goalie.saveReach=1;
+   }
    const direction=goalie.team===0?-1:1;
    const speed=Math.hypot(this.puck.vx,this.puck.vy);
    // Place puck outside goalie on the incoming side, so it cannot immediately score.
