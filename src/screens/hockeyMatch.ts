@@ -90,7 +90,13 @@ export function mountHockeyMatch(
   if(controls.has('d')||controls.has('arrowright'))x+=1;
   if(controls.has('w')||controls.has('arrowup'))y-=1;
   if(controls.has('s')||controls.has('arrowdown'))y+=1;
-  const n=Math.max(1,Math.hypot(x,y));match.setMovement(x/n,y/n);
+  const n=Math.max(1,Math.hypot(x,y));x/=n;y/=n;
+  // Chase camera controls are screen-relative: up advances, left/right
+  // shuffles across the crease. Side and overhead retain rink axes.
+  if(cameraMode==='goalie'||cameraMode==='player'){
+   const direction=goalieCareer||match.skaters[match.selected].team===0?1:-1;
+   match.setMovement(-y*direction,x);
+  }else match.setMovement(x,y);
  }
  function joystick(e:PointerEvent){
   const r=stick.getBoundingClientRect();
