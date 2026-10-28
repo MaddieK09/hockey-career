@@ -1,3 +1,4 @@
+import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 /** Self-contained 5v5 hockey simulation. Coordinates use the 800x440 canvas.
  * All puck possession, team decisions, goals, periods and goalie saves run here.
  */
@@ -31,7 +32,10 @@ export class HockeyMatch {
  scores:[number,number]=[0,0];
  shots:[number,number]=[0,0];
  saves=0;goals=0;assists=0;
+ readonly periodMinutes:PeriodMinutes;
+ readonly paceFactor:number;
  period=1;timeRemaining=60;
+ private shotClock:[number,number]=[0,0];
  phase:MatchPhase='live';phaseTime=0;
  message='PUCK DROP';messageTime=1.8;
  selected=0;lastPasser=-1;
@@ -46,7 +50,11 @@ export class HockeyMatch {
  private possessionTime:[number,number]=[0,0];
  private goalieSaveCooldown:[number,number]=[0,0];
  private creaseMomentum:[number,number]=[0,0];
- constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random){
+ constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5){
+  this.periodMinutes=validPeriodMinutes(periodMinutes);
+  this.timeRemaining=this.periodMinutes*60;
+  this.paceFactor=1-.24*(this.periodMinutes-1)/19;
+  this.shotClock=[5,7];
   this.goalieCareer=goalieCareer;this.rating=rating;this.rng=rng;
   for(const team of [0,1] as Team[])for(let i=0;i<5;i++){
    const f=spots[i];
@@ -199,7 +207,7 @@ export class HockeyMatch {
    let dx:number,dy:number;
    if(controlled){dx=this.movement.x;dy=this.movement.y;}
    else {const target=this.aiTarget(i);dx=target.x-a.x;dy=target.y-a.y;}
-   const mag=Math.hypot(dx,dy),speed=controlled?185+this.rating.speed*.55:175;
+   const mag=Math.hypot(dx,dy),speed=(controlled?185+this.rating.speed*.55:175)*this.paceFactor;
    const desiredX=mag<4?0:dx/Math.max(1,mag)*Math.min(speed,mag*2.8);
    const desiredY=mag<4?0:dy/Math.max(1,mag)*Math.min(speed,mag*2.8);
    const accel=controlled?8:4.3;
@@ -247,7 +255,7 @@ export class HockeyMatch {
    targetX/=magnitude;targetY/=magnitude;
    const butterfly=g.pose==='butterfly';
    const recovering=g.stance>.05&&g.pose==='glide';
-   const topSpeed=butterfly?66:recovering?70:user?170+this.rating.speed*.28:123;
+   const topSpeed=(butterfly?66:recovering?70:user?170+this.rating.speed*.28:123)*this.paceFactor;
    const accel=butterfly?250:recovering?300:640;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
    // Braking is stronger than acceleration to keep small crease corrections precise.
@@ -285,7 +293,7 @@ export class HockeyMatch {
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
   const inShootingLane=Math.abs(carrier.y-220)<120;
-  if(offensive&&inShootingLane&&(team===0?carrier.x>515:carrier.x<285)){
+  if(this.shotClock[team]<=0&&offensive&&inShootingLane&&(team===0?carrier.x>515:carrier.x<285)){
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
   // Hold possession and carry the puck; pass only when genuinely trapped.
@@ -527,9 +535,10 @@ export class HockeyMatch {
   this.timeRemaining=Math.max(0,this.timeRemaining-dt);
   if(this.timeRemaining===0){
    if(this.period===3){this.phase='final';this.emit('final','FINAL BUZZER');return;}
-   this.period++;this.timeRemaining=60;this.phase='intermission';this.phaseTime=1.15;
+   this.period++;this.timeRemaining=this.periodMinutes*60;this.phase='intermission';this.phaseTime=1.15;
    this.faceoffNext=this.period%2===0?0:1;this.emit('period','PERIOD '+this.period);return;
   }
+  for(const team of [0,1] as Team[])this.shotClock[team]=Math.max(0,this.shotClock[team]-dt);
   this.updateSkaters(dt);
   this.aiDecisions(dt);
   this.stepPuck(dt);
