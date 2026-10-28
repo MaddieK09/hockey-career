@@ -83,3 +83,11 @@
  .match-shell.arena-expanded .rink-stage{min-height:300px}
  .match-shell.arena-expanded .rink-stage canvas{max-height:49dvh}
 }
+
+/* Goalie controls and camera presets */
+.match-shell .action-pad:has([data-action="d"]){grid-template-columns:repeat(2,minmax(0,1fr))}
+.match-shell .action-pad:has([data-action="d"]) button:last-child{grid-column:auto}
+.match-shell .action-pad:has([data-action="d"]) button:nth-child(3){grid-column:auto}
+.match-shell .action-pad [data-action="d"]{background:#286e88;border-color:#b5e6f4}
+.match-shell .camera-options button[data-distance]{background:#16344d;border-color:#658fa9}
+.match-shell .camera-options button[data-distance][aria-pressed=true]{background:#b5e8ff;color:#09263a}
