@@ -1,4 +1,4 @@
-import {findGoalFrameImpact,findGoalieImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
+import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
 import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 /** Self-contained 5v5 hockey simulation. Coordinates use the 800x440 canvas.
  * All puck possession, team decisions, goals, periods and goalie saves run here.
@@ -50,6 +50,8 @@ export class HockeyMatch {
  private faceoffNext:Team=1;
  private possessionTime:[number,number]=[0,0];
  private goalieSaveCooldown:[number,number]=[0,0];
+ private lastSkaterDeflector=-1;
+ private skaterDeflectionTime=0;
  private creaseMomentum:[number,number]=[0,0];
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5){
   this.periodMinutes=validPeriodMinutes(periodMinutes);
@@ -123,6 +125,7 @@ export class HockeyMatch {
   this.goalies[1].x=709;this.goalies[1].y=220;
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
+  this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -443,22 +446,40 @@ export class HockeyMatch {
   this.announce(post?'OFF THE POST!':crossbar?'OFF THE CROSSBAR!':'SIDE NETTING!');
   return true;
  }
- private collideSkaterPuck():void {
-  if(this.puck.owner>=0||this.puck.lock>0||this.puck.height>26)return;
-  for(const skater of this.skaters){
-   const dx=this.puck.x-skater.x,dy=this.puck.y-skater.y;
-   const d=Math.hypot(dx,dy);
-   if(d>0&&d<15){
-    const nx=dx/d,ny=dy/d,normal=this.puck.vx*nx+this.puck.vy*ny;
-    if(normal>=0)continue;
-    this.puck.x=skater.x+nx*16;this.puck.y=skater.y+ny*16;
-    this.puck.vx-=1.4*normal*nx;this.puck.vy-=1.4*normal*ny;
-    this.puck.vx+=skater.vx*.25;this.puck.vy+=skater.vy*.25;
-    this.puck.vz=Math.max(this.puck.vz,25);
-    this.puck.shotTeam=null;this.puck.lock=.12;
-    return;
-   }
+ private collideSkaterPuck(previousX:number,previousY:number,previousHeight:number):boolean {
+  if(this.puck.owner>=0)return false;
+  const from:PuckPoint={x:previousX,y:previousY,z:previousHeight};
+  const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
+  let first:{index:number;hit:ReturnType<typeof findSkaterImpact>}|null=null;
+  for(let i=0;i<this.skaters.length;i++){
+   // Ignore the shooter's own stick until the puck has cleared their release.
+   if(i===this.puck.lastShooter&&this.puck.lock>0)continue;
+   if(i===this.lastSkaterDeflector&&this.skaterDeflectionTime>0)continue;
+   const hit=findSkaterImpact(from,to,this.skaters[i]);
+   if(hit&&(!first||!first.hit||hit.time<first.hit.time))first={index:i,hit};
   }
+  if(!first||!first.hit)return false;
+  const {hit,index}=first;
+  const skater=this.skaters[index];
+  const nx=hit.normal.x,ny=hit.normal.y,nz=hit.normal.z;
+  const dot=this.puck.vx*nx+this.puck.vy*ny+this.puck.vz*nz;
+  const restitution=hit.surface==='stick'?.52:.32;
+  this.puck.x=hit.point.x+nx*4;
+  this.puck.y=hit.point.y+ny*4;
+  this.puck.height=Math.max(0,hit.point.z+nz*4);
+  if(dot<0){
+   this.puck.vx-=(1+restitution)*dot*nx;
+   this.puck.vy-=(1+restitution)*dot*ny;
+   this.puck.vz-=(1+restitution)*dot*nz;
+  }else{
+   this.puck.vx=-this.puck.vx*restitution;
+   this.puck.vy=-this.puck.vy*restitution;
+  }
+  this.puck.vx+=skater.vx*.16;this.puck.vy+=skater.vy*.16;
+  this.puck.shotTeam=null;this.puck.lock=.18;
+  this.lastSkaterDeflector=index;this.skaterDeflectionTime=.18;
+  this.announce(hit.surface==='stick'?'STICK DEFLECTION!':'SHOT BLOCKED!');
+  return true;
  }
  private stepPuck(dt:number):void {
   if(this.puck.owner>=0){
@@ -504,8 +525,8 @@ export class HockeyMatch {
     if(this.phase!=='live')return;
     continue;
    }
+   if(this.collideSkaterPuck(previousX,previousY,previousHeight))continue;
    if(this.resolveGoalPlane(previousX,previousY,previousHeight))return;
-   this.collideSkaterPuck();
    // Behind the nets, end boards absorb energy and send the puck back out.
    if(this.puck.x<43||this.puck.x>757){
     this.puck.x=clamp(this.puck.x,43,757);
@@ -522,6 +543,7 @@ export class HockeyMatch {
   if(this.messageTime===0&&this.phase==='live')this.message='LIVE PLAY';
   this.goalieActionCooldown=Math.max(0,this.goalieActionCooldown-dt);
   this.puck.lock=Math.max(0,this.puck.lock-dt);
+  this.skaterDeflectionTime=Math.max(0,this.skaterDeflectionTime-dt);
   for(const team of [0,1] as Team[])this.goalieSaveCooldown[team]=Math.max(0,this.goalieSaveCooldown[team]-dt);
   if(this.puck.owner>=0)this.possessionTime[this.skaters[this.puck.owner].team]+=dt;
   if(this.phase==='goal'||this.phase==='intermission'){
