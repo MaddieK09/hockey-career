@@ -11,7 +11,7 @@ async function loadTS(entry){
 }
 const physics=await loadTS('src/game/puckCollision.ts');
 const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
-const {findGoalieImpact,findGoalFrameImpact}=physics;
+const {findGoalieImpact,findGoalFrameImpact,findSkaterImpact}=physics;
 const point=(x,y,z=3)=>({x,y,z});
 const home={x:91,y:220,team:0,stance:0,saveHand:null,saveReach:0};
 const incoming=(y=220,z=3)=>[point(160,y,z),point(40,y,z)];
@@ -83,4 +83,18 @@ test('a real shot near home top corner scores unless butterfly pad blocks it',()
  const b=setup();b.goalies[0].stance=1;b.goalies[0].pose='butterfly';
  shoot(b,160,245);
  assert.equal(b.scores[1],0);assert.equal(b.saves,1);
+});
+
+test('fast shots collide with skater bodies even with puck pickup locked',()=>{
+ const body={x:145,y:220,team:0};
+ assert.ok(findSkaterImpact(point(175,220,5),point(100,220,5),body));
+ const m=setup();m.skaters[3].x=145;m.skaters[3].y=220;
+ shoot(m,175,220);
+ assert.equal(m.scores[1],0);
+ assert.equal(m.saves,0,'a skater block is not a goalie save');
+ assert.ok(m.message.includes('BLOCKED')||m.message.includes('DEFLECTION'));
+});
+test('shots over a skater can continue without phantom body contact',()=>{
+ const skater={x:145,y:220,team:0};
+ assert.equal(findSkaterImpact(point(175,220,85),point(100,220,85),skater),null);
 });
