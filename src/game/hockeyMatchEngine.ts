@@ -46,6 +46,7 @@ export class HockeyMatch {
  private possessionTime:[number,number]=[0,0];
  private goalieSaveCooldown:[number,number]=[0,0];
  private creaseMomentum:[number,number]=[0,0];
+ private creaseForwardMomentum=0;
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random){
   this.goalieCareer=goalieCareer;this.rating=rating;this.rng=rng;
   for(const team of [0,1] as Team[])for(let i=0;i<5;i++){
@@ -68,8 +69,8 @@ export class HockeyMatch {
    const goalie=this.goalies[0];
    if(this.goalieActionCooldown>0)return;
    if(action==='butterfly'||action==='blocker'){
-    goalie.pose=action;goalie.poseTime=action==='butterfly'?.85:.47;
-    this.goalieActionCooldown=action==='butterfly'?.65:.26;
+    goalie.pose=action;goalie.poseTime=action==='butterfly'?1.05:.47;
+    this.goalieActionCooldown=action==='butterfly'?.8:.26;
    }else if(action==='poke'){
     if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
      this.puck.owner=-1;this.puck.shotTeam=null;
@@ -114,7 +115,7 @@ export class HockeyMatch {
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;});
-  this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
+  this.creaseMomentum=[0,0];this.creaseForwardMomentum=0;this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1};
@@ -223,7 +224,14 @@ export class HockeyMatch {
   // Controlled goalie stays in the crease. Other goalie tracks the puck.
   for(const g of this.goalies){
    let vy=0,vx=0;
-   if(g.team===0&&this.goalieCareer){vx=this.movement.x*(165+this.rating.speed*.45);vy=this.movement.y*(165+this.rating.speed*.45);}
+   if(g.team===0&&this.goalieCareer){
+    const dropping=g.pose==='butterfly'&&g.poseTime>0;
+    const pace=dropping?56:165+this.rating.speed*.45;
+    vx=this.movement.x*pace;vy=this.movement.y*pace;
+    // Butterfly allows a slow lateral knee shuffle, not full-speed skating.
+    this.creaseForwardMomentum+=(vx-this.creaseForwardMomentum)*Math.min(1,dt*(dropping?5:11));
+    vx=this.creaseForwardMomentum;
+   }
    else {
     // Track the puck from inside the crease; anticipate only the final
     // approach, not shots still travelling across the opposite half.
@@ -238,7 +246,7 @@ export class HockeyMatch {
    const maxX=g.team===0?128:722,minX=g.team===0?72:672;
    g.x=clamp(g.x+vx*dt,minX,maxX);
    const gi=g.team;
-   this.creaseMomentum[gi]+=(vy-this.creaseMomentum[gi])*Math.min(1,dt*8);
+   this.creaseMomentum[gi]+=(vy-this.creaseMomentum[gi])*Math.min(1,dt*(g.pose==='butterfly'?5:12));
    g.y=clamp(g.y+this.creaseMomentum[gi]*dt,178,262);
    g.poseTime=Math.max(0,g.poseTime-dt);
    if(g.poseTime===0)g.pose='glide';
