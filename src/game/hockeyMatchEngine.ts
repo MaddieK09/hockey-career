@@ -59,7 +59,7 @@ export class HockeyMatch {
    .filter(a=>a.i<5&&a.i!==this.selected).sort((a,b)=>a.d-b.d);
   this.selected=nearest[0]?.i??(this.selected+1)%5;
  }
- perform(action:'shoot'|'pass'|'butterfly'|'blocker'):void {
+ perform(action:'shoot'|'pass'|'butterfly'|'blocker'|'poke'):void {
   if(this.phase!=='live')return;
   if(this.goalieCareer){
    const goalie=this.goalies[0];
@@ -67,6 +67,15 @@ export class HockeyMatch {
    if(action==='butterfly'||action==='blocker'){
     goalie.pose=action;goalie.poseTime=.47;
     this.goalieActionCooldown=.26;
+   }else if(action==='poke'){
+    if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
+     this.puck.owner=-1;this.puck.shotTeam=null;
+     this.puck.x=goalie.x+27;this.puck.vx=320;
+     this.puck.vy=(this.rng()-.5)*210;this.puck.lock=.5;
+     goalie.pose='blocker';goalie.poseTime=.28;
+     this.emit('save','POKE CHECK!');
+    }
+    this.goalieActionCooldown=.45;
    }
    return;
   }
@@ -211,7 +220,7 @@ export class HockeyMatch {
   const offensive=team===0?carrier.x>490:carrier.x<310;
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
-  if(offensive&&(carrier.x>(team===0?560:-Infinity)||carrier.x<(team===1?240:Infinity))){
+  if(offensive&&(team===0?carrier.x>555:carrier.x<245)){
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
   if(pressured||carrier.carriedFor>2.4){
