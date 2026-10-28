@@ -23,6 +23,7 @@ export function mountHockeyMatch(
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  let cameraNotice=0;
  let arenaMode=true;
+ let goalieDistance:'close'|'medium'|'far'='medium';
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -36,12 +37,14 @@ export function mountHockeyMatch(
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
   +'<button type="button" data-action="b">'+actB+'</button>'
-  +'<button type="button" data-action="c">'+actC+'</button></div></div>'
+  +'<button type="button" data-action="c">'+actC+'</button>'
+  +(goalieCareer?'<button type="button" data-action="d">GLOVE</button>':'')+'</div></div>'
   +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Choose your camera angle. Changes apply immediately.</p><div class="camera-options">'
   +'<button type="button" data-view="player">PLAYER CHASE (NHL)</button>'
   +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
   +'<button type="button" data-view="sideline">SIDE BOARDS</button>'
   +'<button type="button" data-view="goalie">BEHIND GOALIE (NHL)</button>'
+  +(goalieCareer?'<button type="button" data-distance="close">GOALIE CLOSE</button><button type="button" data-distance="medium">GOALIE MEDIUM</button><button type="button" data-distance="far">GOALIE FAR</button>':'')
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
   +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
@@ -80,6 +83,14 @@ export function mountHockeyMatch(
   viewButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
   });
  });
+ root.querySelectorAll<HTMLButtonElement>('[data-distance]').forEach(b=>{
+  b.setAttribute('aria-pressed',String(b.dataset.distance===goalieDistance));
+  b.addEventListener('click',()=>{
+   goalieDistance=b.dataset.distance as 'close'|'medium'|'far';cameraMode='goalie';cameraNotice=2;
+   root.querySelectorAll<HTMLButtonElement>('[data-distance]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+   viewButtons.forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.view==='goalie')));
+  });
+ });
  root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
  cameraButton.addEventListener('click',()=>setPaused(!paused));
@@ -116,6 +127,7 @@ export function mountHockeyMatch(
  function action(key:string){
   if(paused)return;
   if(key==='c'){if(goalieCareer)match.perform('poke');else match.switchSkater();return;}
+  if(key==='d'&&goalieCareer){match.perform('glove');return;}
   if(key==='a'){match.perform(goalieCareer?'butterfly':'shoot');return;}
   if(key==='b'){match.perform(goalieCareer?'blocker':'pass');}
  }
@@ -127,6 +139,7 @@ export function mountHockeyMatch(
   if(e.code==='Space')action('a');
   if(e.key.toLowerCase()==='e')action('b');
   if(e.key==='Tab')action('c');
+  if(e.key.toLowerCase()==='q')action('d');
  }
  function keyUp(e:KeyboardEvent){controls.delete(e.key.toLowerCase());syncMovement();}
  function visibility(){last=performance.now();}
@@ -155,7 +168,7 @@ export function mountHockeyMatch(
  function render(t:number){
   ctx.save();
   if(cameraMode!=='overhead'){
-   if(cameraMode==='player'||cameraMode==='goalie')drawChaseHockey(ctx,match,cameraMode,t);
+   if(cameraMode==='player'||cameraMode==='goalie')drawChaseHockey(ctx,match,cameraMode,t,goalieDistance);
    else drawSideHockey(ctx,match,cameraMode,t);
    if(match.phase==='goal'||match.phase==='intermission'){
     ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
@@ -202,7 +215,7 @@ export function mountHockeyMatch(
   // Readable puck locator and a pulse on the selected player.
   const pulse=1+Math.sin(visualTime*5)*.08;
   ctx.strokeStyle='#f7c83b';ctx.lineWidth=2.5;
-  ctx.beginPath();ctx.arc(puck.x,puck.y,11*pulse,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.arc(puck.x,puck.y-puck.height,11*pulse,0,Math.PI*2);ctx.stroke();
   if(!goalieCareer){
    const selected=match.skaters[match.selected];
    ctx.fillStyle='#ffcf53';ctx.beginPath();
@@ -212,7 +225,7 @@ export function mountHockeyMatch(
   }
   ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();
   ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y,6.7,5.5,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y-puck.height,6.7,5.5,0,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#8395a4';ctx.lineWidth=1;ctx.stroke();
   if(match.phase==='goal'||match.phase==='intermission'){
    ctx.fillStyle='rgba(4,25,44,.63)';ctx.fillRect(240,167,320,105);
@@ -252,7 +265,7 @@ export function mountHockeyMatch(
    const butterflyButton=root.querySelector<HTMLButtonElement>('[data-action="a"]');
    if(butterflyButton){butterflyButton.setAttribute('aria-pressed',String(inButterfly));butterflyButton.textContent=inButterfly?'STAND UP':'BUTTERFLY';}
    hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then use Butterfly (low) or Blocker (high).':
-    match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly toggles stance · Move to slide · Blocker = high · Poke = close range.';
+    match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly toggles stance · Glove (Q) catches high left · Blocker (E) covers high right · Poke (Tab) close range.';
   }
   render(now/1000);
   if(cameraNotice>0&&!paused){
