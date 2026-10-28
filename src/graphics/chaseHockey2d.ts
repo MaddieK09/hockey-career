@@ -17,9 +17,9 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  // Always look toward the opposing end from behind the controlled player.
  const direction=goalieMode?1:(m.skaters[m.selected].team===0?1:-1);
  const goalDepth=direction===1?controlled.x:800-controlled.x;
- if(previousMode!==mode){cameraDepth=goalDepth;cameraLateral=controlled.y;previousMode=mode;}
- cameraDepth+=(goalDepth-cameraDepth)*.13;
- cameraLateral+=(controlled.y-cameraLateral)*.1;
+ if(previousMode!==mode){cameraDepth=goalieMode?60:goalDepth;cameraLateral=goalieMode?220:controlled.y;previousMode=mode;}
+ if(goalieMode){cameraDepth=60;cameraLateral=220;}
+ else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?Math.max(0,cameraDepth-125):Math.max(0,cameraDepth-55);
  const horizon=goalieMode?95:117;
  // Perspective: width grows toward camera. Near bodies are much larger.
@@ -90,13 +90,9 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
  }
  if(selectedGoalie){
-  // Near goalie stays anchored in the foreground as the camera follows the crease.
+  // Fixed end-zone camera: only the goalie changes position, never the rink or net.
   const p=project(selectedGoalie.x,selectedGoalie.y);
-  drawActor(c,400+(selectedGoalie.y-cameraLateral)*1.25,433,2.1,selectedGoalie,time,true);
-  // Goal frame behind goalie, NHL-style.
-  const gw=94,gy=430;
-  // Near net is behind the camera/player: do not paint its crossbar over the goalie.
-  void gw;void gy;
+  drawActor(c,400+(selectedGoalie.y-220)*1.25,433+(selectedGoalie.x-60)*.42,2.1,selectedGoalie,time,true);
   void p;
  }
  const puck=project(m.puck.x,m.puck.y);
@@ -111,35 +107,33 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
 }
 function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
- const dark='#193146',butterfly=a.goalie&&a.stance>.45;
+ const dark='#193146',drop=a.goalie?clamp(a.stance,0,1):0;
  c.save();c.translate(x,y);c.scale(s,s);
- oval(c,0,0,butterfly?29:22,7,'rgba(21,53,77,.22)');
+ oval(c,0,0,22+drop*15,7,'rgba(21,53,77,.22)');
  const stride=a.goalie?0:Math.sin(time*12+a.num)*7;
- // Skates and knee/leg protection. Butterfly pads rotate OUTWARD and lie flat.
+ // Butterfly mechanics: knees close together, shins and pads flare outward to seal ice.
+ // Interpolate each leg through the drop so the pose never instantly snaps.
  for(const side of [-1,1]){
-  c.save();c.translate(side*10,-18);
-  if(butterfly){
-   c.translate(side*13,12);c.rotate(side*.85);
-   c.fillStyle='#f7fbfd';c.strokeStyle='#819aab';c.lineWidth=1.8;
-   c.beginPath();c.roundRect(-8,-24,16,40,4);c.fill();c.stroke();
-   for(let j=-12;j<=8;j+=10)ln(c,-6,j,6,j,1.4,'#a6b7c4');
-   ln(c,-6,13,7,13,3,'#b8cad6');
-  }else{
-   ln(c,0,-23,side*stride,-2,a.goalie?15:9,a.goalie?'#edf4f8':dark);
-   ln(c,side*stride-7,0,side*stride+9,0,4,'#182a3a');
-   if(a.goalie){
-    c.fillStyle='#f8fafb';c.strokeStyle='#8ca4b4';c.lineWidth=1.3;
-    c.fillRect(-8,-30,16,29);c.strokeRect(-8,-30,16,29);
-    for(let j=-23;j<=-5;j+=9)ln(c,-7,j,7,j,1,'#a8b9c6');
-   }
+  const hipX=side*11, kneeX=side*(11+drop*2), kneeY=-22+drop*14;
+  const footX=side*(12+drop*27),footY=-2;
+  ln(c,hipX,-33,kneeX,kneeY,a.goalie?12:8,dark);
+  ln(c,kneeX,kneeY,footX,footY,a.goalie?13:8,a.goalie?'#e8f2f8':dark);
+  if(a.goalie){
+   c.save();
+   c.translate(kneeX,kneeY);
+   c.rotate(-side*drop*.82);
+   c.fillStyle='#f5f9fd';c.strokeStyle='#7893a7';c.lineWidth=1.6;
+   c.beginPath();c.roundRect(-8,-9,16,33,4);c.fill();c.stroke();
+   for(let j=0;j<23;j+=8)ln(c,-6,j,6,j,1.3,'#9bb3c3');
+   c.restore();
   }
-  c.restore();
+  ln(c,footX-8,footY,footX+8,footY,4,'#182a3a');
  }
  // Pants, jersey, shoulders.
- c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39,30,19,5);c.fill();
- c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();
+ c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+drop*5,30,19,5);c.fill();
+ c.save();c.translate(0,drop*7);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
  ln(c,-17,-41,17,-41,3,trim);ln(c,-18,-64,18,-64,2,trim);
- const armY=butterfly?-35:-43;
+ const armY=-43+drop*8;
  ln(c,-19,-64,-31,armY,12,jersey);ln(c,19,-64,31,armY,12,jersey);
  if(a.goalie){
   // Left hand: open catcher pocket with webbing. Right: rectangular blocker.
