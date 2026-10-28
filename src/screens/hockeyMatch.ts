@@ -20,6 +20,7 @@ export function mountHockeyMatch(
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
  let cameraZoom=false,cameraX=400;
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
+ let cameraNotice=0;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -63,10 +64,14 @@ export function mountHockeyMatch(
   if(paused){match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
   last=performance.now();
  }
- viewButtons.forEach(b=>b.addEventListener('click',()=>{
+ viewButtons.forEach(b=>{
+  b.setAttribute('aria-pressed',String(b.dataset.view===cameraMode));
+  b.addEventListener('click',()=>{
   cameraMode=b.dataset.view as CameraMode;
+  cameraNotice=2.2;
   viewButtons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
- }));
+  });
+ });
  root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
  cameraButton.addEventListener('click',()=>setPaused(!paused));
@@ -225,7 +230,7 @@ export function mountHockeyMatch(
  function frame(now:number){
   if(!active)return;
   const dt=Math.min((now-last)/1000,.04);last=now;
-  if(!paused){visualTime+=dt;match.step(dt);}
+  if(!paused){visualTime+=dt;match.step(dt);cameraNotice=Math.max(0,cameraNotice-dt);}
   syncMovement();
   score.textContent=match.scores[0]+' - '+match.scores[1];
   shots.textContent='Shots '+match.shots[0]+' - '+match.shots[1];
@@ -237,6 +242,11 @@ export function mountHockeyMatch(
     match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly = low · Blocker = high · Poke = close range.';
   }
   render(now/1000);
+  if(cameraNotice>0&&!paused){
+   ctx.fillStyle='rgba(7,29,46,.8)';ctx.fillRect(215,390,370,35);
+   ctx.fillStyle='#f6fcff';ctx.textAlign='center';ctx.font='bold 16px system-ui';
+   ctx.fillText('CAMERA: '+cameraMode.toUpperCase(),400,413);
+  }
   if(match.phase==='final'){completedMatch();return;}
   raf=requestAnimationFrame(frame);
  }
