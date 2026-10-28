@@ -243,7 +243,7 @@ export class HockeyMatch {
    const magnitude=Math.max(1,Math.hypot(targetX,targetY));
    targetX/=magnitude;targetY/=magnitude;
    const butterfly=g.pose==='butterfly';
-   const recovering=g.actionTime>0&&g.pose==='glide';
+   const recovering=g.stance>.05&&g.pose==='glide';
    const topSpeed=butterfly?66:recovering?70:user?170+this.rating.speed*.28:123;
    const accel=butterfly?250:recovering?300:640;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
@@ -329,7 +329,7 @@ export class HockeyMatch {
   this.puck.shotTeam=null;this.puck.lock=.28;
   this.goalieSaveCooldown[defender.team]=.45;
   if(defender.team===0&&this.goalieCareer)this.saves++;
-  if(!(this.goalieCareer&&defender.team===0&&defender.pose==='butterfly')){
+  if(!(this.goalieCareer&&defender.team===0)){
    defender.pose=low?'butterfly':'blocker';defender.poseTime=.35;
   }
   this.emit('save',defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
