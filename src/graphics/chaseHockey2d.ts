@@ -87,12 +87,12 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  for(const a of actors){
   if(a===selectedGoalie)continue;
   const p=project(a.x,a.y);if(p.behind)continue;
-  drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
+  drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false,m.goalies.find(g=>g.team===a.team)?.poseTime??0);
  }
  if(selectedGoalie){
   // Near goalie stays anchored in the foreground as the camera follows the crease.
   const p=project(selectedGoalie.x,selectedGoalie.y);
-  drawActor(c,400+(selectedGoalie.y-cameraLateral)*1.25,420,1.65,selectedGoalie,time,true);
+  drawActor(c,400+(selectedGoalie.y-cameraLateral)*1.25,420,1.65,selectedGoalie,time,true,m.goalies[0].poseTime);
   // Goal frame behind goalie, NHL-style.
   const gw=78,gy=405;
   ln(c,400-gw,gy,400-gw,gy-88,5,'#ca3d4c');
@@ -110,56 +110,82 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number},time:number,back:boolean){
+/** Goalie save is articulated: hips drop, knees meet, toes flare outward,
+ * pads seal the ice, chest stays upright, catcher/blocker remain separate.
+ * The 0.12s landing and 0.18s recovery avoid instantaneous pose snapping.
+ */
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number},time:number,back:boolean,poseTime=0):void{
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
- const dark='#193146',butterfly=a.goalie&&a.pose==='butterfly';
+ const dark='#193146';
+ const butterfly=a.goalie&&a.pose==='butterfly';
+ const drop=butterfly?clamp(Math.min((1.05-poseTime)/.13,poseTime/.18),0,1):0;
+ const gloveSave=a.goalie&&a.pose==='blocker';
  c.save();c.translate(x,y);c.scale(s,s);
- oval(c,0,0,butterfly?29:22,7,'rgba(21,53,77,.22)');
+ // Contact shadow widens as pads flare out.
+ oval(c,0,0,23+drop*34,7+drop*3,'rgba(15,41,60,.22)');
  const stride=a.goalie?0:Math.sin(time*12+a.num)*7;
- // Skates and knee/leg protection. Butterfly pads rotate OUTWARD and lie flat.
+ // Legs first so the jersey correctly occludes the knee attachment.
  for(const side of [-1,1]){
-  c.save();c.translate(side*10,-18);
-  if(butterfly){
-   c.translate(side*13,12);c.rotate(side*.85);
-   c.fillStyle='#f7fbfd';c.strokeStyle='#819aab';c.lineWidth=1.8;
-   c.beginPath();c.roundRect(-8,-24,16,40,4);c.fill();c.stroke();
-   for(let j=-12;j<=8;j+=10)ln(c,-6,j,6,j,1.4,'#a6b7c4');
-   ln(c,-6,13,7,13,3,'#b8cad6');
+  c.save();
+  const spread=side*(11+drop*17);
+  const kneeX=side*(11+drop*2),kneeY=-24+drop*11;
+  // The knees come together; each pad rotates to seal the lower outside.
+  ln(c,side*10,-33,kneeX,kneeY,11,dark);
+  if(a.goalie){
+   const toeX=spread+side*drop*8;
+   const toeY=-1+drop*1;
+   ln(c,kneeX,kneeY,toeX,toeY,14,'#dfeaf1');
+   c.translate(toeX,toeY);
+   c.rotate(side*drop*.94);
+   c.fillStyle='#f8fbfd';c.strokeStyle='#8096a7';c.lineWidth=1.6;
+   c.beginPath();c.roundRect(-9,-32,18,34,4);c.fill();c.stroke();
+   c.fillStyle='#d5e1e9';c.fillRect(-7,-30,14,5);
+   for(let j=-22;j<=-6;j+=8)ln(c,-7,j,7,j,1.5,'#9bb0c0');
+   ln(c,-10,0,11,0,3,'#1c3448');
   }else{
-   ln(c,0,-23,side*stride,-2,a.goalie?15:9,a.goalie?'#edf4f8':dark);
-   ln(c,side*stride-7,0,side*stride+9,0,4,'#182a3a');
-   if(a.goalie){
-    c.fillStyle='#f8fafb';c.strokeStyle='#8ca4b4';c.lineWidth=1.3;
-    c.fillRect(-8,-30,16,29);c.strokeRect(-8,-30,16,29);
-    for(let j=-23;j<=-5;j+=9)ln(c,-7,j,7,j,1,'#a8b9c6');
-   }
+   ln(c,kneeX,kneeY,side*11+side*stride,-2,8,dark);
+   ln(c,side*stride+side*11-8,0,side*stride+side*11+10,0,4,'#1b2d3e');
   }
   c.restore();
  }
- // Pants, jersey, shoulders.
- c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39,30,19,5);c.fill();
- c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();
+ // Padded shorts and articulated torso move down during the save.
+ c.save();c.translate(0,drop*13);
+ c.fillStyle=dark;c.beginPath();c.roundRect(-17,-41,34,22,6);c.fill();
+ c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-74);c.lineTo(14,-74);c.lineTo(23,-60);c.lineTo(17,-37);c.lineTo(-17,-37);c.lineTo(-23,-60);c.closePath();c.fill();
  ln(c,-17,-41,17,-41,3,trim);ln(c,-18,-64,18,-64,2,trim);
- const armY=butterfly?-35:-43;
- ln(c,-19,-64,-31,armY,12,jersey);ln(c,19,-64,31,armY,12,jersey);
+ // A dropped goalie holds the hands forward, not straight out at shoulder height.
+ const handY=-44+drop*12;
+ const handX=31+drop*4;
+ ln(c,-19,-64,-handX,handY,12,jersey);
+ ln(c,19,-64,handX,handY,12,jersey);
  if(a.goalie){
-  // Left hand: open catcher pocket with webbing. Right: rectangular blocker.
-  oval(c,-32,armY,12,11,'#f7fbfd');
-  oval(c,-35,armY-2,6,7,'#aabeca');
-  for(let i=-1;i<=1;i++)ln(c,-38+i*3,armY-7,-31+i*3,armY+5,1,'#718a9c');
-  c.fillStyle='#eef5f9';c.strokeStyle='#8ba3b2';c.lineWidth=1.5;
-  c.beginPath();c.roundRect(25,armY-11,17,23,3);c.fill();c.stroke();
- }else{oval(c,-31,armY,6,6,dark);oval(c,31,armY,6,6,dark);}
- // Stick blade sits on the ice rather than floating through the body.
- ln(c,35,armY,42,-5,3,'#ad865c');ln(c,42,-5,57,-3,5,'#182b3a');
- // Helmet and cage fully enclose head.
- oval(c,0,-85,15,17,a.team===0?'#f2f4f5':'#193d67');
- oval(c,0,-82,12,11,'#b8cbd8');
- for(const k of [-8,0,8])ln(c,k,-91,k,-72,1.7,'#557386');
- for(const k of [-88,-81,-74])ln(c,-12,k,12,k,1.5,'#557386');
- if(back){c.fillStyle=trim;c.textAlign='center';c.font='bold 13px system-ui';c.fillText(String(a.num),0,-49);}
+  // Trapper: wide cuff, curved pocket and actual cross-webbing.
+  c.fillStyle='#f1f6fa';c.strokeStyle='#7996aa';c.lineWidth=2;
+  c.beginPath();c.ellipse(-handX-4,handY-1,14,13,-.2,0,TAU);c.fill();c.stroke();
+  oval(c,-handX-7,handY-3,8,8,'#9fb5c5');
+  for(let j=-2;j<=2;j++)ln(c,-handX-12+j*3,handY-10,-handX-6+j*3,handY+5,1,'#5f8096');
+  // Blocker is a flat rectangular board, not a second catcher.
+  c.fillStyle='#f1f6fa';c.strokeStyle='#8199aa';c.lineWidth=2;
+  c.beginPath();c.roundRect(handX-8,handY-12,22,26,3);c.fill();c.stroke();
+  ln(c,handX-5,handY+7,handX+10,handY+7,2,'#aec3d0');
+  // Stick blade remains flat on the ice during butterfly saves.
+  ln(c,handX+8,handY+5,handX+14,-5-drop*12,3.3,'#aa8358');
+  ln(c,handX+14,-5-drop*12,handX+34,-3-drop*12,5,'#20374b');
+ }else{
+  oval(c,-handX,handY,6,6,dark);oval(c,handX,handY,6,6,dark);
+  ln(c,handX+5,handY,handX+12,-5,3,'#b28c64');
+  ln(c,handX+12,-5,handX+31,-3,5,'#21384b');
+ }
+ // Full-shell mask and face cage.
+ oval(c,0,-86,16,18,a.team===0?'#f3f6f8':'#1b4068');
+ oval(c,0,-82,12,12,'#a7bdce');
+ ln(c,-14,-83,-12,-69,2,'#d7e4eb');ln(c,14,-83,12,-69,2,'#d7e4eb');
+ for(const k of [-8,0,8])ln(c,k,-92,k,-71,1.8,'#536f83');
+ for(const k of [-89,-82,-75])ln(c,-12,k,12,k,1.6,'#536f83');
+ if(back){c.fillStyle=trim;c.textAlign='center';c.font='bold 13px system-ui';c.fillText(String(a.num),0,-50);}
+ c.restore();
  if(a.selected){
-  c.strokeStyle='#ffd34e';c.lineWidth=3;c.beginPath();c.ellipse(0,1,32,9,0,0,TAU);c.stroke();
+  c.strokeStyle='#ffd34e';c.lineWidth=2.7;c.beginPath();c.ellipse(0,1,32+drop*27,9,0,0,TAU);c.stroke();
  }
  c.restore();
 }
