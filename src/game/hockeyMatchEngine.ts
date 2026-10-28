@@ -68,8 +68,8 @@ export class HockeyMatch {
    const goalie=this.goalies[0];
    if(this.goalieActionCooldown>0)return;
    if(action==='butterfly'||action==='blocker'){
-    goalie.pose=action;goalie.poseTime=.47;
-    this.goalieActionCooldown=.26;
+    goalie.pose=action;goalie.poseTime=action==='butterfly'?.85:.47;
+    this.goalieActionCooldown=action==='butterfly'?.65:.26;
    }else if(action==='poke'){
     if(distance(goalie.x,goalie.y,this.puck.x,this.puck.y)<67){
      this.puck.owner=-1;this.puck.shotTeam=null;
