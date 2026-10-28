@@ -38,7 +38,7 @@ export class HockeyMatch {
  events:MatchEvent[]=[];
  goalieCareer:boolean;
  private rng:()=>number;
- private decisionCooldown:[number,number]=[.8,.8];
+ private decisionCooldown:[number,number]=[1.5,1.5];
  private movement:MatchControls={x:0,y:0};
  private goalieActionCooldown=0;
  private rating:MatchRating;
@@ -118,7 +118,7 @@ export class HockeyMatch {
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1};
-  this.lastPasser=-1;this.decisionCooldown=[.8,.8];this.possessionTime=[0,0];
+  this.lastPasser=-1;this.decisionCooldown=[1.5,1.5];this.possessionTime=[0,0];
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
  }
  private release(owner:number,targetX:number,targetY:number,power:number,shot:boolean):void {
@@ -145,7 +145,7 @@ export class HockeyMatch {
   const a=this.skaters[owner],b=this.skaters[to];
   this.release(owner,b.x+b.vx*.42,b.y+b.vy*.42,400+this.rating.handling*.4,false);
   this.puck.lock=.22;this.lastPasser=owner;
-  this.decisionCooldown[a.team]=.6;
+  this.decisionCooldown[a.team]=1.6;
  }
  private closest(team:Team,x:number,y:number):number {
   let found=team===0?0:5,best=Infinity;
@@ -255,17 +255,18 @@ export class HockeyMatch {
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
   const inShootingLane=Math.abs(carrier.y-220)<120;
-  if(offensive&&inShootingLane&&(team===0?carrier.x>530:carrier.x<270)){
+  if(offensive&&inShootingLane&&(team===0?carrier.x>515:carrier.x<285)){
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
-  if(pressured||carrier.carriedFor>1.65){
+  // Hold possession and carry the puck; pass only when genuinely trapped.
+  if(pressured&&carrier.carriedFor>2.1&&this.rng()<.34){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
     const aheadB=(b.a.x-carrier.x)*(team===0?1:-1);
     return (aheadB+distance(b.a.x,b.a.y,carrier.x,carrier.y)*.1)-(aheadA+distance(a.a.x,a.a.y,carrier.x,carrier.y)*.1);
    });
-   if(partners[0])this.pass(owner,partners[0].i);
+   if(partners[0]&&distance(partners[0].a.x,partners[0].a.y,carrier.x,carrier.y)>80)this.pass(owner,partners[0].i);
   }
  }
  private intercept():void {
