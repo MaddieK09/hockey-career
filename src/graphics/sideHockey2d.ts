@@ -16,13 +16,13 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  // The camera angles must actually be different, not five names for the same
  // flat side view. A following camera tracks the controlled player; goalie
  // follows the crease and shot lane; broadcast keeps both nets in view.
- const zoom=mode==='player'?2.18:mode==='goalie'?1.72:mode==='sideline'?1.22:1;
- const focusX=mode==='broadcast'?400:mode==='sideline'?match.puck.x*.5+200:
+ const zoom=mode==='player'?2.5:mode==='goalie'?1.9:mode==='sideline'?1.32:1;
+ const focusX=mode==='broadcast'?400:mode==='sideline'?match.puck.x*.7+120:
   mode==='goalie'?match.goalies[0].x*.7+match.puck.x*.3:player.x;
  const focusY=mode==='player'?player.y:mode==='goalie'?220:mode==='sideline'?match.puck.y:220;
  if(lastCameraMode!==mode){smoothedCameraX=focusX;smoothedCameraY=focusY;lastCameraMode=mode;}
- smoothedCameraX+=(focusX-smoothedCameraX)*.075;
- smoothedCameraY+=(focusY-smoothedCameraY)*.075;
+ smoothedCameraX+=(focusX-smoothedCameraX)*.11;
+ smoothedCameraY+=(focusY-smoothedCameraY)*.11;
  const cameraX=clamp(smoothedCameraX,400/zoom,800-400/zoom);
  const project=(x:number,y:number)=>{
   const depth=clamp((y-24)/392,0,1);
@@ -76,28 +76,29 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   for(let k=1;k<5;k++)line(c,-9*zoom,-48+k*10,9*zoom,-48+k*10,1.2,'#9bb5c4');
   c.restore();
  }
- const characters:{x:number;y:number;goalie:boolean;team:0|1;number:number;speed:number;pose:string;selected:boolean}[]=[
+ const characters:{x:number;y:number;goalie:boolean;team:0|1;number:number;speed:number;pose:string;selected:boolean;vx:number}[]=[
   ...match.skaters.map((s,i)=>({x:s.x,y:s.y,goalie:false,team:s.team,number:s.team===0?10+i:17+i-5,
-   speed:Math.hypot(s.vx,s.vy),pose:s.shotAnimation>0?'shoot':'skate',selected:!match.goalieCareer&&match.selected===i})),
+   speed:Math.hypot(s.vx,s.vy),pose:s.shotAnimation>0?'shoot':'skate',selected:!match.goalieCareer&&match.selected===i,vx:s.vx})),
   ...match.goalies.map(g=>({x:g.x,y:g.y,goalie:true,team:g.team,number:g.team===0?10:30,
-   speed:0,pose:g.pose,selected:match.goalieCareer&&g.team===0}))
+   speed:0,pose:g.pose,selected:match.goalieCareer&&g.team===0,vx:0}))
  ];
  // Draw back-to-front so players correctly overlap on the ice.
  characters.sort((a,b)=>a.y-b.y);
  for(const a of characters){
-  const p=project(a.x,a.y),s=p.scale*zoom*(mode==='player'?.98:1);
+  const p=project(a.x,a.y),s=p.scale*(mode==='player'?1.26:mode==='goalie'?1.12:mode==='broadcast'?.70:.79);
   const red=a.team===0,shirt=red?'#c63c50':'#245c9a',trim=red?'#fff3e9':'#dbeefa';
   c.save();c.translate(p.x,p.y);c.scale(s,s);
   // Body direction changes with team and attacking direction.
   // Goalie always faces toward center ice.
-  const facing=a.goalie?(a.team===0?1:-1):(a.team===0?1:-1);
+  const facing=a.goalie?(a.team===0?1:-1):(Math.abs(a.vx)>25?(a.vx>0?1:-1):(a.team===0?1:-1));
   c.scale(facing,1);
+  if(!a.goalie)c.rotate(Math.min(.13,a.speed/180*.13)*facing);
   ellipse(c,2,2,18,5,'rgba(16,43,64,.22)');
-  const step=Math.sin(time*12+a.number)*Math.min(1,a.speed/160)*7;
+  const step=Math.sin(time*(8+Math.min(9,a.speed/22))+a.number)*Math.min(1,a.speed/160)*11;
   const low=a.pose==='butterfly';
   // Upright skates, trousers, padded legs and a real torso silhouette.
   // Knee flex and skate push are phase-shifted for each player.
-  const crouch=a.goalie?(low?12:4):Math.min(7,a.speed/35);
+  const crouch=a.goalie?(low?12:4):Math.min(8,a.speed/32);
   c.translate(0,crouch*.35);
   for(const side of [-1,1]){
    const offset=side*9;
@@ -117,6 +118,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   c.fillStyle=shirt;c.beginPath();c.moveTo(-13,-66);c.lineTo(15,-66);c.lineTo(19,-56);c.lineTo(14,-35);c.lineTo(-14,-35);c.lineTo(-19,-56);c.closePath();c.fill();
   line(c,-16,-51,17,-51,1.5,'rgba(255,255,255,.28)');
   line(c,-16,-39,16,-39,3,trim);line(c,-17,-60,17,-60,3,trim);
+  line(c,-14,-36,14,-36,2,'#173149');
   const armSwing=a.goalie?0:step*.65;
   line(c,-17,-61,-26+armSwing,-43,a.goalie?12:9,shirt);
   line(c,17,-61,27-armSwing,-43,a.goalie?12:9,shirt);
@@ -140,6 +142,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   if(a.goalie){line(c,6,-88,13,-65,2,'#718b9e');}
   c.fillStyle=trim;c.font='bold 12px system-ui';c.textAlign='center';c.fillText(String(a.number),0,-45);
   // Stick, catcher and blocker are visually distinct.
+  if(a.pose==='shoot'&&!a.goalie){line(c,27,-44,34,-23,3,'#b78d61');}
   line(c,27,-44,31,-10,3.4,'#b78d61');
   line(c,31,-10,45,-7,5,'#1a2b3a');
   line(c,45,-7,52,-9,3,'#182b3c');

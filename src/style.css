@@ -66,3 +66,20 @@
 .match-shell [data-resume]{width:100%;min-height:45px}
 .match-shell .match-meta [data-camera]{background:#2b5b78;color:#fff}
 @media(max-width:420px){.match-shell .match-pause{padding-top:55px}.match-shell .camera-options button{font-size:10px;padding:11px 5px}}
+
+/* V8 iPhone arena presentation: expand game instead of leaving half the screen unused. */
+.match-shell .match-meta [data-arena]{font:800 11px system-ui;color:#fff;background:#235575;border:1px solid #6babc9;border-radius:8px;padding:8px 10px;touch-action:manipulation}
+.match-shell.arena-expanded{min-height:100dvh;display:flex;flex-direction:column;gap:8px}
+.match-shell.arena-expanded .rink-stage{flex:1;min-height:310px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.match-shell.arena-expanded .rink-stage canvas{display:block;width:100%;height:auto;max-height:min(52dvh,560px);object-fit:contain}
+.match-shell.arena-expanded .match-controls{margin-top:6px}
+.match-shell.arena-expanded .career-muted[data-hint]{margin:0;padding-bottom:10px}
+.match-shell .match-pause{position:fixed;inset:0;z-index:200;overflow:auto;padding-top:max(60px,10dvh)}
+.match-shell .match-pause-panel{margin:auto}
+.match-shell .camera-options button{min-height:49px}
+@media(max-width:430px){
+ .match-shell .match-meta{justify-content:space-between;gap:5px}
+ .match-shell .match-meta [data-camera],.match-shell .match-meta [data-arena]{font-size:10px;padding:9px 7px}
+ .match-shell.arena-expanded .rink-stage{min-height:300px}
+ .match-shell.arena-expanded .rink-stage canvas{max-height:49dvh}
+}
