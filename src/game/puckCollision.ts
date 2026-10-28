@@ -126,3 +126,22 @@ export function findGoalFrameImpact(a:PuckPoint,b:PuckPoint,goalX:number,directi
  }
  return best;
 }
+
+/** Hockey players intercept shots with physical bodies and sticks, even during
+ * temporary pickup locks. A moving puck must not tunnel through a defender.
+ */
+export interface SkaterCollider {x:number;y:number;team:0|1}
+export interface SkaterHit extends SweepHit {surface:'body'|'stick';point:PuckPoint}
+export function findSkaterImpact(a:PuckPoint,b:PuckPoint,s:SkaterCollider):SkaterHit|null {
+ const face=s.team===0?1:-1;
+ const bodies:{surface:'body'|'stick';volume:Box}[]=[
+  {surface:'body',volume:box(s.x-11,s.x+11,s.y-14,s.y+14,0,49)},
+  {surface:'stick',volume:box(s.x+face*16,s.x+face*35,s.y-9,s.y+9,0,7)}
+ ];
+ let earliest:SkaterHit|null=null;
+ for(const region of bodies){
+  const hit=sweepPuckBox(a,b,region.volume);
+  if(hit&&(!earliest||hit.time<earliest.time))earliest={...hit,surface:region.surface,point:at(a,b,hit.time)};
+ }
+ return earliest;
+}
