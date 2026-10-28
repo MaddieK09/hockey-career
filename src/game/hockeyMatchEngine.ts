@@ -25,7 +25,7 @@ export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
   {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0},
-  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0}
+  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
  scores:[number,number]=[0,0];
