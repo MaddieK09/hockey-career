@@ -43,6 +43,8 @@ export class HockeyMatch {
  private goalieActionCooldown=0;
  private rating:MatchRating;
  private faceoffNext:Team=1;
+ private possessionTime:[number,number]=[0,0];
+ private goalieSaveCooldown:[number,number]=[0,0];
  private creaseMomentum:[number,number]=[0,0];
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random){
   this.goalieCareer=goalieCareer;this.rating=rating;this.rng=rng;
@@ -82,14 +84,18 @@ export class HockeyMatch {
   }
   if(action!=='shoot'&&action!=='pass')return;
   const skater=this.skaters[this.selected];
-  if(this.puck.owner!==this.selected&&distance(skater.x,skater.y,this.puck.x,this.puck.y)>29)return;
-  this.puck.owner=this.selected;skater.carriedFor=0;
+  // Shooting and passing require possession. No instant telekinetic steals.
+  if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
    this.shoot(this.selected,clamp(220+(this.rng()-.5)*65,185,255),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
-    .sort((a,b)=>b.s.x-a.s.x);
+    .sort((a,b)=>{
+     const sa=(a.s.x-skater.x)*1.2-Math.abs(a.s.y-skater.y)*.18;
+     const sb=(b.s.x-skater.x)*1.2-Math.abs(b.s.y-skater.y)*.18;
+     return sb-sa;
+    });
    const target=teammates[0];
    if(target)this.pass(this.selected,target.i);
   }
@@ -108,11 +114,11 @@ export class HockeyMatch {
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;});
-  this.creaseMomentum=[0,0];
+  this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1};
-  this.lastPasser=-1;this.decisionCooldown=[.8,.8];
+  this.lastPasser=-1;this.decisionCooldown=[.8,.8];this.possessionTime=[0,0];
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
  }
  private release(owner:number,targetX:number,targetY:number,power:number,shot:boolean):void {
@@ -127,8 +133,11 @@ export class HockeyMatch {
  }
  private shoot(owner:number,targetY:number,user=false):void {
   const a=this.skaters[owner];
-  const scatter=(this.rng()-.5)*(user?(85-this.rating.shot*.45):40);
-  this.release(owner,a.team===0?786:14,targetY+scatter,user?570+this.rating.shot*1.6:520+this.rng()*90,true);
+  // A closer shot has less error; player shot skill improves aim.
+  const goalX=a.team===0?740:60;
+  const range=Math.abs(goalX-a.x);
+  const scatter=(this.rng()-.5)*(user?Math.max(12,62-this.rating.shot*.42):Math.max(12,27+range*.05));
+  this.release(owner,a.team===0?780:20,targetY+scatter,user?520+this.rating.shot*1.7:485+this.rng()*90,true);
   this.shots[a.team]++;this.decisionCooldown[a.team]=1.5+this.rng()*.9;
   this.emit('shot',a.team===0?'HOME SHOT':'AWAY SHOT',a.team);
  }
@@ -245,10 +254,11 @@ export class HockeyMatch {
   const offensive=team===0?carrier.x>490:carrier.x<310;
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
-  if(offensive&&(team===0?carrier.x>555:carrier.x<245)){
+  const inShootingLane=Math.abs(carrier.y-220)<120;
+  if(offensive&&inShootingLane&&(team===0?carrier.x>530:carrier.x<270)){
    this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
   }
-  if(pressured||carrier.carriedFor>2.4){
+  if(pressured||carrier.carriedFor>1.65){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
@@ -275,7 +285,8 @@ export class HockeyMatch {
  private collideGoalies():void {
   if(this.puck.owner>=0||this.puck.shotTeam===null)return;
   const team=this.puck.shotTeam,defender=team===0?this.goalies[1]:this.goalies[0];
-  const nearX=Math.abs(this.puck.x-defender.x)<=24;
+  // Collision is valid only as the shot actually crosses the crease.
+  const nearX=Math.abs(this.puck.x-defender.x)<=22&&this.goalieSaveCooldown[defender.team]===0;
   const advancing=team===0?this.puck.vx>0:this.puck.vx<0;
   if(!nearX||!advancing)return;
   const gap=Math.abs(this.puck.y-defender.y);
@@ -285,13 +296,14 @@ export class HockeyMatch {
    reach=defender.pose==='butterfly'?(low?46:9):defender.pose==='blocker'?(!low?40:14):15;
   }else reach=low?29:24;
   if(gap>reach)return;
-  const chance=(defender.team===0&&this.goalieCareer)?1:.78;
+  const chance=(defender.team===0&&this.goalieCareer)?1:.76;
   if(this.rng()>chance)return;
   const side=team===0?-1:1;
   this.puck.vx=side*Math.max(195,Math.abs(this.puck.vx)*.55);
   this.puck.vy+=(this.puck.y-defender.y)*2+(this.rng()-.5)*135;
   this.puck.x=defender.x+side*27;
   this.puck.shotTeam=null;this.puck.lock=.28;
+  this.goalieSaveCooldown[defender.team]=.45;
   if(defender.team===0&&this.goalieCareer)this.saves++;
   defender.pose=low?'butterfly':'blocker';defender.poseTime=.35;
   this.emit('save',defender.team===0?'HOME SAVE!':'AWAY SAVE!',defender.team);
@@ -319,9 +331,10 @@ export class HockeyMatch {
    this.puck.y=clamp(this.puck.y,32,408);this.puck.vy*=-.68;
   }
   this.collideGoalies();
-  if(this.puck.x>=755||this.puck.x<=45){
+  if(this.puck.x>=754||this.puck.x<=46){
    const scoringRight=this.puck.x>=755;
-   if(Math.abs(this.puck.y-220)<=36){
+   // Only actual shots may score, not passes, stick carries, or loose pucks.
+   if(Math.abs(this.puck.y-220)<=34&&this.puck.shotTeam!==null){
     const scorer:Team=scoringRight?0:1;
     this.scores[scorer]++;
     if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
@@ -342,6 +355,8 @@ export class HockeyMatch {
   if(this.messageTime===0&&this.phase==='live')this.message='LIVE PLAY';
   this.goalieActionCooldown=Math.max(0,this.goalieActionCooldown-dt);
   this.puck.lock=Math.max(0,this.puck.lock-dt);
+  for(const team of [0,1] as Team[])this.goalieSaveCooldown[team]=Math.max(0,this.goalieSaveCooldown[team]-dt);
+  if(this.puck.owner>=0)this.possessionTime[this.skaters[this.puck.owner].team]+=dt;
   if(this.phase==='goal'||this.phase==='intermission'){
    this.phaseTime=Math.max(0,this.phaseTime-dt);
    if(this.phaseTime===0)this.resetFaceoff(this.faceoffNext);
