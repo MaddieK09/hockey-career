@@ -103,7 +103,11 @@ export function mountHockeyMatch(
   if(controls.has('d')||controls.has('arrowright'))x+=1;
   if(controls.has('w')||controls.has('arrowup'))y-=1;
   if(controls.has('s')||controls.has('arrowdown'))y+=1;
-  const n=Math.max(1,Math.hypot(x,y));match.setMovement(x/n,y/n);
+  const n=Math.max(1,Math.hypot(x,y));
+  // Chase goalie camera looks down +rink-X: screen up is rink +X,
+  // screen right is rink +Y. Overhead and skater cameras retain rink axes.
+  if(goalieCareer&&cameraMode==='goalie')match.setMovement(-y/n,x/n);
+  else match.setMovement(x/n,y/n);
  }
  function joystick(e:PointerEvent){
   const r=stick.getBoundingClientRect();
