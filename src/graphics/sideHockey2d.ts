@@ -1,3 +1,4 @@
+import {GOAL_HALF_WIDTH,GOAL_HEIGHT} from '../game/puckCollision';
 /** Side-on 2D hockey presentation, projected from the existing rink simulation.
  * This is NOT a top-down sprite view. Skaters have full-height illustrated bodies.
  */
@@ -43,7 +44,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  c.fillStyle='#dbeaf5';for(let x=35;x<800;x+=135){c.fillRect(x,8,68,3);}
  c.fillStyle='#0c1d2c';c.fillRect(0,101,800,16);
  c.fillStyle='#e6f6ff';c.font='bold 11px system-ui';c.textAlign='center';
- c.fillText('HOCKEY CAREER   •   HOME  '+match.scores[0]+'  :  '+match.scores[1]+'  AWAY',400,113);
+ c.fillText('HOCKEY CAREER   •   LIVE HOCKEY',400,113);
  c.fillStyle='#d5e5ed';c.fillRect(0,120,800,9);
  c.fillStyle='rgba(205,236,249,.25)';c.fillRect(0,129,800,19);
  c.strokeStyle='rgba(238,249,255,.5)';c.lineWidth=1;
@@ -67,13 +68,15 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   c.save();c.translate(p.x,p.y);c.scale(zoom,.37);
   c.beginPath();c.arc(0,0,46,0,Math.PI*2);c.strokeStyle='rgba(184,55,77,.52)';c.lineWidth=2;c.stroke();c.restore();
  }
- for(const x of [59,741]){
+ for(const x of [60,740]){
   const p=project(x,220);
   c.save();c.translate(p.x,p.y);
-  c.fillStyle='rgba(83,164,210,.22)';c.beginPath();c.ellipse(0,0,40*zoom,25,0,0,Math.PI*2);c.fill();
+  c.fillStyle='rgba(83,164,210,.22)';c.beginPath();c.ellipse(0,0,40*zoom,GOAL_HALF_WIDTH*.48,0,0,Math.PI*2);c.fill();
   c.strokeStyle='#cf4254';c.lineWidth=5;
-  c.strokeRect(-9*zoom,-48,18*zoom,48);
-  for(let k=1;k<5;k++)line(c,-9*zoom,-48+k*10,9*zoom,-48+k*10,1.2,'#9bb5c4');
+  const netDepth=12*zoom,netHeight=GOAL_HEIGHT*.82;
+  c.strokeRect(-netDepth,-netHeight,netDepth*2,netHeight);
+  for(let k=1;k<7;k++)line(c,-netDepth,-netHeight+k*netHeight/7,netDepth,-netHeight+k*netHeight/7,1.2,'#9bb5c4');
+  for(let k=1;k<5;k++)line(c,-netDepth+k*netDepth*2/5,-netHeight,-netDepth+k*netDepth*2/5,0,1,'#9bb5c4');
   c.restore();
  }
  const characters:{x:number;y:number;goalie:boolean;team:0|1;number:number;speed:number;pose:string;selected:boolean;vx:number}[]=[
