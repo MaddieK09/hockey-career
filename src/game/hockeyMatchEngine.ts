@@ -127,7 +127,7 @@ export class HockeyMatch {
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
-   this.shoot(this.selected,clamp(220+(this.rng()-.5)*65,185,255),true);
+   this.shoot(this.selected,clamp(220+(this.rng()-.5)*92,177,263),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
@@ -352,7 +352,8 @@ export class HockeyMatch {
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
   const inShootingLane=Math.abs(carrier.y-220)<120;
-  const targetY=clamp(220+(this.rng()-.5)*56,192,248);
+  // Aim around the wider opening, including challenging corners.
+  const targetY=clamp(220+(this.rng()-.5)*100,172,268);
   // Avoid firing directly into an obvious defender: create a passing lane first.
   const laneBlocked=this.skaters.some((def,i)=>{
    if(i===owner||def.team===team)return false;
