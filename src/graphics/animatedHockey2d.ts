@@ -1,3 +1,4 @@
+import {GOAL_HALF_WIDTH} from '../game/puckCollision';
 /** Hockey Career V5 — layered, resolution-independent Canvas 2D renderer.
  * Players are purpose-built top-down illustrated sprites drawn procedurally:
  * no WebGL, downloads, or external assets needed on iPhone.
@@ -121,16 +122,24 @@ export function drawRink(c:CanvasRenderingContext2D,time:number):void{
   // Hash marks outside faceoff circles.
   for(const s of [-1,1])line(c,x+s*35,y-49,x+s*35,y-37,2,'#c74857');
  }
- // Correctly positioned crease, goal line and net at both ends.
+ // Nets have the same world-space dimensions used by goal collision.
  for(const side of [0,1]){
-  const x=side===0?60:740;
-  c.fillStyle='rgba(67,158,212,.20)';
-  c.beginPath();c.ellipse(x,220,46,61,0,0,TAU);c.fill();
+  const x=side===0?60:740,netBack=side===0?30:740;
+  const mouthTop=220-GOAL_HALF_WIDTH;
+  const mouthBottom=220+GOAL_HALF_WIDTH;
+  c.fillStyle='rgba(67,158,212,.18)';
+  c.beginPath();c.ellipse(x,220,57,GOAL_HALF_WIDTH+20,0,0,TAU);c.fill();
   line(c,x,24,x,416,2.5,'#cb4557');
-  rounded(c,side===0?30:740,185,30,70,4,'#eef8fc','#b63d4d');
-  for(let n=0;n<6;n++)line(c,side===0?31:741,188+n*11,side===0?59:769,188+n*11,1,'#b5ccd8');
-  for(let n=0;n<4;n++)line(c,(side===0?32:742)+n*8,186,(side===0?32:742)+n*8,253,1,'#b5ccd8');
-  line(c,x,185,x,255,4,'#ca3e51');
+  rounded(c,netBack,mouthTop,30,GOAL_HALF_WIDTH*2,4,'#eef8fc','#b63d4d');
+  for(let n=1;n<10;n++){
+   const y=mouthTop+n*(GOAL_HALF_WIDTH*2)/10;
+   line(c,netBack+1,y,netBack+29,y,1,'#b5ccd8');
+  }
+  for(let n=1;n<5;n++){
+   const xx=netBack+n*30/5;
+   line(c,xx,mouthTop+2,xx,mouthBottom-2,1,'#b5ccd8');
+  }
+  line(c,x,mouthTop,x,mouthBottom,4,'#ca3e51');
  }
  c.restore();
  c.strokeStyle='#2e5c78';c.lineWidth=7;c.beginPath();c.roundRect(18,19,764,402,45);c.stroke();
