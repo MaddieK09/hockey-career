@@ -134,3 +134,17 @@ test('fictional league fixture rotation never schedules your own club',async()=>
   assert.equal(nextOpponent(t.id,7).id,opponents[0].id);
  }
 });
+
+test('AI shots reset the shot clock instead of becoming rapid-fire spam',()=>{
+ const m=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5);
+ m.skaters[5].x=245;m.skaters[5].y=220;
+ m.puck.owner=5;
+ m.shoot(5,220);
+ assert.ok(m.shotClock[1]>=20,'a fresh shot should require another offensive build-up');
+ assert.equal(m.shots[1],1);
+});
+test('a new faceoff starts a nonzero shot build-up interval',()=>{
+ const m=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5);
+ m.shotClock=[0,0];m.resetFaceoff(1);
+ assert.ok(m.shotClock[0]>0&&m.shotClock[1]>0);
+});
