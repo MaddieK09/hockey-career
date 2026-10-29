@@ -27,7 +27,7 @@ export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
   {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0},
-  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0}
+  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
  scores:[number,number]=[0,0];
@@ -335,8 +335,11 @@ export class HockeyMatch {
    g.reactionTime=Math.max(0,g.reactionTime-dt);
    if(g.reactionTime===0)g.reaction=null;
    g.pokeTime=Math.max(0,g.pokeTime-dt);
-   g.saveReach=Math.max(0,g.saveReach-dt*2.5);
-   if(g.saveReach===0)g.saveHand=null;
+   // Rise and retract on separate smooth phases, without snapping the glove or blocker.
+   if(g.poseTime<.21)g.saveTarget=0;
+   const reachSpeed=g.saveTarget>g.saveReach?6:3.7;
+   g.saveReach+=clamp(g.saveTarget-g.saveReach,-dt*reachSpeed,dt*reachSpeed);
+   if(g.saveReach<.001&&g.saveTarget===0){g.saveReach=0;g.saveHand=null;}
    g.poseTime=Math.max(0,g.poseTime-dt);
    if(g.pose==='blocker'&&g.poseTime===0)g.pose='glide';
   }
