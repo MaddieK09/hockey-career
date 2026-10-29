@@ -44,7 +44,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  c.fillStyle='#dbeaf5';for(let x=35;x<800;x+=135){c.fillRect(x,8,68,3);}
  c.fillStyle='#0c1d2c';c.fillRect(0,101,800,16);
  c.fillStyle='#e6f6ff';c.font='bold 11px system-ui';c.textAlign='center';
- c.fillText('HOCKEY CAREER   •   LIVE HOCKEY',400,113);
+ c.fillText(match.teams[0].abbr+'  '+match.scores[0]+'   -   '+match.scores[1]+'  '+match.teams[1].abbr,400,113);
  c.fillStyle='#d5e5ed';c.fillRect(0,120,800,9);
  c.fillStyle='rgba(205,236,249,.25)';c.fillRect(0,129,800,19);
  c.strokeStyle='rgba(238,249,255,.5)';c.lineWidth=1;
@@ -89,7 +89,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  characters.sort((a,b)=>a.y-b.y);
  for(const a of characters){
   const p=project(a.x,a.y),s=p.scale*(mode==='player'?1.26:mode==='goalie'?1.12:mode==='broadcast'?.70:.79);
-  const red=a.team===0,shirt=red?'#c63c50':'#245c9a',trim=red?'#fff3e9':'#dbeefa';
+  const red=a.team===0,shirt=match.teams[a.team].primary,trim=match.teams[a.team].accent;
   c.save();c.translate(p.x,p.y);c.scale(s,s);
   // Body direction changes with team and attacking direction.
   // Goalie always faces toward center ice.
@@ -168,7 +168,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   c.strokeStyle='#a7d6e9';c.lineWidth=1.5;c.strokeRect(629,23,147,61);
   line(c,702.5,23,702.5,84,1,'#bd6070');
   for(const a of match.skaters){
-   ellipse(c,629+a.x/800*147,23+a.y/440*61,2.8,2.8,a.team===0?'#f06070':'#6ebdff');
+   ellipse(c,629+a.x/800*147,23+a.y/440*61,2.8,2.8,match.teams[a.team].accent);
   }
   ellipse(c,629+match.puck.x/800*147,23+match.puck.y/440*61,3.5,3.5,'#ffda50');
   const you=project(player.x,player.y);
