@@ -117,3 +117,20 @@ test('goal width, crossbar and metal contact remain synchronized',()=>{
  assert.equal(findGoalFrameImpact(point(100,220+GOAL_HALF_WIDTH,12),point(40,220+GOAL_HALF_WIDTH,12),60,-1)?.surface,'post');
  assert.equal(findGoalFrameImpact(point(100,220,GOAL_HEIGHT),point(40,220,GOAL_HEIGHT),60,-1)?.surface,'crossbar');
 });
+
+test('fictional league has unique original clubs and no duplicate abbreviations',async()=>{
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ assert.equal(LEAGUE_TEAMS.length,8);
+ assert.equal(new Set(LEAGUE_TEAMS.map(t=>t.id)).size,8);
+ assert.equal(new Set(LEAGUE_TEAMS.map(t=>t.abbr)).size,8);
+ for(const t of LEAGUE_TEAMS){assert.match(t.primary,/^#[0-9a-f]{6}$/i);assert.match(t.accent,/^#[0-9a-f]{6}$/i);}
+});
+test('fictional league fixture rotation never schedules your own club',async()=>{
+ const {LEAGUE_TEAMS,nextOpponent}=await loadTS('src/game/fictionalLeague.ts');
+ for(const t of LEAGUE_TEAMS){
+  const opponents=Array.from({length:7},(_,i)=>nextOpponent(t.id,i));
+  assert.equal(new Set(opponents.map(x=>x.id)).size,7);
+  assert.ok(opponents.every(x=>x.id!==t.id));
+  assert.equal(nextOpponent(t.id,7).id,opponents[0].id);
+ }
+});

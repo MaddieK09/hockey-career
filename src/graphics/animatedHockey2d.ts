@@ -5,7 +5,7 @@ import {GOAL_HALF_WIDTH} from '../game/puckCollision';
  */
 export type HockeyPose='skate'|'glide'|'shoot'|'save'|'butterfly'|'blocker'|'vh'|'rvh';
 export interface CharacterFrame {
- x:number;y:number;team:0|1;goalie?:boolean;angle:number;
+ x:number;y:number;team:0|1;goalie?:boolean;angle:number;jerseyColor?:string;trimColor?:string;helmetColor?:string;
  time:number;speed:number;pose?:HockeyPose;selected?:boolean;number?:number;hasPuck?:boolean;
 }
 const TAU=Math.PI*2;
@@ -22,8 +22,8 @@ const rounded=(c:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:
 };
 export function drawHockeyCharacter(c:CanvasRenderingContext2D,p:CharacterFrame):void{
  const home=p.team===0,goalie=!!p.goalie;
- const jersey=home?'#d43c4e':'#2364a1',dark=home?'#8f2438':'#16426b';
- const trim=home?'#fff4eb':'#dceeff',helmet=home?'#f7f7f4':'#12385e';
+ const jersey=p.jerseyColor??(home?'#d43c4e':'#2364a1'),dark=p.jerseyColor??(home?'#8f2438':'#16426b');
+ const trim=p.trimColor??(home?'#fff4eb':'#dceeff'),helmet=p.helmetColor??(home?'#f7f7f4':'#12385e');
  const pace=Math.min(1,p.speed/175);
  const stride=Math.sin(p.time*13+p.number!*.17)*pace;
  c.save();c.translate(p.x,p.y);
