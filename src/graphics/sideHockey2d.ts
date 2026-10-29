@@ -17,20 +17,20 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  // The camera angles must actually be different, not five names for the same
  // flat side view. A following camera tracks the controlled player; goalie
  // follows the crease and shot lane; broadcast keeps both nets in view.
- const zoom=mode==='player'?2.5:mode==='goalie'?1.9:mode==='sideline'?1.32:1;
- const focusX=mode==='broadcast'?400:mode==='sideline'?match.puck.x*.7+120:
+ const zoom=mode==='player'?2.15:mode==='goalie'?1.65:mode==='sideline'?1.48:1.12;
+ const focusX=mode==='broadcast'?400+(match.puck.x-400)*.65:mode==='sideline'?match.puck.x:
   mode==='goalie'?match.goalies[0].x*.7+match.puck.x*.3:player.x;
  const focusY=mode==='player'?player.y:mode==='goalie'?220:mode==='sideline'?match.puck.y:220;
  if(lastCameraMode!==mode){smoothedCameraX=focusX;smoothedCameraY=focusY;lastCameraMode=mode;}
- smoothedCameraX+=(focusX-smoothedCameraX)*.11;
- smoothedCameraY+=(focusY-smoothedCameraY)*.11;
+ smoothedCameraX+=(focusX-smoothedCameraX)*(mode==='broadcast'?.08:.15);
+ smoothedCameraY+=(focusY-smoothedCameraY)*.12;
  const cameraX=clamp(smoothedCameraX,400/zoom,800-400/zoom);
  const project=(x:number,y:number)=>{
   const depth=clamp((y-24)/392,0,1);
-  const vertical=mode==='sideline'?235:mode==='goalie'?255:mode==='player'?290:210;
-  const base=mode==='player'?185:mode==='goalie'?155:132;
+  const vertical=mode==='sideline'?280:mode==='goalie'?275:mode==='player'?285:235;
+  const base=mode==='player'?175:mode==='goalie'?148:130;
   return {x:400+(x-cameraX)*zoom,y:base+(depth-(mode==='player'?(smoothedCameraY-24)/392:0))*vertical,
-   scale:(.60+depth*.55)*(mode==='player'?1.22:mode==='goalie'?1.12:1)};
+   scale:(.62+depth*.48)*(mode==='player'?1.17:mode==='goalie'?1.12:mode==='sideline'?1.08:1)};
  };
  // Arena backdrop: seating, glass, boards and a slanted ice plane.
  const sky=c.createLinearGradient(0,0,0,290);
