@@ -642,7 +642,7 @@ export class HockeyMatch {
   this.updateSkaters(dt);
   if(this.goalies.some(g=>g.holdTime>0)){
    const g=this.goalies.find(g=>g.holdTime>0)!;
-   this.puck.x=g.x+(g.team===0?14:-14);this.puck.y=g.y-31;this.puck.height=45;
+   this.puck.x=g.x+(g.team===0?14:-14);this.puck.y=g.coverTime>0?g.y:g.y-31;this.puck.height=g.coverTime>0?0:45;
    this.puck.vx=this.puck.vy=this.puck.vz=0;return;
   }
   this.aiDecisions(dt);
