@@ -1,3 +1,4 @@
+import {GOAL_HALF_WIDTH} from '../game/puckCollision';
 /** Hockey Career V5 — layered, resolution-independent Canvas 2D renderer.
  * Players are purpose-built top-down illustrated sprites drawn procedurally:
  * no WebGL, downloads, or external assets needed on iPhone.
@@ -127,10 +128,10 @@ export function drawRink(c:CanvasRenderingContext2D,time:number):void{
   c.fillStyle='rgba(67,158,212,.20)';
   c.beginPath();c.ellipse(x,220,46,61,0,0,TAU);c.fill();
   line(c,x,24,x,416,2.5,'#cb4557');
-  rounded(c,side===0?30:740,185,30,70,4,'#eef8fc','#b63d4d');
-  for(let n=0;n<6;n++)line(c,side===0?31:741,188+n*11,side===0?59:769,188+n*11,1,'#b5ccd8');
-  for(let n=0;n<4;n++)line(c,(side===0?32:742)+n*8,186,(side===0?32:742)+n*8,253,1,'#b5ccd8');
-  line(c,x,185,x,255,4,'#ca3e51');
+  rounded(c,side===0?30:740,220-GOAL_HALF_WIDTH,30,GOAL_HALF_WIDTH*2,4,'#eef8fc','#b63d4d');
+  for(let n=0;n<8;n++)line(c,side===0?31:741,220-GOAL_HALF_WIDTH+3+n*12,side===0?59:769,220-GOAL_HALF_WIDTH+3+n*12,1,'#b5ccd8');
+  for(let n=0;n<4;n++)line(c,(side===0?32:742)+n*8,220-GOAL_HALF_WIDTH+1,(side===0?32:742)+n*8,220+GOAL_HALF_WIDTH-1,1,'#b5ccd8');
+  line(c,x,220-GOAL_HALF_WIDTH,x,220+GOAL_HALF_WIDTH,4,'#ca3e51');
  }
  c.restore();
  c.strokeStyle='#2e5c78';c.lineWidth=7;c.beginPath();c.roundRect(18,19,764,402,45);c.stroke();
