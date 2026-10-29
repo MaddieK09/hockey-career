@@ -21,14 +21,17 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(goalieMode){cameraDepth=60;cameraLateral=220;}
  else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?0:Math.max(0,cameraDepth-55);
- const cameraFactor=goalieDistance==='close'?1.35:goalieDistance==='far'?.76:1;
+ const cameraFactor=goalieDistance==='close'?1.16:goalieDistance==='far'?.76:1;
+ // The original camera compresses almost the whole rink into a thin row.
+ // Increase perspective depth separation so approaching skaters actually grow.
+ const perspectiveDistance=goalieMode?245:260;
  const horizon=goalieMode?95:117;
  // Perspective: width grows toward camera. Near bodies are much larger.
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
-  const z=clamp((goalieMode?360:260)/((goalieMode?360:260)+depth),goalieMode?.32:.27,1.15);
-  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+300*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.7*cameraFactor:1.45),behind:along< -25};
+  const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.24:.27,1.15);
+  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+310*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.9*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
@@ -90,10 +93,10 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  };
  drawGoal(direction===1?740:60,1);
  if(goalieMode)drawGoal(60,.52);
- type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
+ type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;vy:number;heading:number;shotAnimation:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
  const actors:Actor[]=[
-  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0})),
-  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vy,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide}))
+  ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,vy:s.vy,heading:s.heading,shotAnimation:s.shotAnimation,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0})),
+  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vx,vy:g.vy,heading:0,shotAnimation:0,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide}))
  ];
  // Distant skaters first; selected goalie drawn last, as an NHL goalie camera.
  actors.sort((a,b)=>(direction===1?b.x-a.x:a.x-b.x));
@@ -101,7 +104,12 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  for(const a of actors){
   if(a===selectedGoalie)continue;
   const p=project(a.x,a.y);if(p.behind)continue;
+  // Fade skaters directly in the goalie sightline instead of letting a
+  // foreground jersey completely hide the puck and the attacking formation.
+  const obstructs=goalieMode&&!a.goalie&&Math.abs(p.x-400)<72&&a.x<245;
+  c.save();if(obstructs)c.globalAlpha=.56;
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
+  c.restore();
  }
  if(selectedGoalie){
   // Unlike the old manually anchored goalie, all bodies and puck share the
@@ -110,6 +118,14 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   drawActor(c,p.x,p.y,clamp(p.scale*1.24,.75,2.7),selectedGoalie,time,true);
  }
  const puck=project(m.puck.x,m.puck.y);
+ // Show possession clearly rather than letting a cluster of players hide the puck.
+ if(m.puck.owner>=0){
+  const carrier=m.skaters[m.puck.owner],p=project(carrier.x,carrier.y);
+  if(!p.behind){
+   c.strokeStyle='rgba(255,208,62,.85)';c.lineWidth=2;
+   c.beginPath();c.ellipse(p.x,p.y,17*p.scale,7*p.scale,0,0,TAU);c.stroke();
+  }
+ }
  if(!puck.behind){
   // A shadow and contrast halo make the puck readable over dark equipment.
   oval(c,puck.x,puck.y,Math.max(4,7*puck.scale),Math.max(2,3*puck.scale),'rgba(19,42,59,.24)');
@@ -126,14 +142,20 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number},time:number,back:boolean){
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
  const dark='#193146',drop=a.goalie?clamp(a.stance+(a.reaction==='pads'?Math.sin((.52-a.reactionTime)/.52*Math.PI)*.32:0),0,1):0;
  const impact=a.goalie&&a.reactionTime>0?Math.sin((.52-a.reactionTime)/.52*Math.PI):0;
  const lean=impact*(a.reactionSide>=0?-1:1)*.10;
  c.save();c.translate(x+impact*(a.reactionSide>=0?-5:5)*s,y+impact*3*s);c.scale(s,s);
  oval(c,0,0,22+drop*15,7,'rgba(21,53,77,.22)');
- const stride=a.goalie?0:Math.sin(time*12+a.num)*7;
+ const speed=Math.hypot(a.vx,a.vy);
+ const skating=!a.goalie?clamp(speed/135,0,1):0;
+ const stride=Math.sin(time*(6+skating*9)+a.num*.9)*9*skating;
+ const shot=a.goalie?0:clamp(a.shotAnimation/.3,0,1);
+ const shotWindup=shot>0?Math.sin((1-shot)*Math.PI):0;
+ const lateral=a.goalie?clamp(a.vy/120,-1,1):0;
+ const skateLean=a.goalie?lateral*(1-drop)*.09:clamp(a.vy/250,-.14,.14);
  // Butterfly based on a real goalie: both knees drive down and inward,
  // while the pad faces rotate out to form a continuous seal along the ice.
  // All coordinates interpolate from the standing stance; no instant snap.
@@ -141,9 +163,9 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const bodyDrop=ease*11;
  for(const side of [-1,1]){
   const hipX=side*11;
-  const kneeX=side*(12-ease*4);
+  const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
   const kneeY=-23+ease*17;
-  const skateX=side*(13+ease*31);
+  const skateX=side*(13+ease*31)+(a.goalie?lateral*4:stride*side);
   const skateY=-2;
   // Thighs bend in as the knees settle close together.
   ln(c,hipX,-34+bodyDrop,kneeX,kneeY,a.goalie?12:8,dark);
@@ -177,12 +199,13 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  }
  // Pants, jersey, shoulders.
  c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+bodyDrop,30,19,5);c.fill();
- c.save();c.translate(lean*15,bodyDrop+impact*3);c.rotate(lean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
+ c.save();c.translate(lean*15,bodyDrop+impact*3);c.rotate(lean+skateLean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
  ln(c,-17,-41+bodyDrop,17,-41+bodyDrop,3,trim);ln(c,-18,-64+bodyDrop,18,-64+bodyDrop,2,trim);
  const armY=-43+bodyDrop;
+ const armPump=skating*Math.sin(time*(6+skating*9)+a.num*.9)*6;
  const gloveLift=(a.saveHand==='glove'?a.saveReach*29:0)+(a.reaction==='glove'?impact*22:0);
  const blockerLift=(a.saveHand==='blocker'?a.saveReach*29:0)+(a.reaction==='blocker'?impact*22:0);
- ln(c,-19,-64+bodyDrop,-31-gloveLift*.2,armY-gloveLift,12,jersey);ln(c,19,-64+bodyDrop,31+blockerLift*.2,armY-blockerLift,12,jersey);
+ ln(c,-19,-64+bodyDrop,-31-gloveLift*.2,armY-gloveLift+armPump-shotWindup*15,12,jersey);ln(c,19,-64+bodyDrop,31+blockerLift*.2,armY-blockerLift-armPump+shotWindup*11,12,jersey);
  if(a.goalie){
   // Left hand: open catcher pocket with webbing. Right: rectangular blocker.
   oval(c,-32-gloveLift*.2,armY-gloveLift,12,11,'#f7fbfd');
@@ -190,14 +213,15 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
   for(let i=-1;i<=1;i++)ln(c,-38+i*3,armY-7-gloveLift,-31+i*3,armY+5-gloveLift,1,'#718a9c');
   c.fillStyle='#eef5f9';c.strokeStyle='#8ba3b2';c.lineWidth=1.5;
   c.beginPath();c.roundRect(25+blockerLift*.2,armY-11-blockerLift,17,23,3);c.fill();c.stroke();
- }else{oval(c,-31,armY,6,6,dark);oval(c,31,armY,6,6,dark);}
+ }else{oval(c,-31,armY+armPump-shotWindup*15,6,6,dark);oval(c,31,armY-armPump+shotWindup*11,6,6,dark);}
  // Poke check: extend the stick toward the shooter, then pull it back.
  const poke=a.goalie&&a.pokeTime>0?Math.sin((.34-a.pokeTime)/.34*Math.PI):0;
  const stickSave=a.reaction==='stick'?impact*.75:0;
- const bladeY=-3-poke*52-stickSave*28,bladeX=57+poke*10+stickSave*9;
+ const bladeY=-3-poke*52-stickSave*28-shotWindup*32,bladeX=57+poke*10+stickSave*9+shotWindup*22;
  ln(c,35,armY,42+poke*6,bladeY-4,3,'#ad865c');
  ln(c,42+poke*6,bladeY-4,bladeX,bladeY,5,'#182b3a');
  if(poke>.15)oval(c,bladeX,bladeY,4,2,'#d5e8f3');
+ if(shotWindup>.12){ln(c,bladeX-14,bladeY-4,bladeX+8,bladeY,2,'rgba(255,255,255,.6)');}
  // Helmet and cage fully enclose head.
  oval(c,0,-85+bodyDrop,15,17,a.team===0?'#f2f4f5':'#193d67');
  oval(c,0,-82+bodyDrop,12,11,'#b8cbd8');
