@@ -23,7 +23,7 @@ export function mountHockeyMatch(
  match.setTeams(homeTeam,awayTeam);
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
- let cameraZoom=false,cameraX=400;
+ let cameraZoom=false,cameraX=400,cameraY=220;
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  let cameraNotice=0;
  let arenaMode=true;
@@ -59,6 +59,7 @@ export function mountHockeyMatch(
   +'<button type="button" data-view="goalie">BEHIND GOALIE (NHL)</button>'
   +(goalieCareer?'<button type="button" data-distance="close">CREASE CLOSE</button><button type="button" data-distance="medium">CREASE STANDARD</button><button type="button" data-distance="far">CREASE WIDE</button>':'')
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
+  +'<button type="button" data-overhead="full">FULL RINK</button><button type="button" data-overhead="track">TRACK PUCK</button>'
   +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
   +(goalieCareer?'Move inside the crease · Toggle Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
@@ -95,6 +96,15 @@ export function mountHockeyMatch(
  arenaButton.addEventListener('click',()=>{arenaMode=!arenaMode;shell.classList.toggle('arena-expanded',arenaMode);arenaButton.textContent=arenaMode?'⤢ NORMAL VIEW':'⛶ BIG RINK';});
  const pausePanel=root.querySelector<HTMLElement>('[data-pause]')!;
  const viewButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
+ const overheadButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-overhead]'));
+ overheadButtons.forEach(b=>{
+  b.setAttribute('aria-pressed',String((b.dataset.overhead==='track')===cameraZoom));
+  b.addEventListener('click',()=>{
+   cameraZoom=b.dataset.overhead==='track';cameraMode='overhead';cameraNotice=1.7;
+   overheadButtons.forEach(x=>x.setAttribute('aria-pressed',String((x.dataset.overhead==='track')===cameraZoom)));
+   viewButtons.forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.view==='overhead')));
+  });
+ });
  const postButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-post-mode]'));
  const periodSelect=root.querySelector<HTMLSelectElement>('[data-period-length]')!;
  periodSelect.addEventListener('change',()=>{
