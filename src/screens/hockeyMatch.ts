@@ -317,7 +317,7 @@ export function mountHockeyMatch(
    const pass=root.querySelector<HTMLButtonElement>('[data-action="f"]');
    if(cover){cover.textContent=match.goalieHolding?'FREEZE PUCK':'COVER PUCK';cover.disabled=!match.goalieHolding&&!match.canCoverPuck;}
    if(pass)pass.disabled=!match.goalieHolding;
-   for(const b of root.querySelectorAll<HTMLButtonElement>('[data-action="g"],[data-action="h"]')){
+   for(const b of Array.from(root.querySelectorAll<HTMLButtonElement>('[data-action="g"],[data-action="h"]'))){
     b.hidden=match.postMode!=='manual';b.disabled=!match.postAvailable;
     b.setAttribute('aria-pressed',String(match.goalies[0].pose===(b.dataset.action==='g'?'vh':'rvh')));
    }
