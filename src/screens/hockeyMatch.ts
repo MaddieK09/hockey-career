@@ -245,7 +245,7 @@ export function mountHockeyMatch(
   ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y-puck.height,6.7,5.5,0,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#8395a4';ctx.lineWidth=1;ctx.stroke();
-  if(match.phase==='goal'||match.phase==='intermission'){
+  if(match.phase==='intermission'){
    ctx.fillStyle='rgba(4,25,44,.63)';ctx.fillRect(240,167,320,105);
    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 34px system-ui';
    ctx.fillText(match.message,400,229);
