@@ -1,3 +1,4 @@
+import {getTeam,type LeagueTeam} from '../game/fictionalLeague';
 import {validPeriodMinutes,periodOptions,savePeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
@@ -15,9 +16,11 @@ export interface MatchSummary {
  */
 export function mountHockeyMatch(
  root:HTMLElement,goalieCareer:boolean,rating:MatchRating,
- onComplete:(result:MatchSummary)=>void,onReturn:()=>void,onPeriodChange?:(minutes:PeriodMinutes)=>void
+ onComplete:(result:MatchSummary)=>void,onReturn:()=>void,onPeriodChange?:(minutes:PeriodMinutes)=>void,
+ homeTeam:LeagueTeam=getTeam(),awayTeam:LeagueTeam=getTeam('lakehaven')
 ):{stop:()=>void}{
  const match=new HockeyMatch(goalieCareer,rating,Math.random,validPeriodMinutes((rating as MatchRating & {periodMinutes?:number}).periodMinutes));
+ match.setTeams(homeTeam,awayTeam);
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
  let cameraZoom=false,cameraX=400;
@@ -32,15 +35,15 @@ export function mountHockeyMatch(
  root.innerHTML='<main class="career-shell match-shell">'
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<div class="scorebug" role="status" aria-label="Live game scoreboard">'
-  +'<div class="scorebug-team scorebug-home"><span>HOM</span><strong data-home-score>0</strong></div>'
-  +'<div class="scorebug-team scorebug-away"><span>AWY</span><strong data-away-score>0</strong></div>'
+  +'<div class="scorebug-team scorebug-home"><span>'+homeTeam.abbr+'</span><strong data-home-score>0</strong></div>'
+  +'<div class="scorebug-team scorebug-away"><span>'+awayTeam.abbr+'</span><strong data-away-score>0</strong></div>'
   +'<div class="scorebug-timer"><strong data-clock>'+match.periodMinutes+':00</strong><small data-period>1ST</small></div>'
   +'</div></header>'
   +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
   +'<div class="rink-scorebug-slot" data-rink-scorebug></div>'
   +'<div class="goal-banner" data-goal-banner hidden><span data-goal-team>HOME</span><strong>GOAL!</strong></div>'
-  +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
+  +'<div class="rink-hud"><span>'+homeTeam.city.toUpperCase()+' · '+homeTeam.name.toUpperCase()+'</span><span data-event>FACE OFF</span><span>'+awayTeam.city.toUpperCase()+' · '+awayTeam.name.toUpperCase()+'</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
   +'<button type="button" data-action="b">'+actB+'</button>'
@@ -68,6 +71,13 @@ export function mountHockeyMatch(
  const scorebug=root.querySelector<HTMLElement>('.scorebug')!;
  const scorebugSlot=root.querySelector<HTMLElement>('[data-rink-scorebug]')!;
  scorebugSlot.appendChild(scorebug);
+ shellColorFix();
+ function shellColorFix(){
+  const home=root.querySelector<HTMLElement>('.scorebug-home');
+  const away=root.querySelector<HTMLElement>('.scorebug-away');
+  if(home)home.style.backgroundColor=homeTeam.primary;
+  if(away)away.style.backgroundColor=awayTeam.primary;
+ }
  const goalBanner=root.querySelector<HTMLElement>('[data-goal-banner]')!;
  const goalTeam=root.querySelector<HTMLElement>('[data-goal-team]')!;
  const clock=root.querySelector<HTMLElement>('[data-clock]')!;
@@ -303,7 +313,7 @@ export function mountHockeyMatch(
   goalBanner.hidden=match.phase!=='goal';
   if(match.phase==='goal'){
    const isHome=match.message.startsWith('HOME');
-   goalTeam.textContent=isHome?'HOME':'AWAY';
+   goalTeam.textContent=isHome?homeTeam.abbr:awayTeam.abbr;
    goalBanner.classList.toggle('goal-banner-away',!isHome);
   }
   shots.textContent='SOG '+match.shots[0]+' - '+match.shots[1];
