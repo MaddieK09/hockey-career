@@ -47,6 +47,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const newLevel=1+Math.floor(career.xp/200);
   if(newLevel>career.level){career.skillPoints+=newLevel-career.level;career.level=newLevel;}
   saveCareer(career);
- },()=>drawHub());
+ },()=>drawHub(),(minutes)=>{
+  career.periodMinutes=minutes;saveCareer(career);
+ });
  drawHub();
 }

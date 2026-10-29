@@ -138,3 +138,13 @@
  .match-shell .rink-scorebug-slot .scorebug-timer{min-width:50px;padding:2px 5px}
  .match-shell .rink-scorebug-slot .scorebug-timer strong{font-size:11px}
 }
+
+/* Pause-menu gameplay settings, separate from camera presets. */
+.match-shell .pause-setting{margin:12px 0;padding:12px;border:1px solid #476c85;border-radius:12px;background:#0b2337;text-align:left}
+.match-shell .pause-setting strong{display:block;color:#f0faff;font-size:12px;letter-spacing:.05em}
+.match-shell .pause-setting small{display:block;margin-top:7px;color:#aac8da;font-size:11px;line-height:1.5}
+.match-shell .pause-setting .camera-options{margin:10px 0 4px}
+.match-shell .pause-setting select{width:100%;margin-top:9px;min-height:43px;padding:9px 11px;background:#193e59;color:white;border:1px solid #75b0d3;border-radius:9px;font:inherit}
+.match-shell .action-pad [data-action="g"],.match-shell .action-pad [data-action="h"]{border-color:#77c6de;background:#164761}
+.match-shell .action-pad [data-action="g"][aria-pressed="true"],.match-shell .action-pad [data-action="h"][aria-pressed="true"]{background:#c4edfa;color:#0b293e}
+.match-shell .action-pad [hidden]{display:none!important}

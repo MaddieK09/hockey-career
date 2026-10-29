@@ -3,7 +3,7 @@ import {GOAL_HALF_WIDTH} from '../game/puckCollision';
  * Players are purpose-built top-down illustrated sprites drawn procedurally:
  * no WebGL, downloads, or external assets needed on iPhone.
  */
-export type HockeyPose='skate'|'glide'|'shoot'|'save'|'butterfly'|'blocker';
+export type HockeyPose='skate'|'glide'|'shoot'|'save'|'butterfly'|'blocker'|'vh'|'rvh';
 export interface CharacterFrame {
  x:number;y:number;team:0|1;goalie?:boolean;angle:number;
  time:number;speed:number;pose?:HockeyPose;selected?:boolean;number?:number;hasPuck?:boolean;
