@@ -52,6 +52,7 @@ export class HockeyMatch {
  private goalieSaveCooldown:[number,number]=[0,0];
  private lastSkaterDeflector=-1;
  private skaterDeflectionTime=0;
+ private lastBlockAnnouncement=0;
  private creaseMomentum:[number,number]=[0,0];
  constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5){
   this.periodMinutes=validPeriodMinutes(periodMinutes);
@@ -126,6 +127,7 @@ export class HockeyMatch {
   this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
+  this.lastBlockAnnouncement=0;
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -481,7 +483,10 @@ export class HockeyMatch {
   return true;
  }
  private collideSkaterPuck(previousX:number,previousY:number,previousHeight:number):boolean {
-  if(this.puck.owner>=0||this.puck.lock>0&&this.puck.shotTeam===null)return false;
+  // Stick/body shot blocks only apply to genuine high-speed attempts.
+  // Slow loose pucks are handled by possession pickup, not phantom ricochets.
+  if(this.puck.owner>=0||this.puck.shotTeam===null&&
+     (this.puck.lock>0||Math.hypot(this.puck.vx,this.puck.vy)<195))return false;
   const from:PuckPoint={x:previousX,y:previousY,z:previousHeight};
   const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
   let first:{index:number;hit:ReturnType<typeof findSkaterImpact>}|null=null;
@@ -515,7 +520,10 @@ export class HockeyMatch {
   this.puck.vx+=skater.vx*.16;this.puck.vy+=skater.vy*.16;
   this.puck.shotTeam=null;this.puck.lock=.32;
   this.lastSkaterDeflector=index;this.skaterDeflectionTime=.18;
-  this.announce(hit.surface==='stick'?'STICK DEFLECTION!':'SHOT BLOCKED!');
+  if(this.lastBlockAnnouncement<=0){
+   this.announce(hit.surface==='stick'?'STICK DEFLECTION!':'SHOT BLOCKED!',.85);
+   this.lastBlockAnnouncement=1.5;
+  }
   return true;
  }
  private stepPuck(dt:number):void {
@@ -581,6 +589,7 @@ export class HockeyMatch {
   this.goalieActionCooldown=Math.max(0,this.goalieActionCooldown-dt);
   this.puck.lock=Math.max(0,this.puck.lock-dt);
   this.skaterDeflectionTime=Math.max(0,this.skaterDeflectionTime-dt);
+  this.lastBlockAnnouncement=Math.max(0,this.lastBlockAnnouncement-dt);
   for(const team of [0,1] as Team[])this.goalieSaveCooldown[team]=Math.max(0,this.goalieSaveCooldown[team]-dt);
   if(this.puck.owner>=0)this.possessionTime[this.skaters[this.puck.owner].team]+=dt;
   if(this.phase==='goal'||this.phase==='intermission'){
