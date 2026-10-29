@@ -111,10 +111,16 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  }
  const puck=project(m.puck.x,m.puck.y);
  if(!puck.behind){
-  oval(c,puck.x,puck.y,Math.max(3,5*puck.scale),Math.max(2,2*puck.scale),'rgba(19,42,59,.16)');
+  // A shadow and contrast halo make the puck readable over dark equipment.
+  oval(c,puck.x,puck.y,Math.max(4,7*puck.scale),Math.max(2,3*puck.scale),'rgba(19,42,59,.24)');
   oval(c,puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(3,8*puck.scale),Math.max(2,3*puck.scale),'#182631');
   c.beginPath();c.ellipse(puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(8,15*puck.scale),Math.max(5,9*puck.scale),0,0,TAU);
-  c.strokeStyle='#ffd34f';c.lineWidth=2;c.stroke();
+  c.strokeStyle='#ffd34f';c.lineWidth=2.8;c.stroke();
+  if(Math.hypot(m.puck.vx,m.puck.vy)>125){
+   const mag=Math.hypot(m.puck.vx,m.puck.vy);
+   const trail=project(m.puck.x-m.puck.vx/mag*22,m.puck.y-m.puck.vy/mag*22);
+   if(!trail.behind)ln(c,trail.x,trail.y-m.puck.height*trail.scale*.8,puck.x,puck.y-m.puck.height*puck.scale*.8,2,'rgba(255,211,79,.55)');
+  }
  }
  c.fillStyle='rgba(8,29,47,.8)';c.fillRect(12,12,220,30);
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
