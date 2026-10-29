@@ -95,10 +95,10 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  };
  drawGoal(direction===1?740:60,1);
  if(goalieMode)drawGoal(60,.52);
- type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;vy:number;heading:number;shotAnimation:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1};
+ type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;vy:number;heading:number;shotAnimation:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1;stridePhase:number;pushStrength:number;pushDirection:number;weightShift:number};
  const actors:Actor[]=[
   ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,vy:s.vy,heading:s.heading,shotAnimation:s.shotAnimation,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0 as const})),
-  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vx,vy:g.vy,heading:0,shotAnimation:0,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide,holdTime:g.holdTime,coverTime:g.coverTime,releaseTime:g.releaseTime,postBlend:g.postBlend,postSide:g.postSide}))
+  ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vx,vy:g.vy,heading:0,shotAnimation:0,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide,holdTime:g.holdTime,coverTime:g.coverTime,releaseTime:g.releaseTime,postBlend:g.postBlend,postSide:g.postSide,stridePhase:g.stridePhase,pushStrength:g.pushStrength,pushDirection:g.pushDirection,weightShift:g.weightShift}))
  ];
  // Distant skaters first; selected goalie drawn last, as an NHL goalie camera.
  actors.sort((a,b)=>(direction===1?b.x-a.x:a.x-b.x));
@@ -144,7 +144,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1},time:number,back:boolean){
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1;stridePhase:number;pushStrength:number;pushDirection:number;weightShift:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
  const dark='#193146',drop=a.goalie?clamp(a.stance+(a.reaction==='pads'?Math.sin((.52-a.reactionTime)/.52*Math.PI)*.32:0),0,1):0;
  const impact=a.goalie&&a.reactionTime>0?Math.sin((.52-a.reactionTime)/.52*Math.PI):0;
@@ -156,28 +156,29 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const stride=Math.sin(time*(6+skating*9)+a.num*.9)*9*skating;
  const shot=a.goalie?0:clamp(a.shotAnimation/.3,0,1);
  const shotWindup=shot>0?Math.sin((1-shot)*Math.PI):0;
- const lateral=a.goalie?clamp(a.vy/120,-1,1):0;
+ const lateral=a.goalie?clamp(a.weightShift,-1,1):0;
  const skateLean=a.goalie?lateral*(1-drop)*.13:clamp(a.vy/250,-.14,.14);
-  // Goalies move with alternating C-cut shuffles when standing and
-  // a single loaded-leg push when sliding in butterfly.
+  // Footwork is driven by the engine's actual skate-push phase and momentum.
   const shuffleSpeed=a.goalie?clamp(Math.abs(a.vy)/85,0,1):0;
-  const shufflePhase=Math.sin(time*(5+shuffleSpeed*6)+a.num*.9);
-  const push=shuffleSpeed*shufflePhase*(1-drop);
-  const butterflyPush=drop*shuffleSpeed*Math.sin(time*6+a.num);
+  const pushPhase=a.goalie?Math.sin(a.stridePhase):0;
+  const loadedFoot=a.pushDirection>0?-1:1;
+  const push=a.goalie?a.pushStrength*pushPhase*(1-drop):0;
+  const butterflyPush=a.goalie?drop*a.pushStrength*Math.sin(a.stridePhase*.7):0;
  // Butterfly based on a real goalie: both knees drive down and inward,
  // while the pad faces rotate out to form a continuous seal along the ice.
  // All coordinates interpolate from the standing stance; no instant snap.
  const ease=drop*drop*(3-2*drop);
  // Even before a save, the goalie crouches with bent knees and a wide base.
  const bodyDrop=5+ease*11;
+ const torsoShift=a.goalie?clamp(a.weightShift,-1,1)*5:0;
  const post=clamp(a.postBlend,0,1);
  for(const side of [-1,1]){
   const postLeg=a.goalie&&a.postSide===side;
   const hipX=side*11;
-  const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
+  const kneeX=side*(12-ease*4)+(a.goalie?lateral*4+push*(side===loadedFoot?side*5:-side*2):stride*(side===1?-.5:.5));
   const kneeY=-23+ease*17;
   const skateX=side*(13+ease*31)+(a.goalie?lateral*4+push*side*9+butterflyPush*side*7:stride*side);
-  const skateY=-2+(a.goalie?Math.abs(push)*-3:0);
+  const skateY=-2+(a.goalie&&side===loadedFoot?Math.abs(push)*-5:0);
   // Thighs bend in as the knees settle close together.
   ln(c,hipX,-34+bodyDrop,kneeX,kneeY,a.goalie?12:8,dark);
   if(a.goalie){
@@ -210,7 +211,7 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  }
  // Pants, jersey, shoulders.
  c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+bodyDrop,30,19,5);c.fill();
- c.save();c.translate(lean*15,bodyDrop+impact*3);c.rotate(lean+skateLean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
+ c.save();c.translate(lean*15+torsoShift,bodyDrop+impact*3);c.rotate(lean+skateLean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
  ln(c,-17,-41+bodyDrop,17,-41+bodyDrop,3,trim);ln(c,-18,-64+bodyDrop,18,-64+bodyDrop,2,trim);
  const armY=-43+bodyDrop;
  const cover=a.goalie?clamp(a.coverTime/.55,0,1):0;
@@ -226,7 +227,7 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const rightWrist={x:39+blockerLift*.23+outlet*19-push*2,y:armY-blockerLift+cover*33-outlet*16+Math.abs(push)*2};
  const shoulderY=-63+bodyDrop;
  const arm=(side:-1|1,wrist:{x:number;y:number})=>{
-  const shoulderX=side*19;
+  const shoulderX=side*19+torsoShift;
   const elbowX=shoulderX+(wrist.x-shoulderX)*.55+side*9;
   const elbowY=shoulderY+(wrist.y-shoulderY)*.56+5;
   ln(c,shoulderX,shoulderY,elbowX,elbowY,12,jersey);
