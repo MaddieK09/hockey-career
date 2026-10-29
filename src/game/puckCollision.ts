@@ -7,6 +7,7 @@ export type SaveSurface='stick'|'pads'|'body'|'mask'|'glove'|'blocker';
 export interface GoalieCollider {
  x:number;y:number;team:0|1;stance:number;
  saveHand:'glove'|'blocker'|null;saveReach:number;
+ postBlend?:number;postSide?:-1|0|1;pose?:string;
 }
 export interface SweepHit {time:number;normal:PuckPoint}
 export interface EquipmentHit extends SweepHit {surface:SaveSurface;point:PuckPoint}
@@ -63,6 +64,19 @@ export function findGoalieImpact(a:PuckPoint,b:PuckPoint,g:GoalieCollider):Equip
  const shapes:{surface:SaveSurface;volume:Box}[]=[];
  // A low stick is well ahead of the body, with a small lateral footprint.
  shapes.push({surface:'stick',volume:box(g.x+facing*13,g.x+facing*54,g.y-10,g.y+10,0,6)});
+ // VH: upright post pad and low far pad. RVH: post pad seals ice and far leg braces.
+ // These shapes are additional physical equipment, never a scoring override.
+ const post=Math.max(0,Math.min(1,g.postBlend??0));
+ if(post>.02&&g.postSide){
+  const yPost=g.y+g.postSide*17;
+  if(g.pose==='vh'){
+   shapes.push({surface:'pads',volume:box(g.x-14,g.x+14,yPost-9*post,yPost+9*post,0,65*post)});
+   shapes.push({surface:'pads',volume:box(g.x-13,g.x+13,g.y-g.postSide*32-9,g.y-g.postSide*32+9,0,18)});
+  }else if(g.pose==='rvh'){
+   shapes.push({surface:'pads',volume:box(g.x-14,g.x+14,yPost-13*post,yPost+13*post,0,20)});
+   shapes.push({surface:'body',volume:box(g.x-13,g.x+13,g.y-15,g.y+15,12,54)});
+  }
+ }
  // Individual body regions never depend on a random save percentage.
  shapes.push({surface:'pads',volume:box(g.x-15,g.x+15,g.y-(18+16*drop),g.y+(18+16*drop),0,20)});
  shapes.push({surface:'body',volume:box(g.x-13,g.x+13,g.y-17,g.y+17,17,61)});
