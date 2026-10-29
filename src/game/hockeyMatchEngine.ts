@@ -314,8 +314,8 @@ export class HockeyMatch {
    targetX/=magnitude;targetY/=magnitude;
    const butterfly=g.pose==='butterfly';
    const recovering=g.stance>.05&&g.pose==='glide';
-   const topSpeed=(butterfly?66:recovering?70:user?170+this.rating.speed*.28:123)*this.paceFactor;
-   const accel=butterfly?250:recovering?300:640;
+   const topSpeed=(butterfly?56:recovering?68:user?132+this.rating.speed*.22:115)*this.paceFactor;
+   const accel=butterfly?205:recovering?290:470;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
    // Braking is stronger than acceleration to keep small crease corrections precise.
    const maxChange=(Math.hypot(targetX,targetY)<.08?accel*1.8:accel)*dt;
@@ -325,7 +325,8 @@ export class HockeyMatch {
    g.vy+=change>maxChange?dy/change*maxChange:dy;
    const minX=g.team===0?72:672,maxX=g.team===0?128:728;
    const nextX=clamp(g.x+g.vx*dt,minX,maxX);
-   const nextY=clamp(g.y+g.vy*dt,178,262);
+   // Wider net requires lateral post-to-post coverage, but the goalie cannot leave the crease.
+   const nextY=clamp(g.y+g.vy*dt,163,277);
    if(nextX===g.x&&Math.sign(g.vx)===Math.sign(g.x-(minX+maxX)/2))g.vx=0;
    if(nextY===g.y&&Math.sign(g.vy)===Math.sign(g.y-220))g.vy=0;
    g.x=nextX;g.y=nextY;
