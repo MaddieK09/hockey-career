@@ -121,3 +121,20 @@
  .match-shell .scorebug-timer strong{font-size:13px}
  .match-shell .scorebug-timer small{font-size:8px}
 }
+
+/* True broadcast overlay: the live score stays inside the gameplay viewport. */
+.match-shell .rink-scorebug-slot{position:absolute;z-index:7;top:8px;left:50%;transform:translateX(-50%);pointer-events:none;max-width:calc(100% - 12px)}
+.match-shell .rink-scorebug-slot .scorebug{min-height:34px;border-color:#d7e4ee;box-shadow:0 2px 8px #001b2b99}
+.match-shell .rink-scorebug-slot .scorebug-team{padding:3px 7px;gap:6px}
+.match-shell .rink-scorebug-slot .scorebug-team strong{font-size:17px}
+.match-shell .rink-scorebug-slot .scorebug-timer{padding:2px 7px;min-width:62px}
+.match-shell .rink-scorebug-slot .scorebug-timer strong{font-size:13px}
+.match-shell .rink-scorebug-slot .scorebug-timer small{font-size:8px}
+@media(max-width:420px){
+ .match-shell .rink-scorebug-slot{top:5px}
+ .match-shell .rink-scorebug-slot .scorebug{min-height:28px}
+ .match-shell .rink-scorebug-slot .scorebug-team{font-size:9px;padding:2px 5px;gap:4px}
+ .match-shell .rink-scorebug-slot .scorebug-team strong{font-size:14px}
+ .match-shell .rink-scorebug-slot .scorebug-timer{min-width:50px;padding:2px 5px}
+ .match-shell .rink-scorebug-slot .scorebug-timer strong{font-size:11px}
+}
