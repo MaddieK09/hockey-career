@@ -116,6 +116,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  // Distant skaters first; selected goalie drawn last, as an NHL goalie camera.
  actors.sort((a,b)=>(direction===1?b.x-a.x:a.x-b.x));
  const selectedGoalie=goalieMode?actors.find(a=>a.goalie&&a.team===0):undefined;
+ const puckScreen=project(m.puck.x,m.puck.y);
  for(const a of actors){
   if(a===selectedGoalie)continue;
   const p=project(a.x,a.y);if(p.behind)continue;
