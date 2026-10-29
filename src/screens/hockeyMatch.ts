@@ -37,6 +37,7 @@ export function mountHockeyMatch(
   +'</div></header>'
   +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
+  +'<div class="rink-scorebug-slot" data-rink-scorebug></div>'
   +'<div class="goal-banner" data-goal-banner hidden><span data-goal-team>HOME</span><strong>GOAL!</strong></div>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
@@ -61,6 +62,8 @@ export function mountHockeyMatch(
  const awayScore=root.querySelector<HTMLElement>('[data-away-score]')!;
  const periodLabel=root.querySelector<HTMLElement>('[data-period]')!;
  const scorebug=root.querySelector<HTMLElement>('.scorebug')!;
+ const scorebugSlot=root.querySelector<HTMLElement>('[data-rink-scorebug]')!;
+ scorebugSlot.appendChild(scorebug);
  const goalBanner=root.querySelector<HTMLElement>('[data-goal-banner]')!;
  const goalTeam=root.querySelector<HTMLElement>('[data-goal-team]')!;
  const clock=root.querySelector<HTMLElement>('[data-clock]')!;

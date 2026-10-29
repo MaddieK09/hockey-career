@@ -157,7 +157,13 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const shot=a.goalie?0:clamp(a.shotAnimation/.3,0,1);
  const shotWindup=shot>0?Math.sin((1-shot)*Math.PI):0;
  const lateral=a.goalie?clamp(a.vy/120,-1,1):0;
- const skateLean=a.goalie?lateral*(1-drop)*.09:clamp(a.vy/250,-.14,.14);
+ const skateLean=a.goalie?lateral*(1-drop)*.13:clamp(a.vy/250,-.14,.14);
+  // Goalies move with alternating C-cut shuffles when standing and
+  // a single loaded-leg push when sliding in butterfly.
+  const shuffleSpeed=a.goalie?clamp(Math.abs(a.vy)/85,0,1):0;
+  const shufflePhase=Math.sin(time*(5+shuffleSpeed*6)+a.num*.9);
+  const push=shuffleSpeed*shufflePhase*(1-drop);
+  const butterflyPush=drop*shuffleSpeed*Math.sin(time*6+a.num);
  // Butterfly based on a real goalie: both knees drive down and inward,
  // while the pad faces rotate out to form a continuous seal along the ice.
  // All coordinates interpolate from the standing stance; no instant snap.
@@ -168,8 +174,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
   const hipX=side*11;
   const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
   const kneeY=-23+ease*17;
-  const skateX=side*(13+ease*31)+(a.goalie?lateral*4:stride*side);
-  const skateY=-2;
+  const skateX=side*(13+ease*31)+(a.goalie?lateral*4+push*side*9+butterflyPush*side*7:stride*side);
+  const skateY=-2+(a.goalie?Math.abs(push)*-3:0);
   // Thighs bend in as the knees settle close together.
   ln(c,hipX,-34+bodyDrop,kneeX,kneeY,a.goalie?12:8,dark);
   if(a.goalie){
@@ -214,8 +220,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  // Anatomical two-bone arms: shoulders -> articulated elbows -> wrists.
  // The elbow follows the wrist at half speed, preventing glove/blocker
  // from floating or snapping independently of the player's shoulders.
- const leftWrist={x:-39-gloveLift*.23,y:armY-gloveLift+cover*38+(hold?-10:0)};
- const rightWrist={x:39+blockerLift*.23+outlet*19,y:armY-blockerLift+cover*33-outlet*16};
+ const leftWrist={x:-39-gloveLift*.23+push*2,y:armY-gloveLift+cover*38+(hold?-10:0)+Math.abs(push)*2};
+ const rightWrist={x:39+blockerLift*.23+outlet*19-push*2,y:armY-blockerLift+cover*33-outlet*16+Math.abs(push)*2};
  const shoulderY=-63+bodyDrop;
  const arm=(side:-1|1,wrist:{x:number;y:number})=>{
   const shoulderX=side*19;

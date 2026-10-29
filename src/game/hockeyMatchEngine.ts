@@ -11,7 +11,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;saveTarget:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
@@ -26,8 +26,8 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0},
-  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0}
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0},
+  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
  scores:[number,number]=[0,0];
@@ -57,7 +57,7 @@ export class HockeyMatch {
  }
  private releaseGoalie(team:Team):void{
   const g=this.goalies[team];if(g.holdTime<=0)return;
-  g.holdTime=0;g.releaseTime=.55;g.saveHand=null;
+  g.holdTime=0;g.releaseTime=.55;g.saveHand=null;g.saveTarget=0;
   const forward=team===0?1:-1;
   // Controlled release into the defensive-zone boards; no instant teleport pass.
   this.puck.owner=-1;this.puck.x=g.x+forward*32;this.puck.y=clamp(g.y+(g.y<220?-37:37),60,380);
@@ -112,7 +112,7 @@ export class HockeyMatch {
     goalie.pose=goalie.pose==='butterfly'?'glide':'butterfly';
     goalie.poseTime=0;goalie.actionTime=.18;
    }else if((action==='blocker'||action==='glove')&&this.goalieActionCooldown<=0){
-    goalie.saveHand=action;goalie.saveReach=1;goalie.poseTime=.46;goalie.actionTime=.46;
+    goalie.saveHand=action;goalie.saveTarget=1;goalie.poseTime=.46;goalie.actionTime=.46;
     this.goalieActionCooldown=.38;
    }else if(action==='poke'&&this.goalieActionCooldown<=0){
     // Start an actual stick thrust. Contact is evaluated during the animation,
@@ -153,7 +153,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;g.holdTime=g.coverTime=g.releaseTime=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=g.saveTarget=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;g.holdTime=g.coverTime=g.releaseTime=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
   this.lastBlockAnnouncement=0;
@@ -314,8 +314,8 @@ export class HockeyMatch {
    targetX/=magnitude;targetY/=magnitude;
    const butterfly=g.pose==='butterfly';
    const recovering=g.stance>.05&&g.pose==='glide';
-   const topSpeed=(butterfly?66:recovering?70:user?170+this.rating.speed*.28:123)*this.paceFactor;
-   const accel=butterfly?250:recovering?300:640;
+   const topSpeed=(butterfly?56:recovering?68:user?132+this.rating.speed*.22:115)*this.paceFactor;
+   const accel=butterfly?205:recovering?290:470;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
    // Braking is stronger than acceleration to keep small crease corrections precise.
    const maxChange=(Math.hypot(targetX,targetY)<.08?accel*1.8:accel)*dt;
@@ -325,7 +325,8 @@ export class HockeyMatch {
    g.vy+=change>maxChange?dy/change*maxChange:dy;
    const minX=g.team===0?72:672,maxX=g.team===0?128:728;
    const nextX=clamp(g.x+g.vx*dt,minX,maxX);
-   const nextY=clamp(g.y+g.vy*dt,178,262);
+   // Wider net requires lateral post-to-post coverage, but the goalie cannot leave the crease.
+   const nextY=clamp(g.y+g.vy*dt,163,277);
    if(nextX===g.x&&Math.sign(g.vx)===Math.sign(g.x-(minX+maxX)/2))g.vx=0;
    if(nextY===g.y&&Math.sign(g.vy)===Math.sign(g.y-220))g.vy=0;
    g.x=nextX;g.y=nextY;
@@ -335,8 +336,11 @@ export class HockeyMatch {
    g.reactionTime=Math.max(0,g.reactionTime-dt);
    if(g.reactionTime===0)g.reaction=null;
    g.pokeTime=Math.max(0,g.pokeTime-dt);
-   g.saveReach=Math.max(0,g.saveReach-dt*2.5);
-   if(g.saveReach===0)g.saveHand=null;
+   // Rise and retract on separate smooth phases, without snapping the glove or blocker.
+   if(g.poseTime<.21&&g.holdTime<=0)g.saveTarget=0;
+   const reachSpeed=g.saveTarget>g.saveReach?6:3.7;
+   g.saveReach+=clamp(g.saveTarget-g.saveReach,-dt*reachSpeed,dt*reachSpeed);
+   if(g.saveReach<.001&&g.saveTarget===0){g.saveReach=0;g.saveHand=null;}
    g.poseTime=Math.max(0,g.poseTime-dt);
    if(g.pose==='blocker'&&g.poseTime===0)g.pose='glide';
   }
@@ -450,7 +454,7 @@ export class HockeyMatch {
   goalie.reactionTime=.56;
   goalie.reactionSide=impact.point.y-goalie.y;
   if(contact==='glove'||contact==='blocker'){
-   goalie.saveHand=contact;goalie.saveReach=1;
+   goalie.saveHand=contact;goalie.saveTarget=1;goalie.poseTime=Math.max(goalie.poseTime,.46);
   }else if(contact==='pads'){
    goalie.poseTime=.35;
    if(!this.goalieCareer||goalie.team!==0)goalie.pose='butterfly';
@@ -466,7 +470,7 @@ export class HockeyMatch {
    // A clean glove save stays live for two seconds. The user may pass or
    // cover/freeze; timeout or AI catches whistle for a faceoff.
    goalie.holdTime=2;
-   goalie.saveHand='glove';goalie.saveReach=1;
+   goalie.saveHand='glove';goalie.saveTarget=1;goalie.poseTime=Math.max(goalie.poseTime,.46);
    this.puck.x=goalie.x+(goalie.team===0?14:-14);
    this.puck.y=goalie.y-31;this.puck.height=45;
    this.puck.vx=this.puck.vy=this.puck.vz=0;
