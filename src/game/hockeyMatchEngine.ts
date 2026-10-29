@@ -103,9 +103,9 @@ export class HockeyMatch {
     return;
    }
    if(action==='cover'&&this.canCoverPuck){
-    goalie.coverTime=.7;goalie.pose='butterfly';goalie.poseTime=.7;
+    goalie.coverTime=.55;goalie.holdTime=.55;goalie.pose='butterfly';goalie.poseTime=.7;
     this.puck.x=goalie.x+20;this.puck.y=goalie.y;this.puck.height=0;
-    this.freezeGoalie(0);return;
+    this.announce('COVERING THE PUCK!');return;
    }
    if(action==='butterfly'){
     // Toggle a persistent stance. Recovery has a genuine movement penalty.
