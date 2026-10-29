@@ -30,10 +30,14 @@ export function mountHockeyMatch(
  const actC=goalieCareer?'POKE':'SWITCH';
  root.innerHTML='<main class="career-shell match-shell">'
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
-  +'<strong>HOME <span data-score>0 - 0</span> AWAY</strong>'
-  +'<span data-clock>P1 · '+match.periodMinutes+':00</span></header>'
-  +'<div class="match-meta"><span data-shots>Shots 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
+  +'<div class="scorebug" role="status" aria-label="Live game scoreboard">'
+  +'<div class="scorebug-team scorebug-home"><span>HOM</span><strong data-home-score>0</strong></div>'
+  +'<div class="scorebug-team scorebug-away"><span>AWY</span><strong data-away-score>0</strong></div>'
+  +'<div class="scorebug-timer"><strong data-clock>'+match.periodMinutes+':00</strong><small data-period>1ST</small></div>'
+  +'</div></header>'
+  +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
+  +'<div class="goal-banner" data-goal-banner hidden><span data-goal-team>HOME</span><strong>GOAL!</strong></div>'
   +'<div class="rink-hud"><span>HOME · RED</span><span data-event>FACE OFF</span><span>AWAY · BLUE</span></div></div>'
   +'<div class="match-controls"><div class="move-pad" data-stick><span class="move-knob" data-knob></span><small>MOVE</small></div>'
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
@@ -53,7 +57,12 @@ export function mountHockeyMatch(
   +'</p><section class="match-result" data-result hidden></section></main>';
  const canvas=root.querySelector<HTMLCanvasElement>('[data-rink]')!;
  const ctx=canvas.getContext('2d')!;
- const score=root.querySelector<HTMLElement>('[data-score]')!;
+ const homeScore=root.querySelector<HTMLElement>('[data-home-score]')!;
+ const awayScore=root.querySelector<HTMLElement>('[data-away-score]')!;
+ const periodLabel=root.querySelector<HTMLElement>('[data-period]')!;
+ const scorebug=root.querySelector<HTMLElement>('.scorebug')!;
+ const goalBanner=root.querySelector<HTMLElement>('[data-goal-banner]')!;
+ const goalTeam=root.querySelector<HTMLElement>('[data-goal-team]')!;
  const clock=root.querySelector<HTMLElement>('[data-clock]')!;
  const shots=root.querySelector<HTMLElement>('[data-shots]')!;
  const event=root.querySelector<HTMLElement>('[data-event]')!;
@@ -179,7 +188,7 @@ export function mountHockeyMatch(
   if(cameraMode!=='overhead'){
    if(cameraMode==='player'||cameraMode==='goalie')drawChaseHockey(ctx,match,cameraMode,t,goalieDistance);
    else drawSideHockey(ctx,match,cameraMode,t);
-   if(match.phase==='goal'||match.phase==='intermission'){
+   if(match.phase==='intermission'){
     ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
     ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(match.message,400,225);
    }
@@ -236,7 +245,7 @@ export function mountHockeyMatch(
   ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y-puck.height,6.7,5.5,0,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#8395a4';ctx.lineWidth=1;ctx.stroke();
-  if(match.phase==='goal'||match.phase==='intermission'){
+  if(match.phase==='intermission'){
    ctx.fillStyle='rgba(4,25,44,.63)';ctx.fillRect(240,167,320,105);
    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 34px system-ui';
    ctx.fillText(match.message,400,229);
@@ -264,10 +273,19 @@ export function mountHockeyMatch(
   const dt=Math.min((now-last)/1000,.04);last=now;
   if(!paused){visualTime+=dt;match.step(dt);cameraNotice=Math.max(0,cameraNotice-dt);}
   syncMovement();
-  score.textContent=match.scores[0]+' - '+match.scores[1];
-  shots.textContent='Shots '+match.shots[0]+' - '+match.shots[1];
+  homeScore.textContent=String(match.scores[0]);
+  awayScore.textContent=String(match.scores[1]);
+  scorebug.classList.toggle('scorebug-goal',match.phase==='goal');
+  goalBanner.hidden=match.phase!=='goal';
+  if(match.phase==='goal'){
+   const isHome=match.message.startsWith('HOME');
+   goalTeam.textContent=isHome?'HOME':'AWAY';
+   goalBanner.classList.toggle('goal-banner-away',!isHome);
+  }
+  shots.textContent='SOG '+match.shots[0]+' - '+match.shots[1];
   const remaining=Math.ceil(match.timeRemaining);
-  clock.textContent='P'+match.period+' · '+Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0');
+  clock.textContent=Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0');
+  periodLabel.textContent=match.period===1?'1ST':match.period===2?'2ND':'3RD';
   event.textContent=match.message;
   if(goalieCareer){
    const danger=match.puck.shotTeam===1&&match.puck.owner<0;

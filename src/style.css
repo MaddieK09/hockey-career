@@ -91,3 +91,33 @@
 .match-shell .action-pad [data-action="d"]{background:#286e88;border-color:#b5e6f4}
 .match-shell .camera-options button[data-distance]{background:#16344d;border-color:#658fa9}
 .match-shell .camera-options button[data-distance][aria-pressed=true]{background:#b5e8ff;color:#09263a}
+
+/* Broadcast / CHEL-inspired scorebug. Compact enough for portrait iPhones. */
+.match-shell .career-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.match-shell .career-top>[data-exit]{font-size:11px;padding:9px 10px;white-space:nowrap;flex-shrink:0}
+.match-shell .scorebug{display:flex;align-items:stretch;overflow:hidden;border:1px solid #87a7ba;border-radius:5px;background:#182632;box-shadow:0 2px 11px #0007;min-height:44px;letter-spacing:0;flex-shrink:0}
+.match-shell .scorebug-team{display:flex;align-items:center;gap:8px;padding:4px 9px;color:white;font-size:12px;font-weight:900;letter-spacing:.04em}
+.match-shell .scorebug-team span{color:#fff;line-height:1}
+.match-shell .scorebug-team strong{color:#fff;display:grid;place-items:center;min-width:21px;font-size:20px;font-variant-numeric:tabular-nums;line-height:1}
+.match-shell .scorebug-home{background:#af3042}
+.match-shell .scorebug-away{background:#205d91}
+.match-shell .scorebug-timer{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:3px 9px;min-width:71px;color:#fff;background:#15212c}
+.match-shell .scorebug-timer strong{color:#fff;font-size:15px;line-height:1.1;font-weight:900;font-variant-numeric:tabular-nums}
+.match-shell .scorebug-timer small{color:#cddce8;font-size:9px;letter-spacing:.05em;font-weight:800}
+.match-shell .scorebug-goal{box-shadow:0 0 0 2px #f7df68,0 0 18px #f7df6855}
+.match-shell .goal-banner[hidden]{display:none!important}
+.match-shell .goal-banner{position:absolute;z-index:6;top:21%;left:50%;transform:translateX(-50%);min-width:180px;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 16px;border:1px solid #aafcfa;border-radius:4px;background:linear-gradient(100deg,#125b74,#159a9f);box-shadow:0 4px 14px #00354a99;color:#fff;text-shadow:0 1px 2px #001827;pointer-events:none;animation:goal-pulse .46s ease-out both}
+.match-shell .goal-banner span{font-size:12px;font-weight:900;letter-spacing:.06em;border-right:1px solid #c9fafa88;padding-right:12px}
+.match-shell .goal-banner strong{font-size:clamp(20px,5vw,30px);font-weight:1000;letter-spacing:.06em;line-height:1}
+.match-shell .goal-banner-away{background:linear-gradient(100deg,#133e75,#377ac2)}
+@keyframes goal-pulse{0%{opacity:.25;transform:translateX(-50%) scale(.78)}70%{opacity:1;transform:translateX(-50%) scale(1.08)}100%{opacity:1;transform:translateX(-50%) scale(1)}}
+@media(max-width:420px){
+ .match-shell .career-top{gap:5px}
+ .match-shell .career-top>[data-exit]{font-size:10px;padding:8px 7px}
+ .match-shell .scorebug{min-height:38px}
+ .match-shell .scorebug-team{gap:5px;padding:3px 6px;font-size:10px}
+ .match-shell .scorebug-team strong{font-size:17px;min-width:16px}
+ .match-shell .scorebug-timer{padding:3px 6px;min-width:61px}
+ .match-shell .scorebug-timer strong{font-size:13px}
+ .match-shell .scorebug-timer small{font-size:8px}
+}
