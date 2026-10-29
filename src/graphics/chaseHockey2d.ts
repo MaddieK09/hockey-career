@@ -22,18 +22,18 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(goalieMode){cameraDepth=60;cameraLateral=220;}
  else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?0:Math.max(0,cameraDepth-55);
- const cameraFactor=goalieDistance==='close'?1.14:goalieDistance==='far'?.80:1;
+ const cameraFactor=goalieDistance==='close'?1.18:goalieDistance==='far'?.83:1;
  const cameraElevation=goalieDistance==='close'?13:goalieDistance==='far'?-9:0;
  // The original camera compresses almost the whole rink into a thin row.
  // Increase perspective depth separation so approaching skaters actually grow.
- const perspectiveDistance=goalieMode?(goalieDistance==='close'?290:goalieDistance==='far'?500:365):310;
- const horizon=goalieMode?72+cameraElevation:100;
+ const perspectiveDistance=goalieMode?(goalieDistance==='close'?245:goalieDistance==='far'?410:310):270;
+ const horizon=goalieMode?66+cameraElevation:100;
  // Perspective: width grows toward camera. Near bodies are much larger.
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
   const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.24:.27,1.15);
-  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+315*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.7*cameraFactor:1.45),behind:along< -25};
+  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+350*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.8*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
@@ -108,7 +108,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   const p=project(a.x,a.y);if(p.behind)continue;
   // Fade skaters directly in the goalie sightline instead of letting a
   // foreground jersey completely hide the puck and the attacking formation.
-  const obstructs=goalieMode&&!a.goalie&&Math.abs(p.x-400)<72&&a.x<245;
+  const obstructs=goalieMode&&!a.goalie&&Math.abs(p.x-400)<85&&a.x<210;
   c.save();if(obstructs)c.globalAlpha=.56;
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
   c.restore();
