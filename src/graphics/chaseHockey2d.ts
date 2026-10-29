@@ -19,7 +19,13 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  const direction=goalieMode?1:(m.skaters[m.selected].team===0?1:-1);
  const goalDepth=direction===1?controlled.x:800-controlled.x;
  if(previousMode!==mode){cameraDepth=goalieMode?60:goalDepth;cameraLateral=goalieMode?220:controlled.y;previousMode=mode;}
- if(goalieMode){cameraDepth=60;cameraLateral=220;}
+ if(goalieMode){
+  cameraDepth=60;
+  // Small puck-side lookahead preserves the crease in frame while following
+  // wide attacks; never pan all the way to a skater and lose the net.
+  const targetLane=clamp(220+(m.puck.y-220)*.18,192,248);
+  cameraLateral+=(targetLane-cameraLateral)*.075;
+ }
  else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?0:Math.max(0,cameraDepth-55);
  const cameraFactor=goalieDistance==='close'?1.10:goalieDistance==='far'?.88:1;
@@ -113,10 +119,16 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  for(const a of actors){
   if(a===selectedGoalie)continue;
   const p=project(a.x,a.y);if(p.behind)continue;
+  // A subtle skate shadow lets nearby players be judged by their ice position.
+  if(!a.goalie&&p.scale>.30)oval(c,p.x,p.y+2,Math.max(5,13*p.scale),Math.max(2,5*p.scale),'rgba(18,55,80,.15)');
   // Fade skaters directly in the goalie sightline instead of letting a
   // foreground jersey completely hide the puck and the attacking formation.
-  const obstructs=goalieMode&&!a.goalie&&Math.abs(p.x-400)<85&&a.x<210;
-  c.save();if(obstructs)c.globalAlpha=.56;
+  // Fade only foreground skaters that genuinely overlap the puck sightline.
+  // The rest of the formation stays opaque for player/position readability.
+  const obstructs=goalieMode&&!a.goalie&&a.x<300&&
+   Math.abs(p.x-puckScreen.x)<Math.max(22,35*p.scale)&&
+   Math.abs(p.y-puckScreen.y)<Math.max(18,48*p.scale);
+  c.save();if(obstructs)c.globalAlpha=.38;
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
   c.restore();
  }
