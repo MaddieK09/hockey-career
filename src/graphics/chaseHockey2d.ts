@@ -22,18 +22,18 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(goalieMode){cameraDepth=60;cameraLateral=220;}
  else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?0:Math.max(0,cameraDepth-55);
- const cameraFactor=goalieDistance==='close'?1.30:goalieDistance==='far'?.72:1;
+ const cameraFactor=goalieDistance==='close'?1.14:goalieDistance==='far'?.80:1;
  const cameraElevation=goalieDistance==='close'?13:goalieDistance==='far'?-9:0;
  // The original camera compresses almost the whole rink into a thin row.
  // Increase perspective depth separation so approaching skaters actually grow.
- const perspectiveDistance=goalieMode?(goalieDistance==='close'?205:goalieDistance==='far'?320:255):260;
- const horizon=goalieMode?95+cameraElevation:117;
+ const perspectiveDistance=goalieMode?(goalieDistance==='close'?290:goalieDistance==='far'?500:365):310;
+ const horizon=goalieMode?72+cameraElevation:100;
  // Perspective: width grows toward camera. Near bodies are much larger.
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
   const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.24:.27,1.15);
-  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+310*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.9*cameraFactor:1.45),behind:along< -25};
+  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+315*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.7*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
