@@ -14,8 +14,8 @@ export type GoalSurface='post'|'crossbar'|'mesh'|'goal';
 export interface GoalHit extends SweepHit {surface:GoalSurface;point:PuckPoint}
 interface Box {min:PuckPoint;max:PuckPoint}
 export const PUCK_RADIUS=3;
-export const GOAL_HALF_WIDTH=34;
-export const GOAL_HEIGHT=64;
+export const GOAL_HALF_WIDTH=50;
+export const GOAL_HEIGHT=80;
 export const POST_RADIUS=4;
 const EPS=1e-8;
 const at=(a:PuckPoint,b:PuckPoint,t:number):PuckPoint=>({
@@ -61,9 +61,9 @@ export function findGoalieImpact(a:PuckPoint,b:PuckPoint,g:GoalieCollider):Equip
  const facing=g.team===0?1:-1,drop=Math.max(0,Math.min(1,g.stance));
  const shapes:{surface:SaveSurface;volume:Box}[]=[];
  // A low stick is well ahead of the body, with a small lateral footprint.
- shapes.push({surface:'stick',volume:box(g.x+facing*13,g.x+facing*54,g.y-11,g.y+11,0,6)});
+ shapes.push({surface:'stick',volume:box(g.x+facing*12,g.x+facing*38,g.y-7,g.y+7,0,5)});
  // Individual body regions never depend on a random save percentage.
- shapes.push({surface:'pads',volume:box(g.x-15,g.x+15,g.y-(19+23*drop),g.y+(19+23*drop),0,20)});
+ shapes.push({surface:'pads',volume:box(g.x-15,g.x+15,g.y-(17+15*drop),g.y+(17+15*drop),0,20)});
  shapes.push({surface:'body',volume:box(g.x-13,g.x+13,g.y-17,g.y+17,17,61)});
  shapes.push({surface:'mask',volume:box(g.x-11,g.x+11,g.y-12,g.y+12,61,83)});
  if(g.saveReach>.05&&g.saveHand){
