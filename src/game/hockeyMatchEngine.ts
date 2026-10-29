@@ -17,7 +17,7 @@ export interface MatchSkater {
 export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;saveTarget:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1;stridePhase:number;pushStrength:number;pushDirection:number;weightShift:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
- shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
+ shotTeam:Team|null;countedShotTeam?:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
 }
 export interface MatchEvent {kind:'goal'|'save'|'shot'|'faceoff'|'period'|'final';team?:Team;message:string}
 export interface MatchControls {x:number;y:number}
@@ -79,7 +79,7 @@ export class HockeyMatch {
   // Controlled release into the defensive-zone boards; no instant teleport pass.
   this.puck.owner=-1;this.puck.x=g.x+forward*32;this.puck.y=clamp(g.y+(g.y<220?-37:37),60,380);
   this.puck.height=8;this.puck.vx=forward*260;this.puck.vy=g.y<220?-145:145;this.puck.vz=58;
-  this.puck.lock=.35;this.puck.shotTeam=null;this.goalieSaveCooldown[team]=.4;
+  this.puck.lock=.35;this.puck.shotTeam=null;this.puck.countedShotTeam=null;this.goalieSaveCooldown[team]=.4;
   this.announce('GOALIE PLAYS THE PUCK!');
  }
  private rating:MatchRating;
@@ -180,7 +180,7 @@ export class HockeyMatch {
   this.lastBlockAnnouncement=0;
   const carrier=team===0?0:5;
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
-   vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
+   vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,countedShotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
   this.lastPasser=-1;this.decisionCooldown=[1.5,1.5];this.possessionTime=[0,0];
   this.shotClock=[8+this.rng()*4,8+this.rng()*4];
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
@@ -191,6 +191,7 @@ export class HockeyMatch {
   this.puck.owner=-1;this.puck.x=a.x+nx*24;this.puck.y=a.y+ny*24;
   this.puck.vx=nx*power;this.puck.vy=ny*power;this.puck.lock=.33;
   this.puck.shotTeam=shot?a.team:null;
+  this.puck.countedShotTeam=shot?a.team:null;
   this.puck.lastShooter=shot?owner:-1;
   this.puck.shotHeight=shot&&this.rng()<.58?'low':'high';
   this.puck.height=shot?(this.puck.shotHeight==='high'?13:3):0;
@@ -424,6 +425,7 @@ export class HockeyMatch {
   if(nearest>=0){
    if(this.puck.height>9)return;
    this.puck.owner=nearest;this.puck.vx=this.puck.vy=0;this.puck.height=this.puck.vz=0;
+   this.puck.countedShotTeam=null;
    this.puck.shotTeam=null;
    this.puck.lock=.32;
    this.skaters[nearest].carriedFor=0;
@@ -523,6 +525,14 @@ export class HockeyMatch {
    // the post or crossbar is rejected by the frame sweep before scoring.
    const scorer:Team=to.x>from.x?0:1;
    this.scores[scorer]++;
+   // A direct shot was already recorded in shoot(). Deflected shots retain
+   // their credited origin. Loose-puck and own-goal scores still count as SOG.
+   if(this.puck.countedShotTeam!==scorer){
+    this.shots[scorer]++;
+    this.puck.countedShotTeam=scorer;
+   }
+   // Protect legacy and edge-case states where an earlier counter was lost.
+   this.shots[scorer]=Math.max(this.shots[scorer],this.scores[scorer]);
    if(scorer===0&&!this.goalieCareer&&this.puck.lastShooter===this.selected)this.goals++;
    if(scorer===0&&this.lastPasser>=0&&this.lastPasser!==this.puck.lastShooter)this.assists++;
    this.puck.x=impact.point.x;this.puck.y=impact.point.y;this.puck.height=impact.point.z;
