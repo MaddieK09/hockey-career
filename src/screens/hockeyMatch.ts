@@ -160,6 +160,8 @@ export function mountHockeyMatch(
  }
  function action(key:string){
   if(paused)return;
+  if(goalieCareer&&key==='g'){match.perform('vh');return;}
+  if(goalieCareer&&key==='h'){match.perform('rvh');return;}
   if(goalieCareer&&key==='e'){match.perform(match.goalieHolding?'freeze':'cover');return;}
   if(goalieCareer&&key==='f'){match.perform('pass');return;}
   if(key==='c'){if(goalieCareer)match.perform('poke');else match.switchSkater();return;}
@@ -178,6 +180,8 @@ export function mountHockeyMatch(
   if(e.key.toLowerCase()==='q')action('d');
   if(e.key.toLowerCase()==='f')action('e');
   if(e.key.toLowerCase()==='r')action('f');
+  if(e.key.toLowerCase()==='v')action('g');
+  if(e.key.toLowerCase()==='b')action('h');
  }
  function keyUp(e:KeyboardEvent){controls.delete(e.key.toLowerCase());syncMovement();}
  function visibility(){last=performance.now();}
