@@ -93,7 +93,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  };
  drawGoal(direction===1?740:60,1);
  if(goalieMode)drawGoal(60,.52);
- type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;vy:number;heading:number;shotAnimation:number;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
+ type Actor={x:number;y:number;team:number;goalie:boolean;pose:string;selected:boolean;vx:number;vy:number;heading:number;shotAnimation:number;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number};
  const actors:Actor[]=[
   ...m.skaters.map((s,i)=>({x:s.x,y:s.y,team:s.team,goalie:false,pose:s.shotAnimation>0?'shoot':'skate',selected:!goalieMode&&m.selected===i,vx:s.vx,vy:s.vy,heading:s.heading,shotAnimation:s.shotAnimation,num:i+10,stance:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0})),
   ...m.goalies.map((g,i)=>({x:g.x,y:g.y,team:g.team,goalie:true,pose:g.pose,selected:goalieMode&&i===0,vx:g.vx,vy:g.vy,heading:0,shotAnimation:0,num:30+i,stance:g.stance,saveHand:g.saveHand,saveReach:g.saveReach,pokeTime:g.pokeTime,reaction:g.reaction,reactionTime:g.reactionTime,reactionSide:g.reactionSide}))
@@ -142,7 +142,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
  c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
 }
-function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number},time:number,back:boolean){
+function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
  const dark='#193146',drop=a.goalie?clamp(a.stance+(a.reaction==='pads'?Math.sin((.52-a.reactionTime)/.52*Math.PI)*.32:0),0,1):0;
  const impact=a.goalie&&a.reactionTime>0?Math.sin((.52-a.reactionTime)/.52*Math.PI):0;
