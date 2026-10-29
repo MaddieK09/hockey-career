@@ -170,7 +170,9 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const ease=drop*drop*(3-2*drop);
  // Even before a save, the goalie crouches with bent knees and a wide base.
  const bodyDrop=5+ease*11;
+ const post=clamp(a.postBlend,0,1);
  for(const side of [-1,1]){
+  const postLeg=a.goalie&&a.postSide===side;
   const hipX=side*11;
   const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
   const kneeY=-23+ease*17;
