@@ -174,3 +174,38 @@ test('separation steers away from overlap without abandoning rink limits',async(
  const safe=separateFormation({x:100,y:55},{x:100,y:55},[{x:100,y:55}]);
  assert.ok(safe.y>=55&&safe.x>=85);
 });
+
+test('uncredited loose puck goal increases both score and shots on goal',()=>{
+ const m=setup();
+ m.puck.owner=-1;m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.countedShotTeam=null;
+ const before=m.shots[1];
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.equal(m.scores[1],1);
+ assert.equal(m.shots[1],before+1);
+});
+test('credited direct shot goal does not count the same shot twice',()=>{
+ const m=setup();
+ m.puck.owner=-1;m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.shots[1]=1;m.puck.countedShotTeam=1;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.equal(m.shots[1],1);
+ assert.equal(m.scores[1],1);
+});
+test('a rebounded goal retains its originating shot credit',()=>{
+ const m=setup();
+ m.puck.owner=-1;m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.shotTeam=null;m.puck.countedShotTeam=1;
+ m.shots[1]=1;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.equal(m.scores[1],1);
+ assert.equal(m.shots[1],1);
+});
+test('goal totals cannot exceed SOG even with stale counters',()=>{
+ const m=setup();
+ m.scores[1]=2;m.shots[1]=0;
+ m.puck.owner=-1;m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.countedShotTeam=1;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.ok(m.shots[1]>=m.scores[1]);
+});
