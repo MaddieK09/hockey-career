@@ -297,13 +297,23 @@ export class HockeyMatch {
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
   const inShootingLane=Math.abs(carrier.y-220)<120;
-  if(this.shotClock[team]<=0&&offensive&&inShootingLane&&(team===0?carrier.x>515:carrier.x<285)){
-   this.shoot(owner,clamp(220+(this.rng()-.5)*64,189,251));return;
+  const targetY=clamp(220+(this.rng()-.5)*56,192,248);
+  // Avoid firing directly into an obvious defender: create a passing lane first.
+  const laneBlocked=this.skaters.some((def,i)=>{
+   if(i===owner||def.team===team)return false;
+   const goalX=team===0?740:60,span=goalX-carrier.x;
+   const t=span===0?0:(def.x-carrier.x)/span;
+   if(t<=.04||t>=.96)return false;
+   const laneY=carrier.y+(targetY-carrier.y)*t;
+   return Math.abs(def.y-laneY)<16;
+  });
+  if(this.shotClock[team]<=0&&offensive&&inShootingLane&&!laneBlocked&&(team===0?carrier.x>515:carrier.x<285)){
+   this.shoot(owner,targetY);return;
   }
   // Longer periods need possession cycles, not skaters camping in the slot.
   // Cycle the puck while the team's next shooting opportunity develops.
-  const cycling=offensive&&this.shotClock[team]>6&&carrier.carriedFor>3;
-  if((pressured||cycling)&&carrier.carriedFor>2.2&&this.rng()<(cycling?.07:.20)){
+  const cycling=offensive&&(this.shotClock[team]>6||laneBlocked)&&carrier.carriedFor>2;
+  if((pressured||cycling)&&carrier.carriedFor>2.2&&this.rng()<(cycling?.24:.20)){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
@@ -447,13 +457,16 @@ export class HockeyMatch {
   return true;
  }
  private collideSkaterPuck(previousX:number,previousY:number,previousHeight:number):boolean {
-  if(this.puck.owner>=0)return false;
+  if(this.puck.owner>=0||this.puck.lock>0&&this.puck.shotTeam===null)return false;
   const from:PuckPoint={x:previousX,y:previousY,z:previousHeight};
   const to:PuckPoint={x:this.puck.x,y:this.puck.y,z:this.puck.height};
   let first:{index:number;hit:ReturnType<typeof findSkaterImpact>}|null=null;
   for(let i=0;i<this.skaters.length;i++){
    // Ignore the shooter's own stick until the puck has cleared their release.
    if(i===this.puck.lastShooter&&this.puck.lock>0)continue;
+   // Teammates near the release point should not absorb their own shot.
+   if(this.puck.shotTeam!==null&&this.skaters[i].team===this.puck.shotTeam&&
+      distance(this.skaters[i].x,this.skaters[i].y,from.x,from.y)<65)continue;
    if(i===this.lastSkaterDeflector&&this.skaterDeflectionTime>0)continue;
    const hit=findSkaterImpact(from,to,this.skaters[i]);
    if(hit&&(!first||!first.hit||hit.time<first.hit.time))first={index:i,hit};
@@ -476,7 +489,7 @@ export class HockeyMatch {
    this.puck.vy=-this.puck.vy*restitution;
   }
   this.puck.vx+=skater.vx*.16;this.puck.vy+=skater.vy*.16;
-  this.puck.shotTeam=null;this.puck.lock=.18;
+  this.puck.shotTeam=null;this.puck.lock=.32;
   this.lastSkaterDeflector=index;this.skaterDeflectionTime=.18;
   this.announce(hit.surface==='stick'?'STICK DEFLECTION!':'SHOT BLOCKED!');
   return true;
