@@ -104,7 +104,12 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  for(const a of actors){
   if(a===selectedGoalie)continue;
   const p=project(a.x,a.y);if(p.behind)continue;
+  // Fade skaters directly in the goalie sightline instead of letting a
+  // foreground jersey completely hide the puck and the attacking formation.
+  const obstructs=goalieMode&&!a.goalie&&Math.abs(p.x-400)<72&&a.x<245;
+  c.save();if(obstructs)c.globalAlpha=.56;
   drawActor(c,p.x,p.y,clamp(p.scale*.92,.34,1.7),a,time,false);
+  c.restore();
  }
  if(selectedGoalie){
   // Unlike the old manually anchored goalie, all bodies and puck share the
@@ -147,7 +152,7 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const speed=Math.hypot(a.vx,a.vy);
  const skating=!a.goalie?clamp(speed/135,0,1):0;
  const stride=Math.sin(time*(6+skating*9)+a.num*.9)*9*skating;
- const shot=a.goalie?0:clamp(a.shotAnimation/.38,0,1);
+ const shot=a.goalie?0:clamp(a.shotAnimation/.3,0,1);
  const shotWindup=shot>0?Math.sin((1-shot)*Math.PI):0;
  const lateral=a.goalie?clamp(a.vy/120,-1,1):0;
  const skateLean=a.goalie?lateral*(1-drop)*.09:clamp(a.vy/250,-.14,.14);
