@@ -1,3 +1,4 @@
+import {drawMatchScoreboard} from '../graphics/matchScoreboard';
 import {validPeriodMinutes} from '../config/matchSettings';
 import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
@@ -179,11 +180,11 @@ export function mountHockeyMatch(
   if(cameraMode!=='overhead'){
    if(cameraMode==='player'||cameraMode==='goalie')drawChaseHockey(ctx,match,cameraMode,t,goalieDistance);
    else drawSideHockey(ctx,match,cameraMode,t);
-   if(match.phase==='goal'||match.phase==='intermission'){
-    ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
-    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(match.message,400,225);
+   if(match.phase==='intermission'){
+    ctx.fillStyle='rgba(7,26,43,.74)';ctx.fillRect(245,178,310,70);
+    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 24px system-ui';ctx.fillText(match.message,400,221);
    }
-   ctx.restore();return;
+   ctx.restore();drawMatchScoreboard(ctx,match);return;
   }
   // Camera zoom preserves simulation coordinates; only rendering changes.
   if(cameraZoom){
@@ -236,13 +237,14 @@ export function mountHockeyMatch(
   ctx.ellipse(puck.x+2,puck.y+3,8,5,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#141b22';ctx.beginPath();ctx.ellipse(puck.x,puck.y-puck.height,6.7,5.5,0,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#8395a4';ctx.lineWidth=1;ctx.stroke();
-  if(match.phase==='goal'||match.phase==='intermission'){
+  if(match.phase==='intermission'){
    ctx.fillStyle='rgba(4,25,44,.63)';ctx.fillRect(240,167,320,105);
    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 34px system-ui';
    ctx.fillText(match.message,400,229);
    ctx.font='14px system-ui';ctx.fillText('Next faceoff',400,253);
   }
   ctx.restore();
+  drawMatchScoreboard(ctx,match);
  }
  function completedMatch(){
   if(completed)return;completed=true;stop();
