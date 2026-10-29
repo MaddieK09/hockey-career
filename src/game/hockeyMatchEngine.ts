@@ -11,7 +11,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
@@ -26,7 +26,7 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0},
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0},
   {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
@@ -46,6 +46,25 @@ export class HockeyMatch {
  private decisionCooldown:[number,number]=[1.5,1.5];
  private movement:MatchControls={x:0,y:0};
  private goalieActionCooldown=0;
+ /** Goalkeeper glove possession is distinct from skater possession. */
+ get goalieHolding():boolean{return this.goalies[0].holdTime>0;}
+ get canCoverPuck():boolean{const g=this.goalies[0];return this.goalieCareer&&this.phase==='live'&&this.puck.owner<0&&g.holdTime<=0&&this.puck.height<16&&distance(g.x,g.y,this.puck.x,this.puck.y)<49;}
+ private freezeGoalie(team:Team):void{
+  const g=this.goalies[team];g.holdTime=0;g.coverTime=.55;
+  this.puck.vx=this.puck.vy=this.puck.vz=0;
+  this.phase='intermission';this.phaseTime=1.15;this.faceoffNext=team===0?1:0;
+  this.emit('faceoff','PUCK FROZEN',team);
+ }
+ private releaseGoalie(team:Team):void{
+  const g=this.goalies[team];if(g.holdTime<=0)return;
+  g.holdTime=0;g.releaseTime=.55;g.saveHand=null;
+  const forward=team===0?1:-1;
+  // Controlled release into the defensive-zone boards; no instant teleport pass.
+  this.puck.owner=-1;this.puck.x=g.x+forward*32;this.puck.y=clamp(g.y+(g.y<220?-37:37),60,380);
+  this.puck.height=8;this.puck.vx=forward*260;this.puck.vy=g.y<220?-145:145;this.puck.vz=58;
+  this.puck.lock=.35;this.puck.shotTeam=null;this.goalieSaveCooldown[team]=.4;
+  this.announce('GOALIE PLAYS THE PUCK!');
+ }
  private rating:MatchRating;
  private faceoffNext:Team=1;
  private possessionTime:[number,number]=[0,0];
@@ -74,10 +93,20 @@ export class HockeyMatch {
    .filter(a=>a.i<5&&a.i!==this.selected).sort((a,b)=>a.d-b.d);
   this.selected=nearest[0]?.i??(this.selected+1)%5;
  }
- perform(action:'shoot'|'pass'|'butterfly'|'blocker'|'glove'|'poke'):void {
+ perform(action:'shoot'|'pass'|'butterfly'|'blocker'|'glove'|'poke'|'cover'|'freeze'):void {
   if(this.phase!=='live')return;
   if(this.goalieCareer){
    const goalie=this.goalies[0];
+   if(goalie.holdTime>0){
+    if(action==='pass')this.releaseGoalie(0);
+    else if(action==='freeze'||action==='cover')this.freezeGoalie(0);
+    return;
+   }
+   if(action==='cover'&&this.canCoverPuck){
+    goalie.coverTime=.7;goalie.pose='butterfly';goalie.poseTime=.7;
+    this.puck.x=goalie.x+20;this.puck.y=goalie.y;this.puck.height=0;
+    this.freezeGoalie(0);return;
+   }
    if(action==='butterfly'){
     // Toggle a persistent stance. Recovery has a genuine movement penalty.
     goalie.pose=goalie.pose==='butterfly'?'glide':'butterfly';
@@ -124,7 +153,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;g.holdTime=g.coverTime=g.releaseTime=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
   this.lastBlockAnnouncement=0;
@@ -402,7 +431,6 @@ export class HockeyMatch {
   }
   if(!first)return false;
   const {goalie,impact}=first,contact=impact.surface;
-  const face=goalie.team===0?1:-1;
   const caught=contact==='glove'&&impact.point.z>14;
   const wasShot=this.puck.shotTeam!==null&&this.puck.shotTeam!==goalie.team;
   const restitution=contact==='stick'?.65:contact==='pads'?.46:contact==='mask'?.31:.28;
@@ -434,11 +462,14 @@ export class HockeyMatch {
    this.emit('save',label,goalie.team);
   }
   if(caught){
-   // A clean glove catch stops play. Resume from a faceoff rather than
-   // pretending a trapped puck bounced through the glove.
+   // A clean glove save stays live for two seconds. The user may pass or
+   // cover/freeze; timeout or AI catches whistle for a faceoff.
+   goalie.holdTime=2;
+   goalie.saveHand='glove';goalie.saveReach=1;
+   this.puck.x=goalie.x+(goalie.team===0?14:-14);
+   this.puck.y=goalie.y-31;this.puck.height=45;
    this.puck.vx=this.puck.vy=this.puck.vz=0;
-   this.phase='intermission';this.phaseTime=.85;
-   this.faceoffNext=goalie.team===0?1:0;
+   this.announce('GLOVE SAVE! PASS OR FREEZE · 2 SEC',2);
   }
   return true;
  }
@@ -587,6 +618,10 @@ export class HockeyMatch {
   this.messageTime=Math.max(0,this.messageTime-dt);
   if(this.messageTime===0&&this.phase==='live')this.message='LIVE PLAY';
   this.goalieActionCooldown=Math.max(0,this.goalieActionCooldown-dt);
+  for(const g of this.goalies){
+   g.coverTime=Math.max(0,g.coverTime-dt);g.releaseTime=Math.max(0,g.releaseTime-dt);
+   if(g.holdTime>0){g.holdTime=Math.max(0,g.holdTime-dt);if(g.holdTime===0)this.freezeGoalie(g.team);}
+  }
   this.puck.lock=Math.max(0,this.puck.lock-dt);
   this.skaterDeflectionTime=Math.max(0,this.skaterDeflectionTime-dt);
   this.lastBlockAnnouncement=Math.max(0,this.lastBlockAnnouncement-dt);
@@ -605,6 +640,11 @@ export class HockeyMatch {
   }
   for(const team of [0,1] as Team[])this.shotClock[team]=Math.max(0,this.shotClock[team]-dt);
   this.updateSkaters(dt);
+  if(this.goalies.some(g=>g.holdTime>0)){
+   const g=this.goalies.find(g=>g.holdTime>0)!;
+   this.puck.x=g.x+(g.team===0?14:-14);this.puck.y=g.y-31;this.puck.height=45;
+   this.puck.vx=this.puck.vy=this.puck.vz=0;return;
+  }
   this.aiDecisions(dt);
   this.stepPuck(dt);
  }
