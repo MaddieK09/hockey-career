@@ -1,3 +1,4 @@
+import {getTeam,type LeagueTeam} from './fictionalLeague';
 import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
 import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 /** Self-contained 5v5 hockey simulation. Coordinates use the 800x440 canvas.
@@ -25,6 +26,8 @@ const distance=(ax:number,ay:number,bx:number,by:number)=>Math.hypot(ax-bx,ay-by
 const roles:Position[]=['C','LW','RW','LD','RD'];
 const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:284}];
 export class HockeyMatch {
+ teams:[LeagueTeam,LeagueTeam]=[getTeam(),getTeam('lakehaven')];
+ setTeams(home:LeagueTeam,away:LeagueTeam):void{this.teams=[home,away];}
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
   {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0,stridePhase:0,pushStrength:0,pushDirection:0,weightShift:0},
