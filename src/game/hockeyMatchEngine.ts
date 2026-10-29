@@ -222,7 +222,7 @@ export class HockeyMatch {
  private aiTarget(i:number):{x:number;y:number}{
   const a=this.skaters[i],sign=a.team===0?1:-1;
   const ownGoal=a.team===0?92:708;
-  const roleLane=a.role==='LW'?94:a.role==='RW'?346:a.role==='LD'?145:a.role==='RD'?295:220;
+  const roleLane=a.role==='LW'?92:a.role==='RW'?348:a.role==='LD'?150:a.role==='RD'?290:220;
   const owner=this.puck.owner;
   const carrier=owner>=0?this.skaters[owner]:null;
   const hasPuck=carrier?.team===a.team;
@@ -232,15 +232,15 @@ export class HockeyMatch {
   if(isCarrier){
    const defender=this.closest(a.team===0?1:0,a.x,a.y),opponent=this.skaters[defender];
    const evade=Math.abs(a.y-opponent.y)<45?(a.y<=opponent.y?-1:1)*46:0;
-   return {x:a.team===0?644:156,
-    y:clamp(roleLane+evade,85,355)};
+   return {x:clamp(a.x+sign*105,170,630),
+    y:clamp(a.y+evade*.55+(roleLane-a.y)*.18,65,375)};
   }
   if(hasPuck&&carrier){
    // A real attacking shape: high slot, two wide outlets and two points.
    // Supports track the puck but never collapse onto its carrier.
-   const attackX=clamp(carrier.x+sign*83,155,645);
+   const attackX=clamp(carrier.x+sign*95,155,645);
    if(a.role==='LD'||a.role==='RD')
-    return {x:clamp(carrier.x-sign*205,150,650),y:roleLane};
+    return {x:clamp(carrier.x-sign*235,150,650),y:roleLane};
    if(a.role==='C')
     return {x:clamp(attackX-sign*32,150,650),y:clamp(220+(carrier.y-220)*.22,185,255)};
    return {x:attackX,y:roleLane};
@@ -263,15 +263,15 @@ export class HockeyMatch {
    // Defensive pair protects the crease, with one stepping toward the puck.
    const closeSide=a.role==='LD'?-1:1;
    const puckSide=this.puck.y<220?-1:1;
-   const depth=closeSide===puckSide?144:105;
+   const depth=closeSide===puckSide?165:122;
    return {x:clamp(ownGoal+sign*depth,100,700),y:clamp(220+closeSide*65,140,300)};
   }
   if(carrier&&carrier.team!==a.team){
-   const centerX=clamp(this.puck.x-sign*(a.role==='C'?105:175),120,680);
+   const centerX=clamp(this.puck.x-sign*(a.role==='C'?118:210),120,680);
    return {x:centerX,y:a.role==='C'?clamp(220+(this.puck.y-220)*.2,170,270):roleLane};
   }
   // Loose puck: support behind the forechecker rather than all pursuing it.
-  return {x:clamp(this.puck.x-sign*(attacking?105:78),110,690),y:roleLane};
+  return {x:clamp(this.puck.x-sign*(attacking?140:108),110,690),y:roleLane};
  }
  private updateSkaters(dt:number):void {
   const humanIndex=this.goalieCareer?-1:this.selected;
@@ -424,14 +424,14 @@ export class HockeyMatch {
   // Longer periods need possession cycles, not skaters camping in the slot.
   // Cycle the puck while the team's next shooting opportunity develops.
   const cycling=offensive&&(this.shotClock[team]>6||laneBlocked)&&carrier.carriedFor>2;
-  if((pressured||cycling)&&carrier.carriedFor>2.2&&this.rng()<(cycling?.24:.20)){
+  if((pressured||cycling)&&carrier.carriedFor>2.2&&this.rng()<(cycling?.65:.36)){
    const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
    partners.sort((a,b)=>{
     const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
     const aheadB=(b.a.x-carrier.x)*(team===0?1:-1);
     return (aheadB+distance(b.a.x,b.a.y,carrier.x,carrier.y)*.1)-(aheadA+distance(a.a.x,a.a.y,carrier.x,carrier.y)*.1);
    });
-   if(partners[0]&&distance(partners[0].a.x,partners[0].a.y,carrier.x,carrier.y)>80)this.pass(owner,partners[0].i);
+   if(partners[0]&&distance(partners[0].a.x,partners[0].a.y,carrier.x,carrier.y)>72)this.pass(owner,partners[0].i);
   }
  }
  private intercept():void {
