@@ -1,4 +1,4 @@
-import {validPeriodMinutes} from '../config/matchSettings';
+import {validPeriodMinutes,periodOptions,savePeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 import {HockeyMatch} from '../game/hockeyMatchEngine';
 import type {MatchRating} from '../game/hockeyMatchEngine';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
@@ -15,7 +15,7 @@ export interface MatchSummary {
  */
 export function mountHockeyMatch(
  root:HTMLElement,goalieCareer:boolean,rating:MatchRating,
- onComplete:(result:MatchSummary)=>void,onReturn:()=>void
+ onComplete:(result:MatchSummary)=>void,onReturn:()=>void,onPeriodChange?:(minutes:PeriodMinutes)=>void
 ):{stop:()=>void}{
  const match=new HockeyMatch(goalieCareer,rating,Math.random,validPeriodMinutes((rating as MatchRating & {periodMinutes?:number}).periodMinutes));
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
@@ -25,6 +25,7 @@ export function mountHockeyMatch(
  let cameraNotice=0;
  let arenaMode=true;
  let goalieDistance:'close'|'medium'|'far'='medium';
+ let futurePeriod=match.periodMinutes;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -44,8 +45,11 @@ export function mountHockeyMatch(
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
   +'<button type="button" data-action="b">'+actB+'</button>'
   +'<button type="button" data-action="c">'+actC+'</button>'
-  +(goalieCareer?'<button type="button" data-action="d">GLOVE</button><button type="button" data-action="e">COVER PUCK</button><button type="button" data-action="f">PASS PUCK</button>':'')+'</div></div>'
-  +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Choose your camera angle. Changes apply immediately.</p><div class="camera-options">'
+  +(goalieCareer?'<button type="button" data-action="d">GLOVE</button><button type="button" data-action="e">COVER PUCK</button><button type="button" data-action="f">PASS PUCK</button><button type="button" data-action="g" hidden>VH POST</button><button type="button" data-action="h" hidden>RVH POST</button>':'')+'</div></div>'
+  +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Camera and post settings apply now. Period length applies to your next game.</p>'
+  +(goalieCareer?'<div class="pause-setting"><strong>POST TECHNIQUE</strong><div class="camera-options"><button type="button" data-post-mode="auto">AUTO VH / RVH</button><button type="button" data-post-mode="manual">MANUAL VH / RVH</button></div><small>Auto chooses VH for shots in front and RVH for plays near or behind the goal line. Manual enables post buttons near either post.</small></div>':'')
+  +'<div class="pause-setting"><label for="pause-period-length"><strong>PERIOD LENGTH (NEXT GAME)</strong></label><select id="pause-period-length" data-period-length>'+periodOptions(futurePeriod)+'</select><small>This game remains '+match.periodMinutes+' minutes per period; the next game uses your selection.</small></div>'
+  +'<div class="camera-options">'
   +'<button type="button" data-view="player">PLAYER CHASE (NHL)</button>'
   +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
   +'<button type="button" data-view="sideline">SIDE BOARDS</button>'
@@ -81,6 +85,19 @@ export function mountHockeyMatch(
  arenaButton.addEventListener('click',()=>{arenaMode=!arenaMode;shell.classList.toggle('arena-expanded',arenaMode);arenaButton.textContent=arenaMode?'⤢ NORMAL VIEW':'⛶ BIG RINK';});
  const pausePanel=root.querySelector<HTMLElement>('[data-pause]')!;
  const viewButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
+ const postButtons=Array.from(root.querySelectorAll<HTMLButtonElement>('[data-post-mode]'));
+ const periodSelect=root.querySelector<HTMLSelectElement>('[data-period-length]')!;
+ periodSelect.addEventListener('change',()=>{
+  futurePeriod=validPeriodMinutes(Number(periodSelect.value));
+  savePeriodMinutes(futurePeriod);onPeriodChange?.(futurePeriod);
+ });
+ postButtons.forEach(b=>{
+  b.setAttribute('aria-pressed',String(b.dataset.postMode===match.postMode));
+  b.addEventListener('click',()=>{
+   match.setPostMode(b.dataset.postMode==='manual'?'manual':'auto');
+   postButtons.forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.postMode===match.postMode)));
+  });
+ });
  function setPaused(next:boolean){
   paused=next;pausePanel.hidden=!paused;
   cameraButton.textContent=paused?'▶ RESUME':'Ⅱ PAUSE / CAMERA';
@@ -296,6 +313,10 @@ export function mountHockeyMatch(
    const pass=root.querySelector<HTMLButtonElement>('[data-action="f"]');
    if(cover){cover.textContent=match.goalieHolding?'FREEZE PUCK':'COVER PUCK';cover.disabled=!match.goalieHolding&&!match.canCoverPuck;}
    if(pass)pass.disabled=!match.goalieHolding;
+   for(const b of root.querySelectorAll<HTMLButtonElement>('[data-action="g"],[data-action="h"]')){
+    b.hidden=match.postMode!=='manual';b.disabled=!match.postAvailable;
+    b.setAttribute('aria-pressed',String(match.goalies[0].pose===(b.dataset.action==='g'?'vh':'rvh')));
+   }
    const inButterfly=match.goalies[0].pose==='butterfly';
    const butterflyButton=root.querySelector<HTMLButtonElement>('[data-action="a"]');
    if(butterflyButton){butterflyButton.setAttribute('aria-pressed',String(inButterfly));butterflyButton.textContent=inButterfly?'STAND UP':'BUTTERFLY';}
