@@ -337,7 +337,7 @@ export class HockeyMatch {
    if(g.reactionTime===0)g.reaction=null;
    g.pokeTime=Math.max(0,g.pokeTime-dt);
    // Rise and retract on separate smooth phases, without snapping the glove or blocker.
-   if(g.poseTime<.21)g.saveTarget=0;
+   if(g.poseTime<.21&&g.holdTime<=0)g.saveTarget=0;
    const reachSpeed=g.saveTarget>g.saveReach?6:3.7;
    g.saveReach+=clamp(g.saveTarget-g.saveReach,-dt*reachSpeed,dt*reachSpeed);
    if(g.saveReach<.001&&g.saveTarget===0){g.saveReach=0;g.saveHand=null;}
@@ -454,7 +454,7 @@ export class HockeyMatch {
   goalie.reactionTime=.56;
   goalie.reactionSide=impact.point.y-goalie.y;
   if(contact==='glove'||contact==='blocker'){
-   goalie.saveHand=contact;goalie.saveTarget=1;
+   goalie.saveHand=contact;goalie.saveTarget=1;goalie.poseTime=Math.max(goalie.poseTime,.46);
   }else if(contact==='pads'){
    goalie.poseTime=.35;
    if(!this.goalieCareer||goalie.team!==0)goalie.pose='butterfly';
@@ -470,7 +470,7 @@ export class HockeyMatch {
    // A clean glove save stays live for two seconds. The user may pass or
    // cover/freeze; timeout or AI catches whistle for a faceoff.
    goalie.holdTime=2;
-   goalie.saveHand='glove';goalie.saveTarget=1;
+   goalie.saveHand='glove';goalie.saveTarget=1;goalie.poseTime=Math.max(goalie.poseTime,.46);
    this.puck.x=goalie.x+(goalie.team===0?14:-14);
    this.puck.y=goalie.y-31;this.puck.height=45;
    this.puck.vx=this.puck.vy=this.puck.vz=0;
