@@ -1,3 +1,4 @@
+import {GOAL_HALF_WIDTH,GOAL_HEIGHT} from '../game/puckCollision';
 /** NHL-inspired end-zone chase cameras. Perspective is drawn in Canvas 2D;
  * match coordinates remain authoritative and gameplay stays 5-on-5.
  */
@@ -71,11 +72,11 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  const center=project(400,220);
  if(!center.behind)oval(c,center.x,center.y,4*center.scale,2.5*center.scale,'#bb4356');
  // Render both goals directly from the same world coordinates as puck physics.
- // Post spacing: y=220±34; crossbar: z=64. None depends on goalie movement.
+ // Post spacing and crossbar match the authoritative collision constants.
  const drawGoal=(worldX:number,opacity:number)=>{
-  const base=project(worldX,220),l=project(worldX,186),r=project(worldX,254);
+  const base=project(worldX,220),l=project(worldX,220-GOAL_HALF_WIDTH),r=project(worldX,220+GOAL_HALF_WIDTH);
   if(base.behind)return;
-  const top=base.y-64*base.scale*.8;
+  const top=base.y-GOAL_HEIGHT*base.scale*.8;
   oval(c,base.x,base.y,Math.abs(r.x-l.x)*.63,Math.max(6,base.scale*12),'rgba(78,160,208,.18)');
   c.save();c.globalAlpha=opacity;
   const width=Math.max(1,3*base.scale);
@@ -141,7 +142,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  }
  c.fillStyle='rgba(8,29,47,.8)';c.fillRect(12,12,220,30);
  c.fillStyle='#e9f7ff';c.font='bold 14px system-ui';c.textAlign='left';
- c.fillText(goalieMode?'BEHIND GOALIE • NHL STYLE':'BEHIND PLAYER • NHL STYLE',22,32);
+ c.fillText(goalieMode?'GOALIE CAM':'PLAYER CAM',22,424);
 }
 function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team:number;goalie:boolean;pose:string;selected:boolean;num:number;vx:number;vy:number;heading:number;shotAnimation:number;stance:number;saveHand:'glove'|'blocker'|null;saveReach:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number},time:number,back:boolean){
  const jersey=a.team===0?'#c83e51':'#2864a5',trim=a.team===0?'#f8f5f1':'#dceeff';
@@ -163,10 +164,10 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const ease=drop*drop*(3-2*drop);
  const bodyDrop=ease*11;
  for(const side of [-1,1]){
-  const hipX=side*11;
-  const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
-  const kneeY=-23+ease*17;
-  const skateX=side*(13+ease*31)+(a.goalie?lateral*4:stride*side);
+  const hipX=side*12;
+  const kneeX=side*(17-ease*9)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
+  const kneeY=-24+ease*18;
+  const skateX=side*(23+ease*13)+(a.goalie?lateral*4:stride*side);
   const skateY=-2;
   // Thighs bend in as the knees settle close together.
   ln(c,hipX,-34+bodyDrop,kneeX,kneeY,a.goalie?12:8,dark);
@@ -175,7 +176,7 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
    // face lies along the ice with the outer tip extended toward the post.
    const padTopX=kneeX*(1-ease)+skateX*ease;
    const padTopY=kneeY*(1-ease)+(-5)*ease;
-   const padEndX=side*(12+ease*37);
+   const padEndX=side*(23+ease*13);
    const padEndY=-4;
    ln(c,kneeX,kneeY,padEndX,padEndY,15,'#7b92a8');
    ln(c,kneeX,kneeY,padEndX,padEndY,12,'#f3f8fc');
@@ -212,8 +213,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  // Anatomical two-bone arms: shoulders -> articulated elbows -> wrists.
  // The elbow follows the wrist at half speed, preventing glove/blocker
  // from floating or snapping independently of the player's shoulders.
- const leftWrist={x:-32-gloveLift*.2,y:armY-gloveLift+cover*38+(hold?-10:0)};
- const rightWrist={x:32+blockerLift*.2+outlet*19,y:armY-blockerLift+cover*33-outlet*16};
+ const leftWrist={x:-39-gloveLift*.25,y:armY-5-gloveLift+cover*38+(hold?-10:0)};
+ const rightWrist={x:39+blockerLift*.25+outlet*19,y:armY-10-blockerLift+cover*33-outlet*16};
  const shoulderY=-63+bodyDrop;
  const arm=(side:-1|1,wrist:{x:number;y:number})=>{
   const shoulderX=side*19;
