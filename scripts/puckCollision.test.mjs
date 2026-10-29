@@ -148,3 +148,29 @@ test('a new faceoff starts a nonzero shot build-up interval',()=>{
  m.shotClock=[0,0];m.resetFaceoff(1);
  assert.ok(m.shotClock[0]>0&&m.shotClock[1]>0);
 });
+
+test('formation AI gives five players separated attacking lanes and depth',async()=>{
+ const {supportPosition}=await loadTS('src/game/formationAI.ts');
+ const carry={x:485,y:220},roles=['C','LW','RW','LD','RD'];
+ const spots=roles.map(role=>supportPosition(role,0,carry,true));
+ assert.ok(spots[1].y<150&&spots[2].y>290,'wings should occupy opposite wide lanes');
+ assert.ok(spots[3].x<spots[0].x&&spots[4].x<spots[0].x,'defenders should support behind forwards');
+ assert.ok(spots[0].y>180&&spots[0].y<260,'centre stays inside high slot');
+ assert.ok(spots.every(p=>p.x>=85&&p.x<=715&&p.y>=55&&p.y<=385));
+});
+test('formation preserves opposite-board support on both teams',async()=>{
+ const {supportPosition}=await loadTS('src/game/formationAI.ts');
+ for(const team of [0,1]){
+  const x=team===0?510:290;
+  const lw=supportPosition('LW',team,{x,y:220},true);
+  const rw=supportPosition('RW',team,{x,y:220},true);
+  assert.ok(Math.abs(lw.y-rw.y)>=200);
+ }
+});
+test('separation steers away from overlap without abandoning rink limits',async()=>{
+ const {separateFormation}=await loadTS('src/game/formationAI.ts');
+ const t=separateFormation({x:520,y:220},{x:510,y:210},[{x:511,y:212}]);
+ assert.ok(t.x<520&&t.y<220);
+ const safe=separateFormation({x:100,y:55},{x:100,y:55},[{x:100,y:55}]);
+ assert.ok(safe.y>=55&&safe.x>=85);
+});

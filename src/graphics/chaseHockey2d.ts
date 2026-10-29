@@ -22,7 +22,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  if(goalieMode){cameraDepth=60;cameraLateral=220;}
  else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
  const eye=goalieMode?0:Math.max(0,cameraDepth-55);
- const cameraFactor=goalieDistance==='close'?1.18:goalieDistance==='far'?.83:1;
+ const cameraFactor=goalieDistance==='close'?1.10:goalieDistance==='far'?.88:1;
  const cameraElevation=goalieDistance==='close'?13:goalieDistance==='far'?-9:0;
  // The original camera compresses almost the whole rink into a thin row.
  // Increase perspective depth separation so approaching skaters actually grow.
@@ -32,8 +32,15 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  const project=(x:number,y:number)=>{
   const along=(direction===1?x:800-x)-eye;
   const depth=Math.max(-30,along);
-  const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.24:.27,1.15);
-  return {x:400+(y-cameraLateral)*z*(goalieMode?1.75*cameraFactor:1.52),y:horizon+350*z*(goalieMode?cameraFactor:1),scale:z*(goalieMode?1.8*cameraFactor:1.45),behind:along< -25};
+  // Logarithmic ice-depth mapping gives the first 400 rink units usable
+  // screen space, rather than squeezing every attacker against the horizon.
+  const lens=goalieMode?(goalieDistance==='close'?185:goalieDistance==='far'?335:255):240;
+  const depthFraction=Math.log1p(depth/lens)/Math.log1p(820/lens);
+  const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.25:.28,1.16);
+  const visibleWidth=Math.pow(z,.70);
+  const floorY=horizon+(goalieMode?325:305)*cameraFactor*(1-depthFraction);
+  return {x:400+(y-cameraLateral)*visibleWidth*(goalieMode?1.65*cameraFactor:1.46),
+   y:floorY,scale:z*(goalieMode?1.72*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
  const sky=c.createLinearGradient(0,0,0,190);
