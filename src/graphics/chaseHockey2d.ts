@@ -2,6 +2,7 @@
  * match coordinates remain authoritative and gameplay stays 5-on-5.
  */
 import type {HockeyMatch} from '../game/hockeyMatchEngine';
+import {GOAL_HALF_WIDTH,GOAL_HEIGHT} from '../game/puckCollision';
 const TAU=Math.PI*2;
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const ln=(c:CanvasRenderingContext2D,x:number,y:number,u:number,v:number,w:number,color:string)=>{
@@ -73,9 +74,9 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
  // Render both goals directly from the same world coordinates as puck physics.
  // Post spacing: y=220±34; crossbar: z=64. None depends on goalie movement.
  const drawGoal=(worldX:number,opacity:number)=>{
-  const base=project(worldX,220),l=project(worldX,186),r=project(worldX,254);
+  const base=project(worldX,220),l=project(worldX,220-GOAL_HALF_WIDTH),r=project(worldX,220+GOAL_HALF_WIDTH);
   if(base.behind)return;
-  const top=base.y-64*base.scale*.8;
+  const top=base.y-GOAL_HEIGHT*base.scale*.8;
   oval(c,base.x,base.y,Math.abs(r.x-l.x)*.63,Math.max(6,base.scale*12),'rgba(78,160,208,.18)');
   c.save();c.globalAlpha=opacity;
   const width=Math.max(1,3*base.scale);
@@ -149,7 +150,7 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  const impact=a.goalie&&a.reactionTime>0?Math.sin((.52-a.reactionTime)/.52*Math.PI):0;
  const lean=impact*(a.reactionSide>=0?-1:1)*.10;
  c.save();c.translate(x+impact*(a.reactionSide>=0?-5:5)*s,y+impact*3*s);c.scale(s,s);
- oval(c,0,0,22+drop*15,7,'rgba(21,53,77,.22)');
+ oval(c,0,0,34+drop*20,8,'rgba(21,53,77,.22)');
  const speed=Math.hypot(a.vx,a.vy);
  const skating=!a.goalie?clamp(speed/135,0,1):0;
  const stride=Math.sin(time*(6+skating*9)+a.num*.9)*9*skating;
@@ -161,7 +162,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  // while the pad faces rotate out to form a continuous seal along the ice.
  // All coordinates interpolate from the standing stance; no instant snap.
  const ease=drop*drop*(3-2*drop);
- const bodyDrop=ease*11;
+ // Even before a save, the goalie crouches with bent knees and a wide base.
+ const bodyDrop=5+ease*11;
  for(const side of [-1,1]){
   const hipX=side*11;
   const kneeX=side*(12-ease*4)+(a.goalie?lateral*3:stride*(side===1?-.5:.5));
@@ -175,12 +177,12 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
    // face lies along the ice with the outer tip extended toward the post.
    const padTopX=kneeX*(1-ease)+skateX*ease;
    const padTopY=kneeY*(1-ease)+(-5)*ease;
-   const padEndX=side*(12+ease*37);
+   const padEndX=side*(33+ease*19);
    const padEndY=-4;
    ln(c,kneeX,kneeY,padEndX,padEndY,15,'#7b92a8');
    ln(c,kneeX,kneeY,padEndX,padEndY,12,'#f3f8fc');
    // Standing leg pad remains vertical until the knee drop rotates it.
-   const upperX=kneeX+side*(2+ease*3);
+   const upperX=kneeX+side*(3+ease*3);
    const upperY=kneeY-24*(1-ease);
    ln(c,upperX,upperY,padTopX,padTopY,14,'#7b92a8');
    ln(c,upperX,upperY,padTopX,padTopY,11,'#f3f8fc');
@@ -212,8 +214,8 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  // Anatomical two-bone arms: shoulders -> articulated elbows -> wrists.
  // The elbow follows the wrist at half speed, preventing glove/blocker
  // from floating or snapping independently of the player's shoulders.
- const leftWrist={x:-32-gloveLift*.2,y:armY-gloveLift+cover*38+(hold?-10:0)};
- const rightWrist={x:32+blockerLift*.2+outlet*19,y:armY-blockerLift+cover*33-outlet*16};
+ const leftWrist={x:-39-gloveLift*.23,y:armY-gloveLift+cover*38+(hold?-10:0)};
+ const rightWrist={x:39+blockerLift*.23+outlet*19,y:armY-blockerLift+cover*33-outlet*16};
  const shoulderY=-63+bodyDrop;
  const arm=(side:-1|1,wrist:{x:number;y:number})=>{
   const shoulderX=side*19;
