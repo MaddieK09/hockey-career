@@ -135,8 +135,8 @@ export interface SkaterHit extends SweepHit {surface:'body'|'stick';point:PuckPo
 export function findSkaterImpact(a:PuckPoint,b:PuckPoint,s:SkaterCollider):SkaterHit|null {
  const face=s.team===0?1:-1;
  const bodies:{surface:'body'|'stick';volume:Box}[]=[
-  {surface:'body',volume:box(s.x-11,s.x+11,s.y-14,s.y+14,0,49)},
-  {surface:'stick',volume:box(s.x+face*16,s.x+face*35,s.y-9,s.y+9,0,7)}
+  {surface:'body',volume:box(s.x-7,s.x+7,s.y-9,s.y+9,0,43)},
+  {surface:'stick',volume:box(s.x+face*15,s.x+face*27,s.y-5,s.y+5,0,5)}
  ];
  let earliest:SkaterHit|null=null;
  for(const region of bodies){
