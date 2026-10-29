@@ -11,7 +11,7 @@ async function loadTS(entry){
 }
 const physics=await loadTS('src/game/puckCollision.ts');
 const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
-const {findGoalieImpact,findGoalFrameImpact,findSkaterImpact}=physics;
+const {findGoalieImpact,findGoalFrameImpact,findSkaterImpact,GOAL_HALF_WIDTH,GOAL_HEIGHT,POST_RADIUS,PUCK_RADIUS}=physics;
 const point=(x,y,z=3)=>({x,y,z});
 const home={x:91,y:220,team:0,stance:0,saveHand:null,saveReach:0};
 const incoming=(y=220,z=3)=>[point(160,y,z),point(40,y,z)];
@@ -55,15 +55,15 @@ test('shot into open home goal scores when goalie is displaced',()=>{
  assert.equal(m.scores[1],1);assert.equal(m.phase,'goal');
 });
 test('post and crossbar bounce instead of goals',()=>{
- for(const [y,z,surface] of [[254,5,'post'],[220,64,'crossbar']]){
+ for(const [y,z,surface] of [[220+GOAL_HALF_WIDTH,5,'post'],[220,GOAL_HEIGHT,'crossbar']]){
   const impact=findGoalFrameImpact(point(105,y,z),point(40,y,z),60,-1);
   assert.equal(impact?.surface,surface);
  }
 });
 test('shot fully inside the mouth scores; touching post does not',()=>{
  assert.equal(findGoalFrameImpact(point(100,220,8),point(40,220,8),60,-1)?.surface,'goal');
- assert.equal(findGoalFrameImpact(point(100,247,8),point(40,247,8),60,-1)?.surface,'post');
- assert.notEqual(findGoalFrameImpact(point(100,275,8),point(40,275,8),60,-1)?.surface,'goal');
+ assert.equal(findGoalFrameImpact(point(100,220+GOAL_HALF_WIDTH,8),point(40,220+GOAL_HALF_WIDTH,8),60,-1)?.surface,'post');
+ assert.notEqual(findGoalFrameImpact(point(100,220+GOAL_HALF_WIDTH+26,8),point(40,220+GOAL_HALF_WIDTH+26,8),60,-1)?.surface,'goal');
 });
 test('shots above crossbar and outside the posts cannot score',()=>{
  assert.notEqual(findGoalFrameImpact(point(100,220,85),point(40,220,85),60,-1)?.surface,'goal');
@@ -71,10 +71,10 @@ test('shots above crossbar and outside the posts cannot score',()=>{
 });
 test('right-side goal mirrors left-side goal',()=>{
  assert.equal(findGoalFrameImpact(point(695,220,8),point(760,220,8),740,1)?.surface,'goal');
- assert.equal(findGoalFrameImpact(point(695,254,8),point(760,254,8),740,1)?.surface,'post');
+ assert.equal(findGoalFrameImpact(point(695,220+GOAL_HALF_WIDTH,8),point(760,220+GOAL_HALF_WIDTH,8),740,1)?.surface,'post');
 });
 test('outside mesh contact is not a goal',()=>{
- const hit=findGoalFrameImpact(point(110,269,9),point(43,269,9),60,-1);
+ const hit=findGoalFrameImpact(point(110,220+GOAL_HALF_WIDTH+15,9),point(43,220+GOAL_HALF_WIDTH+15,9),60,-1);
  assert.equal(hit?.surface,'mesh');
 });
 test('a real shot near home top corner scores unless butterfly pad blocks it',()=>{
@@ -98,4 +98,22 @@ test('fast shots collide with skater bodies even with puck pickup locked',()=>{
 test('shots over a skater can continue without phantom body contact',()=>{
  const skater={x:145,y:220,team:0};
  assert.equal(findSkaterImpact(point(175,220,85),point(100,220,85),skater),null);
+});
+
+test('wider net has a real open corner outside the butterfly pads',()=>{
+ const lateral=220+GOAL_HALF_WIDTH-POST_RADIUS-PUCK_RADIUS-5;
+ assert.ok(lateral>220+35,'net is wider than even the extended butterfly');
+ const [a,b]=incoming(lateral,6);
+ assert.equal(findGoalieImpact(a,b,{...home,stance:1}),null,
+  'a puck in the open corner must not count as a pad save');
+ assert.equal(findGoalFrameImpact(point(100,lateral,6),point(40,lateral,6),60,-1)?.surface,'goal',
+  'a fully clear shot just inside the post is a goal');
+});
+test('goal width, crossbar and metal contact remain synchronized',()=>{
+ const yInside=220+GOAL_HALF_WIDTH-POST_RADIUS-PUCK_RADIUS-1;
+ const zInside=GOAL_HEIGHT-POST_RADIUS-PUCK_RADIUS-1;
+ assert.equal(findGoalFrameImpact(point(100,yInside,12),point(40,yInside,12),60,-1)?.surface,'goal');
+ assert.equal(findGoalFrameImpact(point(100,220,zInside),point(40,220,zInside),60,-1)?.surface,'goal');
+ assert.equal(findGoalFrameImpact(point(100,220+GOAL_HALF_WIDTH,12),point(40,220+GOAL_HALF_WIDTH,12),60,-1)?.surface,'post');
+ assert.equal(findGoalFrameImpact(point(100,220,GOAL_HEIGHT),point(40,220,GOAL_HEIGHT),60,-1)?.surface,'crossbar');
 });
