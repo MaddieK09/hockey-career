@@ -39,13 +39,13 @@ export function mountHockeyMatch(
   +'<div class="action-pad"><button type="button" data-action="a">'+actA+'</button>'
   +'<button type="button" data-action="b">'+actB+'</button>'
   +'<button type="button" data-action="c">'+actC+'</button>'
-  +(goalieCareer?'<button type="button" data-action="d">GLOVE</button>':'')+'</div></div>'
+  +(goalieCareer?'<button type="button" data-action="d">GLOVE</button><button type="button" data-action="e">COVER PUCK</button><button type="button" data-action="f">PASS PUCK</button>':'')+'</div></div>'
   +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Choose your camera angle. Changes apply immediately.</p><div class="camera-options">'
   +'<button type="button" data-view="player">PLAYER CHASE (NHL)</button>'
   +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
   +'<button type="button" data-view="sideline">SIDE BOARDS</button>'
   +'<button type="button" data-view="goalie">BEHIND GOALIE (NHL)</button>'
-  +(goalieCareer?'<button type="button" data-distance="close">GOALIE CLOSE</button><button type="button" data-distance="medium">GOALIE MEDIUM</button><button type="button" data-distance="far">GOALIE FAR</button>':'')
+  +(goalieCareer?'<button type="button" data-distance="close">CREASE CLOSE</button><button type="button" data-distance="medium">CREASE STANDARD</button><button type="button" data-distance="far">CREASE WIDE</button>':'')
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
   +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
@@ -131,6 +131,8 @@ export function mountHockeyMatch(
  }
  function action(key:string){
   if(paused)return;
+  if(goalieCareer&&key==='e'){match.perform(match.goalieHolding?'freeze':'cover');return;}
+  if(goalieCareer&&key==='f'){match.perform('pass');return;}
   if(key==='c'){if(goalieCareer)match.perform('poke');else match.switchSkater();return;}
   if(key==='d'&&goalieCareer){match.perform('glove');return;}
   if(key==='a'){match.perform(goalieCareer?'butterfly':'shoot');return;}
@@ -145,6 +147,8 @@ export function mountHockeyMatch(
   if(e.key.toLowerCase()==='e')action('b');
   if(e.key==='Tab')action('c');
   if(e.key.toLowerCase()==='q')action('d');
+  if(e.key.toLowerCase()==='f')action('e');
+  if(e.key.toLowerCase()==='r')action('f');
  }
  function keyUp(e:KeyboardEvent){controls.delete(e.key.toLowerCase());syncMovement();}
  function visibility(){last=performance.now();}
@@ -267,10 +271,14 @@ export function mountHockeyMatch(
   event.textContent=match.message;
   if(goalieCareer){
    const danger=match.puck.shotTeam===1&&match.puck.owner<0;
+   const cover=root.querySelector<HTMLButtonElement>('[data-action="e"]');
+   const pass=root.querySelector<HTMLButtonElement>('[data-action="f"]');
+   if(cover){cover.textContent=match.goalieHolding?'FREEZE PUCK':'COVER PUCK';cover.disabled=!match.goalieHolding&&!match.canCoverPuck;}
+   if(pass)pass.disabled=!match.goalieHolding;
    const inButterfly=match.goalies[0].pose==='butterfly';
    const butterflyButton=root.querySelector<HTMLButtonElement>('[data-action="a"]');
    if(butterflyButton){butterflyButton.setAttribute('aria-pressed',String(inButterfly));butterflyButton.textContent=inButterfly?'STAND UP':'BUTTERFLY';}
-   hint.textContent=danger?'SHOT INCOMING · Move into the shooting lane, then use Butterfly (low) or Blocker (high).':
+   hint.textContent=match.goalieHolding?'GLOVE SAVE! '+match.goalies[0].holdTime.toFixed(1)+'s · PASS PUCK or FREEZE PUCK now.':match.canCoverPuck?'LOOSE PUCK NEAR CREASE · Press COVER PUCK to freeze play.':danger?'SHOT INCOMING · Move into the shooting lane, then use Butterfly (low) or Blocker (high).':
     match.messageTime>0?match.message+' · Track the shooter and time your save.':'Butterfly toggles stance · Glove (Q) catches high left · Blocker (E) covers high right · Poke (Tab) close range.';
   }
   render(now/1000);
