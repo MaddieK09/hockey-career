@@ -134,32 +134,55 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  c.save();c.translate(x+impact*(a.reactionSide>=0?-5:5)*s,y+impact*3*s);c.scale(s,s);
  oval(c,0,0,22+drop*15,7,'rgba(21,53,77,.22)');
  const stride=a.goalie?0:Math.sin(time*12+a.num)*7;
- // Butterfly mechanics: knees close together, shins and pads flare outward to seal ice.
- // Interpolate each leg through the drop so the pose never instantly snaps.
+ // Butterfly based on a real goalie: both knees drive down and inward,
+ // while the pad faces rotate out to form a continuous seal along the ice.
+ // All coordinates interpolate from the standing stance; no instant snap.
+ const ease=drop*drop*(3-2*drop);
+ const bodyDrop=ease*11;
  for(const side of [-1,1]){
-  const hipX=side*11, kneeX=side*(11+drop*2), kneeY=-22+drop*14;
-  const footX=side*(12+drop*27),footY=-2;
-  ln(c,hipX,-33,kneeX,kneeY,a.goalie?12:8,dark);
-  ln(c,kneeX,kneeY,footX,footY,a.goalie?13:8,a.goalie?'#e8f2f8':dark);
+  const hipX=side*11;
+  const kneeX=side*(12-ease*4);
+  const kneeY=-23+ease*17;
+  const skateX=side*(13+ease*31);
+  const skateY=-2;
+  // Thighs bend in as the knees settle close together.
+  ln(c,hipX,-34+bodyDrop,kneeX,kneeY,a.goalie?12:8,dark);
   if(a.goalie){
-   c.save();
-   c.translate(kneeX,kneeY);
-   c.rotate(-side*drop*.82);
-   c.fillStyle='#f5f9fd';c.strokeStyle='#7893a7';c.lineWidth=1.6;
-   c.beginPath();c.roundRect(-8,-9,16,33,4);c.fill();c.stroke();
-   for(let j=0;j<23;j+=8)ln(c,-6,j,6,j,1.3,'#9bb3c3');
-   c.restore();
+   // In a standing stance the pad is vertical; in butterfly its broad
+   // face lies along the ice with the outer tip extended toward the post.
+   const padTopX=kneeX*(1-ease)+skateX*ease;
+   const padTopY=kneeY*(1-ease)+(-5)*ease;
+   const padEndX=side*(12+ease*37);
+   const padEndY=-4;
+   ln(c,kneeX,kneeY,padEndX,padEndY,15,'#7b92a8');
+   ln(c,kneeX,kneeY,padEndX,padEndY,12,'#f3f8fc');
+   // Standing leg pad remains vertical until the knee drop rotates it.
+   const upperX=kneeX+side*(2+ease*3);
+   const upperY=kneeY-24*(1-ease);
+   ln(c,upperX,upperY,padTopX,padTopY,14,'#7b92a8');
+   ln(c,upperX,upperY,padTopX,padTopY,11,'#f3f8fc');
+   // Contrasting knee blocks make the ice seal readable.
+   oval(c,kneeX,kneeY,8,6,'#e2ebf4');
+   ln(c,kneeX+side*5,kneeY+2,padEndX-side*4,padEndY+1,2,'#9db5c7');
+   // Skate blade stays flush to the ice during the butterfly.
+   ln(c,skateX-side*8,skateY,skateX+side*8,skateY,4,'#182a3a');
+  }else{
+   ln(c,kneeX,kneeY,skateX,skateY,8,dark);
+   ln(c,skateX-8,skateY,skateX+8,skateY,4,'#182a3a');
   }
-  ln(c,footX-8,footY,footX+8,footY,4,'#182a3a');
+ }
+ // The five-hole closes when both knee blocks meet at ice level.
+ if(a.goalie&&ease>.15){
+  oval(c,0,-6,Math.max(3,9*ease),4,'#dfeaf2');
  }
  // Pants, jersey, shoulders.
- c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+drop*5,30,19,5);c.fill();
- c.save();c.translate(lean*15,drop*7+impact*3);c.rotate(lean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
- ln(c,-17,-41,17,-41,3,trim);ln(c,-18,-64,18,-64,2,trim);
- const armY=-43+drop*8;
+ c.fillStyle=dark;c.beginPath();c.roundRect(-15,-39+bodyDrop,30,19,5);c.fill();
+ c.save();c.translate(lean*15,bodyDrop+impact*3);c.rotate(lean);c.fillStyle=jersey;c.beginPath();c.moveTo(-14,-73);c.lineTo(14,-73);c.lineTo(23,-58);c.lineTo(16,-36);c.lineTo(-16,-36);c.lineTo(-23,-58);c.closePath();c.fill();c.restore();
+ ln(c,-17,-41+bodyDrop,17,-41+bodyDrop,3,trim);ln(c,-18,-64+bodyDrop,18,-64+bodyDrop,2,trim);
+ const armY=-43+bodyDrop;
  const gloveLift=(a.saveHand==='glove'?a.saveReach*29:0)+(a.reaction==='glove'?impact*22:0);
  const blockerLift=(a.saveHand==='blocker'?a.saveReach*29:0)+(a.reaction==='blocker'?impact*22:0);
- ln(c,-19,-64,-31-gloveLift*.2,armY-gloveLift,12,jersey);ln(c,19,-64,31+blockerLift*.2,armY-blockerLift,12,jersey);
+ ln(c,-19,-64+bodyDrop,-31-gloveLift*.2,armY-gloveLift,12,jersey);ln(c,19,-64+bodyDrop,31+blockerLift*.2,armY-blockerLift,12,jersey);
  if(a.goalie){
   // Left hand: open catcher pocket with webbing. Right: rectangular blocker.
   oval(c,-32-gloveLift*.2,armY-gloveLift,12,11,'#f7fbfd');
@@ -176,11 +199,11 @@ function drawActor(c:CanvasRenderingContext2D,x:number,y:number,s:number,a:{team
  ln(c,42+poke*6,bladeY-4,bladeX,bladeY,5,'#182b3a');
  if(poke>.15)oval(c,bladeX,bladeY,4,2,'#d5e8f3');
  // Helmet and cage fully enclose head.
- oval(c,0,-85,15,17,a.team===0?'#f2f4f5':'#193d67');
- oval(c,0,-82,12,11,'#b8cbd8');
- for(const k of [-8,0,8])ln(c,k,-91,k,-72,1.7,'#557386');
- for(const k of [-88,-81,-74])ln(c,-12,k,12,k,1.5,'#557386');
- if(back){c.fillStyle=trim;c.textAlign='center';c.font='bold 13px system-ui';c.fillText(String(a.num),0,-49);}
+ oval(c,0,-85+bodyDrop,15,17,a.team===0?'#f2f4f5':'#193d67');
+ oval(c,0,-82+bodyDrop,12,11,'#b8cbd8');
+ for(const k of [-8,0,8])ln(c,k,-91+bodyDrop,k,-72+bodyDrop,1.7,'#557386');
+ for(const k of [-88,-81,-74])ln(c,-12,k+bodyDrop,12,k+bodyDrop,1.5,'#557386');
+ if(back){c.fillStyle=trim;c.textAlign='center';c.font='bold 13px system-ui';c.fillText(String(a.num),0,-49+bodyDrop);}
  if(a.selected){
   c.strokeStyle='#ffd34e';c.lineWidth=3;c.beginPath();c.ellipse(0,1,32,9,0,0,TAU);c.stroke();
  }
