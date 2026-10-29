@@ -1,4 +1,4 @@
-import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
+import {GOAL_HALF_WIDTH,findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
 import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 /** Self-contained 5v5 hockey simulation. Coordinates use the 800x440 canvas.
  * All puck possession, team decisions, goals, periods and goalie saves run here.
@@ -127,7 +127,7 @@ export class HockeyMatch {
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
-   this.shoot(this.selected,clamp(220+(this.rng()-.5)*65,185,255),true);
+   this.shoot(this.selected,clamp(220+(this.rng()-.5)*(GOAL_HALF_WIDTH*1.70),220-GOAL_HALF_WIDTH+6,220+GOAL_HALF_WIDTH-6),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
@@ -352,7 +352,11 @@ export class HockeyMatch {
   const marker=this.closest(team===0?1:0,carrier.x,carrier.y);
   const pressured=distance(carrier.x,carrier.y,this.skaters[marker].x,this.skaters[marker].y)<60;
   const inShootingLane=Math.abs(carrier.y-220)<120;
-  const targetY=clamp(220+(this.rng()-.5)*56,192,248);
+  // Use both upper/lower corners of the *actual* net, not just the middle.
+  // Wider goals must create more viable scoring lanes past the goalie.
+  const aimingCorner=this.rng()<.70;
+  const lateral=aimingCorner?(this.rng()<.5?-1:1)*(GOAL_HALF_WIDTH-9-this.rng()*10):(this.rng()-.5)*45;
+  const targetY=220+lateral;
   // Avoid firing directly into an obvious defender: create a passing lane first.
   const laneBlocked=this.skaters.some((def,i)=>{
    if(i===owner||def.team===team)return false;
