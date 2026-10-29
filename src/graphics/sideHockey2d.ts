@@ -72,8 +72,8 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   c.save();c.translate(p.x,p.y);
   c.fillStyle='rgba(83,164,210,.22)';c.beginPath();c.ellipse(0,0,40*zoom,25,0,0,Math.PI*2);c.fill();
   c.strokeStyle='#cf4254';c.lineWidth=5;
-  c.strokeRect(-9*zoom,-48,18*zoom,48);
-  for(let k=1;k<5;k++)line(c,-9*zoom,-48+k*10,9*zoom,-48+k*10,1.2,'#9bb5c4');
+  c.strokeRect(-12*zoom,-68,24*zoom,68);
+  for(let k=1;k<7;k++)line(c,-12*zoom,-68+k*10,12*zoom,-68+k*10,1.2,'#9bb5c4');
   c.restore();
  }
  const characters:{x:number;y:number;goalie:boolean;team:0|1;number:number;speed:number;pose:string;selected:boolean;vx:number}[]=[
