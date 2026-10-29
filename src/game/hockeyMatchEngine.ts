@@ -12,7 +12,7 @@ export interface MatchSkater {
  x:number;y:number;vx:number;vy:number;heading:number;team:Team;role:Position;
  carriedFor:number;shotAnimation:number;
 }
-export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;saveTarget:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1}
+export interface MatchGoalie {x:number;y:number;team:Team;pose:SavePose;poseTime:number;vx:number;vy:number;stance:number;actionTime:number;saveHand:'glove'|'blocker'|null;saveReach:number;saveTarget:number;pokeTime:number;reaction:'pads'|'body'|'stick'|'glove'|'blocker'|null;reactionTime:number;reactionSide:number;holdTime:number;coverTime:number;releaseTime:number;postBlend:number;postSide:-1|0|1;stridePhase:number;pushStrength:number;pushDirection:number;weightShift:number}
 export interface MatchPuck {
  x:number;y:number;vx:number;vy:number;owner:number;lock:number;
  shotTeam:Team|null;shotHeight:'low'|'high';lastShooter:number;height:number;vz:number;
@@ -27,8 +27,8 @@ const spots=[{x:308,y:220},{x:330,y:119},{x:330,y:321},{x:205,y:156},{x:205,y:28
 export class HockeyMatch {
  readonly skaters:MatchSkater[]=[];
  readonly goalies:MatchGoalie[]=[
-  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0},
-  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0}
+  {x:91,y:220,team:0,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0,stridePhase:0,pushStrength:0,pushDirection:0,weightShift:0},
+  {x:709,y:220,team:1,pose:'glide',poseTime:0,vx:0,vy:0,stance:0,actionTime:0,saveHand:null,saveReach:0,saveTarget:0,pokeTime:0,reaction:null,reactionTime:0,reactionSide:0,holdTime:0,coverTime:0,releaseTime:0,postBlend:0,postSide:0,stridePhase:0,pushStrength:0,pushDirection:0,weightShift:0}
  ];
  puck:MatchPuck={x:400,y:220,vx:0,vy:0,owner:-1,lock:0,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
  scores:[number,number]=[0,0];
@@ -170,7 +170,7 @@ export class HockeyMatch {
   }
   this.goalies[0].x=91;this.goalies[0].y=220;
   this.goalies[1].x=709;this.goalies[1].y=220;
-  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=g.saveTarget=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;g.holdTime=g.coverTime=g.releaseTime=g.postBlend=0;g.postSide=0;});
+  this.goalies.forEach(g=>{g.pose='glide';g.poseTime=0;g.vx=g.vy=g.stance=g.actionTime=g.saveReach=g.saveTarget=0;g.saveHand=null;g.pokeTime=0;g.reaction=null;g.reactionTime=0;g.reactionSide=0;g.holdTime=g.coverTime=g.releaseTime=g.postBlend=0;g.postSide=0;g.stridePhase=g.pushStrength=g.pushDirection=g.weightShift=0;});
   this.creaseMomentum=[0,0];this.goalieSaveCooldown=[0,0];
   this.lastSkaterDeflector=-1;this.skaterDeflectionTime=0;
   this.lastBlockAnnouncement=0;
@@ -345,6 +345,25 @@ export class HockeyMatch {
    const topSpeed=(postLock?24:butterfly?56:recovering?68:user?132+this.rating.speed*.22:115)*this.paceFactor;
    const accel=postLock?115:butterfly?205:recovering?290:470;
    const desiredX=targetX*topSpeed,desiredY=targetY*topSpeed;
+   // Movement animation is tied to physical push-off events rather than a free
+   // running clock. Fast shuffles load the opposite skate; a butterfly slide
+   // gets one long, powerful push, not frantic alternating foot motion.
+   const lateralIntent=Math.abs(targetY)>.16?Math.sign(targetY):0;
+   const startPush=lateralIntent!==0&&(Math.sign(g.pushDirection)!==lateralIntent||g.pushStrength<.1);
+   const speedFraction=clamp(Math.abs(g.vy)/Math.max(1,topSpeed),0,1);
+   if(startPush){
+    g.pushDirection=lateralIntent;
+    g.pushStrength=butterfly?.85:postLock?.16:.64;
+   }
+   if(lateralIntent!==0){
+    g.stridePhase+=(butterfly?2.9:postLock?2.0:6.4)*dt*(.35+.65*speedFraction);
+    g.pushStrength=clamp(g.pushStrength+dt*(butterfly?.55:1.25),0,butterfly?.95:1);
+   }else{
+    g.pushStrength=Math.max(0,g.pushStrength-dt*(butterfly?1.8:3.8));
+    g.stridePhase+=dt*1.2*speedFraction;
+   }
+   const targetLean=postLock?0:clamp(targetY*.68+g.vy/Math.max(1,topSpeed)*.32,-1,1);
+   g.weightShift+=clamp(targetLean-g.weightShift,-dt*4,dt*4);
    // Braking is stronger than acceleration to keep small crease corrections precise.
    const maxChange=(Math.hypot(targetX,targetY)<.08?accel*1.8:accel)*dt;
    const dx=desiredX-g.vx,dy=desiredY-g.vy;
