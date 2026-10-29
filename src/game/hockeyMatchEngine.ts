@@ -181,6 +181,7 @@ export class HockeyMatch {
   this.puck={x:this.skaters[carrier].x,y:this.skaters[carrier].y,
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
   this.lastPasser=-1;this.decisionCooldown=[1.5,1.5];this.possessionTime=[0,0];
+  this.shotClock=[8+this.rng()*4,8+this.rng()*4];
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
  }
  private release(owner:number,targetX:number,targetY:number,power:number,shot:boolean):void {
@@ -202,7 +203,9 @@ export class HockeyMatch {
   const range=Math.abs(goalX-a.x);
   const scatter=(this.rng()-.5)*(user?Math.max(12,62-this.rating.shot*.42):Math.max(12,27+range*.05));
   this.release(owner,a.team===0?780:20,targetY+scatter,user?520+this.rating.shot*1.7:485+this.rng()*90,true);
-  this.shots[a.team]++;this.decisionCooldown[a.team]=1.5+this.rng()*.9;
+  this.shots[a.team]++;
+  this.shotClock[a.team]=user?0:13+this.periodMinutes*1.6+this.rng()*11;
+  this.decisionCooldown[a.team]=1.8+this.rng()*1.1;
   this.emit('shot',a.team===0?'HOME SHOT':'AWAY SHOT',a.team);
  }
  private pass(owner:number,to:number):void {
