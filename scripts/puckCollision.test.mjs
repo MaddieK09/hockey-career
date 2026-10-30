@@ -547,3 +547,33 @@ test('players aging out of junior continue in development without invalid age el
  const next=nextCareerStart(p,'2006-02-02');
  assert.equal(next.age,21);assert.equal(next.division,'development');
 });
+
+test('all eight fictional teams have distinct valid original jersey crests',async()=>{
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ const {TEAM_CRESTS,teamCrest,crestIds}=await loadTS('src/game/fictionalBranding.ts');
+ assert.equal(crestIds().length,8);
+ assert.equal(new Set(Object.values(TEAM_CRESTS).map(v=>v.path)).size,8);
+ for(const team of LEAGUE_TEAMS){
+  const design=TEAM_CRESTS[team.id];
+  assert.ok(design.path.startsWith('M')&&design.detail.startsWith('M'));
+  const markup=teamCrest(team.id,42);
+  assert.match(markup,/viewBox="0 0 100 100"/);
+  assert.ok(markup.includes(team.primary)&&markup.includes(team.accent));
+  assert.ok(markup.includes(team.city+' '+team.name));
+ }
+});
+test('league crests label Peewee, U18, Junior and legacy development paths',async()=>{
+ const {startingPath,normalizeCareerStart}=await loadTS('src/game/careerPath.ts');
+ const {leagueCrest}=await loadTS('src/game/fictionalBranding.ts');
+ const options=[
+  startingPath('2014-08-26',12,'u13','aaa'),
+  startingPath('2010-08-26',17,'u18','aa'),
+  startingPath('2008-08-26',18,'junior','jra'),
+  normalizeCareerStart(null,'2009-08-26','2026-10-01')
+ ];
+ for(const start of options){
+  const svg=leagueCrest(start,40);
+  assert.ok(svg.includes('<svg')&&svg.includes('Northern Ice'));
+  assert.ok(svg.includes(start.division==='development'?'DEV':start.division.toUpperCase()));
+ }
+});
