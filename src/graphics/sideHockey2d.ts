@@ -18,11 +18,11 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  // flat side view. A following camera tracks the controlled player; goalie
  // follows the crease and shot lane; broadcast keeps both nets in view.
  const zoom=mode==='player'?2.15:mode==='goalie'?1.65:mode==='sideline'?1.48:1.12;
- const focusX=mode==='broadcast'?400+(match.puck.x-400)*.65:mode==='sideline'?match.puck.x:
+ const focusX=mode==='broadcast'?400+(match.puck.x-400)*.76:mode==='sideline'?match.puck.x:
   mode==='goalie'?match.goalies[0].x*.7+match.puck.x*.3:player.x;
  const focusY=mode==='player'?player.y:mode==='goalie'?220:mode==='sideline'?match.puck.y:220;
  if(lastCameraMode!==mode){smoothedCameraX=focusX;smoothedCameraY=focusY;lastCameraMode=mode;}
- smoothedCameraX+=(focusX-smoothedCameraX)*(mode==='broadcast'?.08:.15);
+ smoothedCameraX+=(focusX-smoothedCameraX)*(mode==='broadcast'?.10:.15);
  smoothedCameraY+=(focusY-smoothedCameraY)*.12;
  const cameraX=clamp(smoothedCameraX,400/zoom,800-400/zoom);
  const project=(x:number,y:number)=>{
@@ -157,7 +157,13 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
  }
  const puck=project(match.puck.x,match.puck.y);
  ellipse(c,puck.x,puck.y,8*zoom,4.5*zoom,'#172331');
- c.strokeStyle='#ffcf54';c.lineWidth=2;c.beginPath();c.ellipse(puck.x,puck.y,13*zoom,8*zoom,0,0,Math.PI*2);c.stroke();
+ // Fast pucks need an ice-contact shadow and a visible travel trace.
+ const speed=Math.hypot(match.puck.vx,match.puck.vy);
+ if(speed>130){
+  const tail=project(match.puck.x-match.puck.vx/speed*24,match.puck.y-match.puck.vy/speed*24);
+  line(c,tail.x,tail.y,puck.x,puck.y,2.5,'rgba(243,184,46,.63)');
+ }
+ c.strokeStyle='#ffcf54';c.lineWidth=2.6;c.beginPath();c.ellipse(puck.x,puck.y,13*zoom,8*zoom,0,0,Math.PI*2);c.stroke();
  // Non-top-down views show a camera label so orientation is always clear.
  c.fillStyle='rgba(8,30,49,.76)';c.fillRect(12,12,185,30);
  c.fillStyle='#e7f6ff';c.font='bold 13px system-ui';c.textAlign='left';
