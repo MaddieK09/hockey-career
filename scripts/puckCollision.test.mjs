@@ -588,3 +588,49 @@ test('career portrait jersey includes the chosen club crest without changing cre
  assert.ok(careerSvg.includes('translate(127 321)'));
  assert.ok(!draftSvg.includes('Northport Wolves crest'));
 });
+
+test('simulated game awards exactly ten percent of matching played XP',async()=>{
+ const {playedGameXP,simulatedGameXP}=await loadTS('src/game/careerAwards.ts');
+ for(const goals of [0,1,3])for(const assists of [0,1,2])for(const saves of [0,12,34])for(const win of [true,false]){
+  const played=playedGameXP(goals,assists,saves,win);
+  assert.equal(simulatedGameXP(goals,assists,saves,win),Math.round(played*.1));
+ }
+ assert.equal(simulatedGameXP(0,0,0,false),4);
+ assert.equal(simulatedGameXP(0,0,0,true),7);
+});
+test('career trophy milestones are granted once regardless of repeated calls',async()=>{
+ const {emptyTrophyCase,checkMilestoneAwards,normalizeTrophyCase}=await loadTS('src/game/careerAwards.ts');
+ const {emptyPositionStats}=await loadTS('src/game/careerPositionStats.ts');
+ const box=emptyTrophyCase(),stats=emptyPositionStats();
+ stats.wins=10;stats.shutouts=1;
+ assert.equal(checkMilestoneAwards(box,stats,'G',2026,'U13 AAA'),3);
+ assert.equal(checkMilestoneAwards(box,stats,'G',2026,'U13 AAA'),0);
+ assert.equal(box.items.length,3);
+ assert.deepEqual(normalizeTrophyCase(JSON.parse(JSON.stringify(box))),box);
+});
+test('season awards recognize championship, standings winner and runner-up without duplicates',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY,leagueStandings}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,simulateRemainingPlayoffs}=await loadTS('src/game/careerPlayoffs.ts');
+ const {emptyTrophyCase,awardSeason}=await loadTS('src/game/careerAwards.ts');
+ const {emptyPositionStats}=await loadTS('src/game/careerPositionStats.ts');
+ const season=newSeason('northport','2026-10-01',4);simulateThrough(season,MAX_SEASON_DAY);
+ const p=createPlayoffs(season,'u13');simulateRemainingPlayoffs(p);
+ const box=emptyTrophyCase();const n=awardSeason(box,season,p,'G',emptyPositionStats(),'U13 AAA');
+ assert.ok(n>=0&&n<=3);
+ assert.equal(awardSeason(box,season,p,'G',emptyPositionStats(),'U13 AAA'),0);
+ assert.ok(box.items.every(t=>t.year===2026&&t.league==='U13 AAA'));
+ if(p.champion===season.teamId)assert.ok(box.items.some(t=>t.award==='league-champion'));
+ if(leagueStandings(season)[0].team.id===season.teamId)assert.ok(box.items.some(t=>t.award==='regular-champion'));
+});
+test('credited game is not counted twice by simulating a completed fixture again',async()=>{
+ const {newSeason,simulateThrough}=await loadTS('src/game/seasonLeague.ts');
+ const {simulatedGameXP}=await loadTS('src/game/careerAwards.ts');
+ const s=newSeason('northport');
+ const games=s.fixtures.filter(f=>f.day<=4&&(f.homeId==='northport'||f.awayId==='northport'));
+ simulateThrough(s,4);
+ let xp=0;
+ for(const f of games)xp+=simulatedGameXP(0,0,0,f.homeId==='northport'?f.homeGoals>f.awayGoals:f.awayGoals>f.homeGoals);
+ const again=simulateThrough(s,4);
+ assert.equal(again.userGames,0);
+ assert.ok(xp>0);
+});

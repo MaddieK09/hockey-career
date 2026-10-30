@@ -264,3 +264,17 @@
 .playoff-series .hockey-team-crest{width:32px;height:32px}
 .season-fixture .hockey-team-crest{width:19px;height:19px;margin:0 3px}
 .career-panel h2 .hockey-team-crest,.career-panel h2 .hockey-league-crest{width:28px;height:28px;margin-right:4px}
+
+/* PR106 – career trophy case. */
+.season-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
+.trophy-summary{display:flex;align-items:center;gap:12px;border-radius:12px;background:#153f55;padding:12px 16px;margin:14px 0;color:#f1d68c}
+.trophy-summary strong{font-size:30px;font-variant-numeric:tabular-nums}
+.trophy-summary span{font-weight:700;font-size:12px}
+.trophy-shelf{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-top:12px}
+.trophy-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid #a78b55;border-radius:13px;background:linear-gradient(160deg,#294251,#102b41);padding:14px;box-shadow:inset 0 1px 0 #ffffff1a}
+.trophy-card .trophy-emoji{font-size:32px;line-height:1.2}
+.trophy-card strong{color:#ffe3a3;font-size:14px}
+.trophy-card span{font-size:12px;font-weight:800;color:#cce8f4}
+.trophy-card small{color:#9fc4d3;font-size:11px}
+.trophy-card p{font-size:12px;color:#c9d8e1;margin:3px 0 0}
+@media(max-width:420px){.season-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
