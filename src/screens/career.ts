@@ -71,6 +71,15 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  career.attributes=normalizeAttributes(career.attributes,p.position,career);
  career.seasonLedger=normalizeSeasonLedger(career.seasonLedger,Number(career.season.startDate.slice(0,4)));
  career.seasonLedgers??=[];
+ // Recover existing completed simulation records into the new annual ledger,
+ // without replaying career statistics, awarding XP again, or altering scores.
+ for(const fixture of career.season.fixtures){
+  if(fixture.played===false&&(fixture.homeId===career.teamId||fixture.awayId===career.teamId))
+   addSimulatedStat(career.seasonLedger,fixture,p.position,career.teamId);
+ }
+ checkMilestoneAwards(career.trophyCase,career.positionStats,p.position,
+  Number(career.season.startDate.slice(0,4)),leagueTitle(career.startingPath));
+ saveCareer(career);
  const addXP=(amount:number)=>{
   career.xp+=Math.max(0,Math.floor(amount));
   const newLevel=levelFromXP(career.xp);
