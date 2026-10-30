@@ -56,7 +56,7 @@ export function newSeason(teamId:string,startDate=SEASON_START_DATE):SeasonSave{
  */
 export function normalizeSeason(raw:unknown,teamId:string):SeasonSave{
  if(!raw||typeof raw!=='object')return newSeason(teamId);
- const s=raw as Partial<SeasonSave>;
+ const s=raw as Omit<Partial<SeasonSave>,'version'> & {version?:number};
  if(!Array.isArray(s.fixtures)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s.startDate??''))return newSeason(teamId);
  if(s.version===2&&s.fixtures.length===224){
   return {...s,version:2,startDate:s.startDate!,day:clamp(Math.floor(Number(s.day)||0),0,MAX_SEASON_DAY),
