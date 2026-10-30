@@ -1,3 +1,4 @@
+import {drawTeamCrest} from '../game/fictionalBranding';
 import {GOAL_HALF_WIDTH,GOAL_HEIGHT} from '../game/puckCollision';
 /** Side-on 2D hockey presentation, projected from the existing rink simulation.
  * This is NOT a top-down sprite view. Skaters have full-height illustrated bodies.
@@ -119,6 +120,7 @@ export function drawSideHockey(c:CanvasRenderingContext2D,match:HockeyMatch,mode
   // Shoulder pads, tapered jersey and colored elbow bands.
   c.fillStyle='#0d2436';c.beginPath();c.moveTo(-13,-67);c.lineTo(15,-67);c.lineTo(21,-57);c.lineTo(14,-33);c.lineTo(-15,-33);c.lineTo(-21,-57);c.closePath();c.fill();
   c.fillStyle=shirt;c.beginPath();c.moveTo(-13,-66);c.lineTo(15,-66);c.lineTo(19,-56);c.lineTo(14,-35);c.lineTo(-14,-35);c.lineTo(-19,-56);c.closePath();c.fill();
+  drawTeamCrest(c,match.teams[a.team].id,0,-50,22);
   line(c,-16,-51,17,-51,1.5,'rgba(255,255,255,.28)');
   line(c,-16,-39,16,-39,3,trim);line(c,-17,-60,17,-60,3,trim);
   line(c,-14,-36,14,-36,2,'#173149');
