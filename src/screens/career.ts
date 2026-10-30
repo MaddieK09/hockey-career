@@ -1,3 +1,5 @@
+import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
+import {positionStatsMarkup} from './careerStatPanels';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
 import {DEFAULT_TEAM_ID,getTeam,nextOpponent,teamChoiceOptions} from '../game/fictionalLeague';
 import {loadPeriodMinutes,validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
@@ -7,7 +9,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft; teamId?:string; season?:SeasonSave; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -15,7 +17,7 @@ export function loadCareer():CareerSave|null {
  try {const raw=localStorage.getItem(KEY);if(!raw)return null;const s=JSON.parse(raw) as CareerSave;return s?.player&&Number.isFinite(s.games)?s:null;}catch{return null;}
 }
 export function startCareer(p:PlayerDraft):CareerSave {
- const s:CareerSave={player:p,teamId:DEFAULT_TEAM_ID,season:newSeason(DEFAULT_TEAM_ID),periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+ const s:CareerSave={player:p,teamId:DEFAULT_TEAM_ID,season:newSeason(DEFAULT_TEAM_ID),positionStats:emptyPositionStats(),periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -31,8 +33,18 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  career.periodMinutes=validPeriodMinutes(career.periodMinutes??loadPeriodMinutes());
  career.teamId=getTeam(career.teamId).id;
  career.season=normalizeSeason(career.season,career.teamId);
+ career.positionStats=normalizePositionStats(career.positionStats,career);
  let selectedDay=career.season.day;
  const persist=()=>saveCareer(career);
+ const creditSimulation=(season:SeasonSave,day:number)=>{
+  const pending=season.fixtures.filter(f=>f.homeGoals===undefined&&(f.homeId===career.teamId||f.awayId===career.teamId)&&f.day<=day);
+  const report=simulateThrough(season,day);
+  for(const fixture of pending){
+   if(fixture.homeGoals!==undefined)applySimulatedCareerFixture(career.positionStats!,p.position,fixture,career.teamId!);
+  }
+  career.games+=report.userGames;career.wins+=report.wins;career.losses+=report.losses;
+  persist();return report;
+ };
  // The season is seven browsable months rather than a single 197-cell strip.
  const months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
  let visibleMonth=Math.max(0,months.indexOf(dateAt(career.season,selectedDay).slice(0,7)));
@@ -86,9 +98,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   // Otherwise Oct 1 scores only appear once the clock reaches Oct 2.
   const hasUnplayedToday=season.fixtures.some(f=>f.day===season.day&&f.homeGoals===undefined);
   const next=hasUnplayedToday?season.day:season.day+1;
-  const summary=simulateThrough(season,next);
-  career.games+=summary.userGames;career.wins+=summary.wins;career.losses+=summary.losses;
-  persist();
+  creditSimulation(season,next);
   selectedDay=season.day;
   const currentMonth=months.indexOf(dateAt(season,season.day).slice(0,7));
   if(currentMonth>=0)visibleMonth=currentMonth;
@@ -126,7 +136,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><strong>FICTIONAL DEVELOPMENT LEAGUE</strong><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · DEVELOPMENT LEAGUE</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality}</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
-   <section class="career-stats"><div><strong>${career.goals}</strong><span>Goals</span></div><div><strong>${career.assists}</strong><span>Assists</span></div><div><strong>${career.saves}</strong><span>Saves</span></div><div><strong>${career.xp}</strong><span>XP</span></div></section>
+   ${positionStatsMarkup(p.position,career.positionStats!)}
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button></nav>
    <div data-season-view="home">
     <section class="career-panel"><h2>Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
@@ -224,18 +234,17 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const startMatch=(fixture:Fixture)=>{
   const season=career.season!;
   // Skip off-days and simulate other clubs up to the day before this game.
-  const warmup=simulateThrough(season,Math.max(season.day,fixture.day-1));
-  career.games+=warmup.userGames;career.wins+=warmup.wins;career.losses+=warmup.losses;
+  creditSimulation(season,Math.max(season.day,fixture.day-1));
   season.day=Math.max(season.day,fixture.day);
   persist();
   const home=getTeam(career.teamId);
   const opponent=getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId);
   return mountHockeyMatch(root,p.position==='G',career,(result)=>{
    recordUserResult(season,fixture,result.home,result.away);
-   const after=simulateThrough(season,season.day);
-   career.games+=1+after.userGames;
+   creditSimulation(season,season.day);
+   career.games+=1;
+   applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false);
    if(result.home>result.away)career.wins++;else if(result.home<result.away)career.losses++;
-   career.wins+=after.wins;career.losses+=after.losses;
    career.goals+=result.goals;career.assists+=result.assists;career.saves+=result.saves;
    const gained=40+result.goals*35+result.assists*20+result.saves*10+(result.home>result.away?30:0);
    career.xp+=gained;
