@@ -3,7 +3,7 @@ import {leagueStandings,botStats,type SeasonSave} from './seasonLeague';
 import type {CareerPositionStats} from './careerPositionStats';
 import type {Position} from '../player/types';
 import type {PlayoffSave} from './careerPlayoffs';
-export type AwardId='league-champion'|'regular-champion'|'playoff-finalist'|'first-win'|'ten-wins'|'shutout'|'first-point'|'scoring-title'|'goalie-wins-title'|'goalie-saves-title'|'goal-title'|'assist-title'|'goalie-save-percentage-title'|'twenty-five-wins'|'fifty-wins'|'twenty-five-goals'|'fifty-points'|'one-hundred-games'|'five-shutouts';
+export type AwardId='league-champion'|'regular-champion'|'playoff-finalist'|'first-win'|'ten-wins'|'shutout'|'first-point'|'scoring-title'|'goalie-wins-title'|'goalie-saves-title'|'goal-title'|'assist-title'|'goalie-save-percentage-title'|'goalie-gaa-title'|'goalie-shutout-title'|'twenty-five-wins'|'fifty-wins'|'twenty-five-goals'|'fifty-points'|'one-hundred-games'|'five-shutouts';
 export interface Trophy {id:string;award:AwardId;title:string;year:number;league:string;detail:string;icon:string}
 export interface TrophyCase {version:1;items:Trophy[]}
 export const emptyTrophyCase=():TrophyCase=>({version:1,items:[]});
@@ -27,6 +27,8 @@ export function giveAward(box:TrophyCase,award:AwardId,year:number,league:string
   'goal-title':['League Goals Leader','🎯'],
   'assist-title':['League Assists Leader','🎟️'],
   'goalie-save-percentage-title':['League Save Percentage Leader','🥅'],
+  'goalie-gaa-title':['League Goals-Against Leader','🛡️'],
+  'goalie-shutout-title':['League Shutout Leader','🚫'],
   'twenty-five-wins':['25 Career Wins','🏅'],
   'fifty-wins':['50 Career Wins','🏆'],
   'twenty-five-goals':['25 Career Goals','🎯'],
@@ -78,7 +80,18 @@ export function awardSeason(box:TrophyCase,season:SeasonSave,post:PlayoffSave,po
   if(position==='G'){
    if(top(stats.wins,p=>goalies.includes(p)?p.wins:0))grant('goalie-wins-title','Most goalie wins in the league');
    if(top(stats.saves,p=>goalies.includes(p)?p.saves:0))grant('goalie-saves-title','Most saves in the league');
-   // Bot records currently lack shots faced. Avoid a fake league SV% award.
+   const eligible=goalies.filter(p=>p.gp>0&&p.shotsAgainst>0);
+   const enoughStarts=stats.gp>=Math.ceil(leagueStandings(season)[0].gp*.5);
+   if(enoughStarts&&stats.shotsAgainst>0&&eligible.length){
+    const playerPct=stats.saves/stats.shotsAgainst;
+    if(eligible.every(p=>playerPct>p.saves/p.shotsAgainst))
+     grant('goalie-save-percentage-title','Led league in save percentage with at least half the season played');
+    const playerGaa=stats.goalsAgainst/stats.gp;
+    if(eligible.every(p=>playerGaa<p.goalsAgainst/p.gp))
+     grant('goalie-gaa-title','Lowest goals against per game with at least half the season played');
+   }
+   if(top(stats.shutouts,p=>goalies.includes(p)?p.shutouts:0))
+    grant('goalie-shutout-title','Most shutouts in the league');
   }else{
    if(top(stats.goals+stats.assists,p=>skaters.includes(p)?p.points:0))grant('scoring-title','Led the league in points');
    if(top(stats.goals,p=>skaters.includes(p)?p.goals:0))grant('goal-title','Led the league in goals');
