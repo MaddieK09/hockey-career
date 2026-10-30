@@ -8,7 +8,7 @@ export interface Fixture {
 }
 export interface SeasonSave {version:2;startDate:string;day:number;teamId:string;fixtures:Fixture[]}
 export interface TeamStanding {team:LeagueTeam;gp:number;w:number;l:number;gf:number;ga:number;pts:number;diff:number}
-export interface BotStat {id:string;name:string;teamId:string;position:'F'|'D'|'G';gp:number;goals:number;assists:number;points:number;saves:number;wins:number}
+export interface BotStat {id:string;name:string;teamId:string;position:'F'|'D'|'G';gp:number;goals:number;assists:number;points:number;saves:number;wins:number;shotsAgainst:number;goalsAgainst:number;shutouts:number}
 const firstNames=['Evan','Mason','Leo','Theo','Owen','Nolan','Finn','Alex','Riley','Jordan','Carter','Max','Jamie','Dylan','Quinn','Parker'];
 const lastNames=['Mercer','Vale','Bennett','Voss','Reed','Cole','Frost','Hale','Rowan','Brooks','Price','Keller','Stone','Mills','Hayes','Ward'];
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
@@ -142,7 +142,7 @@ export function botStats(s:SeasonSave):BotStat[]{
  for(const [ti,t] of LEAGUE_TEAMS.entries()){
   for(let i=0;i<6;i++){
    const n=ti*6+i;players.push({id:t.id+'-'+i,name:firstNames[n%firstNames.length]+' '+lastNames[(n*7+3)%lastNames.length],
-    teamId:t.id,position:i===5?'G':i>=3?'D':'F',gp:0,goals:0,assists:0,points:0,saves:0,wins:0});
+    teamId:t.id,position:i===5?'G':i>=3?'D':'F',gp:0,goals:0,assists:0,points:0,saves:0,wins:0,shotsAgainst:0,goalsAgainst:0,shutouts:0});
   }
  }
  const byTeam=(id:string)=>players.filter(p=>p.teamId===id);
@@ -157,7 +157,10 @@ export function botStats(s:SeasonSave):BotStat[]{
     scorer.goals++;scorer.points++;
     if(helper!==scorer){helper.assists++;helper.points++;}
    }
-   const goalie=roster[5];goalie.saves+=Math.max(5,17+Math.floor(rand(seed+31)*14)-against);
+   const goalie=roster[5];const saves=Math.max(5,17+Math.floor(rand(seed+31)*14)-against);
+   goalie.saves+=saves;goalie.shotsAgainst+=saves+against;
+   goalie.goalsAgainst+=against;
+   if(against===0)goalie.shutouts++;
    if(victory)goalie.wins++;
   }
  }
