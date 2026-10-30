@@ -131,40 +131,90 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
     <section class="career-panel"><h2>Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
    </div>
    <div data-season-view="calendar" hidden>
-    <section class="career-panel"><h2>Season calendar</h2><p>Today: <strong>${current}</strong>. ★ marks your team's games. Choose any future day, then simulate up to that date.</p>
-      <div class="season-calendar">${calendar}</div>
-      <div class="season-sim-controls"><label for="season-target">Simulate until</label><input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,MAX_SEASON_DAY)}" value="${selected}"><button data-sim-target ${selectedDay<=season.day?'disabled':''}>SIM TO DATE</button></div>
-      <p class="career-muted">Simulation includes every league fixture—including your team's games—up to the selected day. Played games and statistics are never overwritten. Simulation is permanent once saved.</p>
+    <section class="career-panel">
+      <h2>Season calendar · October–April</h2>
+      <p>Today: <strong data-calendar-today>${current}</strong>. Every game day shows the matchup and its final score after simulation. <b>T</b> = training placeholder; <b>R</b> = rest.</p>
+      <div class="season-month-bar">
+        <button type="button" data-month-step="-1" ${visibleMonth===0?'disabled':''} aria-label="Previous month">‹</button>
+        <strong data-month-name>${monthTitle()}</strong>
+        <button type="button" data-month-step="1" ${visibleMonth===months.length-1?'disabled':''} aria-label="Next month">›</button>
+      </div>
+      <div class="season-weekdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      <div class="season-calendar" data-calendar-grid>${calendar}</div>
+      <div class="season-sim-controls">
+       <label for="season-target">Simulate until</label>
+       <input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,MAX_SEASON_DAY)}" value="${selected}">
+       <label for="season-speed">Simulation speed</label>
+       <select data-sim-speed id="season-speed">
+        <option value="130" ${simDelay===130?'selected':''}>Steady · 130ms/day</option>
+        <option value="70" ${simDelay===70?'selected':''}>Fast · 70ms/day</option>
+        <option value="35" ${simDelay===35?'selected':''}>Turbo · 35ms/day</option>
+       </select>
+       <button type="button" data-sim-target ${selectedDay<=season.day?'disabled':''}>SIM DAY BY DAY</button>
+      </div>
+      <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${season.day}" hidden></progress>
+      <p class="season-sim-status" data-sim-status aria-live="polite">Ready · Select a future date and simulate.</p>
+      <div class="season-sim-results" data-sim-results>${renderDayResults(season.day)}</div>
+      <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. T and R have no training or recovery mechanics yet.</p>
     </section>
-    <section class="career-panel"><h2>Upcoming fixtures</h2><div class="season-fixtures">${scheduleMarkup||'All league games completed.'}</div></section>
+    <section class="career-panel"><h2>Upcoming fixtures & results</h2><div class="season-fixtures">${scheduleMarkup||'All league games completed.'}</div></section>
    </div>
    <div data-season-view="standings" hidden><section class="career-panel"><h2>League standings</h2><p>Two points for a win. Ties are settled in overtime.</p><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Club</th><th>GP</th><th>W</th><th>L</th><th>GF</th><th>GA</th><th>PTS</th></tr></thead><tbody>${standings.map((t,i)=>'<tr'+(t.team.id===home.id?' class="season-highlight"':'')+'><td>'+(i+1)+'. '+t.team.abbr+'</td><td>'+t.gp+'</td><td>'+t.w+'</td><td>'+t.l+'</td><td>'+t.gf+'</td><td>'+t.ga+'</td><td>'+t.pts+'</td></tr>').join('')}</tbody></table></div></section></div>
    <div data-season-view="stats" hidden>
     <section class="career-panel"><h2>AI skater leaders</h2><p>Generated from the actual league results in this saved season.</p><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Player</th><th>Team</th><th>GP</th><th>G</th><th>A</th><th>PTS</th></tr></thead><tbody>${leaders.map(x=>'<tr><td>'+x.name+'</td><td>'+getTeam(x.teamId).abbr+'</td><td>'+x.gp+'</td><td>'+x.goals+'</td><td>'+x.assists+'</td><td>'+x.points+'</td></tr>').join('')}</tbody></table></div></section>
     <section class="career-panel"><h2>AI goalie statistics</h2><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Goalie</th><th>Team</th><th>GP</th><th>W</th><th>SV</th></tr></thead><tbody>${goalieLeaders.map(x=>'<tr><td>'+x.name+'</td><td>'+getTeam(x.teamId).abbr+'</td><td>'+x.gp+'</td><td>'+x.wins+'</td><td>'+x.saves+'</td></tr>').join('')}</tbody></table></div></section>
    </div></main>`;
-  root.querySelector('[data-menu]')?.addEventListener('click',onMenu);
+  root.querySelector('[data-menu]')?.addEventListener('click',()=>{cancelSim();onMenu();});
   const tabs=root.querySelectorAll<HTMLButtonElement>('[data-tab]');
   const showTab=(tab:string)=>{tabs.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));root.querySelectorAll<HTMLElement>('[data-season-view]').forEach(v=>v.hidden=v.dataset.seasonView!==tab);};
-  tabs.forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab!)));
+  tabs.forEach(b=>b.addEventListener('click',()=>{if(simRunning)return;activeTab=b.dataset.tab!;showTab(activeTab);}));
   showTab(activeTab);
-  root.querySelector('[data-play]')?.addEventListener('click',()=>{if(fixture)match=startMatch(fixture);});
+  root.querySelector('[data-play]')?.addEventListener('click',()=>{if(fixture&&!simRunning){cancelSim();match=startMatch(fixture);}});
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
+   if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate);selectedDay=0;
+   career.season=newSeason(career.teamId,season.startDate);selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
-  root.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.skill as 'speed'|'shot'|'handling'|'defense';if(career.skillPoints&&career[k]<99){career[k]=clamp(career[k]+3,0,99);career.skillPoints--;persist();drawHub();}}));
-  root.querySelectorAll<HTMLButtonElement>('[data-day]').forEach(b=>b.addEventListener('click',()=>{
-   selectedDay=Number(b.dataset.day);activeTab='calendar';drawHub();
+  root.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach(b=>b.addEventListener('click',()=>{
+   if(simRunning)return;
+   const k=b.dataset.skill as 'speed'|'shot'|'handling'|'defense';
+   if(career.skillPoints&&career[k]<99){career[k]=clamp(career[k]+3,0,99);career.skillPoints--;persist();drawHub();}
+  }));
+  const calendarGrid=root.querySelector<HTMLElement>('[data-calendar-grid]');
+  calendarGrid?.addEventListener('click',e=>{
+   if(simRunning)return;
+   const button=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-day]');
+   if(!button)return;
+   selectedDay=Number(button.dataset.day);activeTab='calendar';drawHub();
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-month-step]').forEach(b=>b.addEventListener('click',()=>{
+   if(simRunning)return;
+   visibleMonth=clamp(visibleMonth+Number(b.dataset.monthStep),0,months.length-1);
+   activeTab='calendar';drawHub();
   }));
   const input=root.querySelector<HTMLInputElement>('[data-target-date]');
-  input?.addEventListener('change',()=>{selectedDay=Math.max(season.day,seasonDay(input.value,season.startDate));activeTab='calendar';drawHub();});
+  input?.addEventListener('change',()=>{
+   if(simRunning)return;
+   selectedDay=Math.max(season.day,seasonDay(input.value,season.startDate));
+   visibleMonth=Math.max(0,months.indexOf(dateAt(season,selectedDay).slice(0,7)));
+   activeTab='calendar';drawHub();
+  });
+  root.querySelector<HTMLSelectElement>('[data-sim-speed]')?.addEventListener('change',e=>{
+   const speed=Number((e.currentTarget as HTMLSelectElement).value);
+   simDelay=[35,70,130].includes(speed)?speed:70;
+  });
   root.querySelector<HTMLButtonElement>('[data-sim-target]')?.addEventListener('click',()=>{
+   if(simRunning){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
    if(selectedDay<=season.day)return;
-   const r=simulateThrough(season,selectedDay);
-   career.games+=r.userGames;career.wins+=r.wins;career.losses+=r.losses;
-   persist();activeTab='calendar';drawHub();
+   simTarget=selectedDay;simRunning=true;
+   const button=root.querySelector<HTMLButtonElement>('[data-sim-target]');
+   if(button)button.textContent='STOP SIM';
+   const progress=root.querySelector<HTMLProgressElement>('[data-sim-progress]');
+   if(progress){progress.hidden=false;progress.max=simTarget;progress.value=season.day;}
+   const status=root.querySelector<HTMLElement>('[data-sim-status]');
+   if(status)status.textContent='Advancing day by day from '+dateAt(season,season.day)+'…';
+   simTimer=setTimeout(simTick,simDelay);
   });
  };
  let activeTab='home';
