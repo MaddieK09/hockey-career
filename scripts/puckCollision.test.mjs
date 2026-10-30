@@ -209,3 +209,19 @@ test('goal totals cannot exceed SOG even with stale counters',()=>{
  assert.equal(m.resolveGoalPlane(100,220,8),true);
  assert.ok(m.shots[1]>=m.scores[1]);
 });
+
+test('attacking forwards select open lanes rather than skating into defenders',async()=>{
+ const {openPassingLane}=await loadTS('src/game/formationAI.ts');
+ const base={x:560,y:220};
+ const chosen=openPassingLane('C',base,[{x:560,y:220},{x:570,y:240}]);
+ assert.notEqual(chosen.y,220);
+ assert.ok(chosen.y>=55&&chosen.y<=385);
+});
+test('open-lane selection leaves a clear receiving option unchanged',async()=>{
+ const {openPassingLane}=await loadTS('src/game/formationAI.ts');
+ assert.deepEqual(openPassingLane('RW',{x:520,y:348},[{x:600,y:100}]),{x:520,y:348});
+});
+test('defensemen keep point assignments instead of wandering after defenders',async()=>{
+ const {openPassingLane}=await loadTS('src/game/formationAI.ts');
+ for(const role of ['LD','RD'])assert.deepEqual(openPassingLane(role,{x:340,y:150},[{x:340,y:150}]),{x:340,y:150});
+});
