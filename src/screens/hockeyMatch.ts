@@ -1,3 +1,4 @@
+import {teamCrest} from '../game/fictionalBranding';
 import {getTeam,type LeagueTeam} from '../game/fictionalLeague';
 import {validPeriodMinutes,periodOptions,savePeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 import {HockeyMatch} from '../game/hockeyMatchEngine';
@@ -35,8 +36,8 @@ export function mountHockeyMatch(
  root.innerHTML='<main class="career-shell match-shell">'
   +'<header class="career-top"><button type="button" data-exit>← Career</button>'
   +'<div class="scorebug" role="status" aria-label="Live game scoreboard">'
-  +'<div class="scorebug-team scorebug-home"><span>'+homeTeam.abbr+'</span><strong data-home-score>0</strong></div>'
-  +'<div class="scorebug-team scorebug-away"><span>'+awayTeam.abbr+'</span><strong data-away-score>0</strong></div>'
+  +'<div class="scorebug-team scorebug-home">'+teamCrest(homeTeam.id,30)+'<span>'+homeTeam.abbr+'</span><strong data-home-score>0</strong></div>'
+  +'<div class="scorebug-team scorebug-away">'+teamCrest(awayTeam.id,30)+'<span>'+awayTeam.abbr+'</span><strong data-away-score>0</strong></div>'
   +'<div class="scorebug-timer"><strong data-clock>'+match.periodMinutes+':00</strong><small data-period>1ST</small></div>'
   +'</div></header>'
   +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><span class="match-league-name">'+leagueLabel+'</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
