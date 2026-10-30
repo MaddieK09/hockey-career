@@ -1,3 +1,5 @@
+import {ATTRIBUTES,visibleAttributes,normalizeAttributes,upgradeAttribute,matchRatings,type AttributeValues} from '../game/careerAttributes';
+import {newSeasonLedger,normalizeSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,type SeasonPlayerLedger} from '../game/seasonPlayerLedger';
 import {emptyTrophyCase,normalizeTrophyCase,checkMilestoneAwards,awardSeason,playedGameXP,simulatedGameXP,levelFromXP,type TrophyCase} from '../game/careerAwards';
 import {teamCrest,leagueCrest} from '../game/fictionalBranding';
 import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
@@ -13,7 +15,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -24,7 +26,7 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const start=path??normalizeCareerStart(null,p.birthdate,'2026-10-01');
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
-  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -66,6 +68,18 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  let selectedDay=career.season.day;
  career.seasonHistory??=[];
  career.trophyCase=normalizeTrophyCase(career.trophyCase);
+ career.attributes=normalizeAttributes(career.attributes,p.position,career);
+ career.seasonLedger=normalizeSeasonLedger(career.seasonLedger,Number(career.season.startDate.slice(0,4)));
+ career.seasonLedgers??=[];
+ // Recover existing completed simulation records into the new annual ledger,
+ // without replaying career statistics, awarding XP again, or altering scores.
+ for(const fixture of career.season.fixtures){
+  if(fixture.played===false&&(fixture.homeId===career.teamId||fixture.awayId===career.teamId))
+   addSimulatedStat(career.seasonLedger,fixture,p.position,career.teamId);
+ }
+ checkMilestoneAwards(career.trophyCase,career.positionStats,p.position,
+  Number(career.season.startDate.slice(0,4)),leagueTitle(career.startingPath));
+ saveCareer(career);
  const addXP=(amount:number)=>{
   career.xp+=Math.max(0,Math.floor(amount));
   const newLevel=levelFromXP(career.xp);
@@ -79,6 +93,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    if(fixture.homeGoals===undefined||fixture.awayGoals===undefined)continue;
    const before={goals:career.positionStats!.goals,assists:career.positionStats!.assists,saves:career.positionStats!.saves};
    applySimulatedCareerFixture(career.positionStats!,p.position,fixture,career.teamId!);
+   addSimulatedStat(career.seasonLedger!,fixture,p.position,career.teamId!);
    const own=fixture.homeId===career.teamId?fixture.homeGoals:fixture.awayGoals;
    const opponent=fixture.homeId===career.teamId?fixture.awayGoals:fixture.homeGoals;
    addXP(simulatedGameXP(
@@ -174,7 +189,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.playoffs=createPlayoffs(season,career.startingPath!.division);persist();
   }
   const post=career.playoffs,series=post?nextSeries(post):undefined;
-  if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!)))persist();
+  if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
   const mySeries=series&&(series.seedA===home.id||series.seedB===home.id);
   const isPostseason=!!post;
   const bracket=post?post.series.map((round,i)=>{
@@ -207,7 +222,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
    <div data-season-view="home">
     <section class="career-panel"><h2>${leagueCrest(start,28)} ${teamCrest(home.id,30)} ${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
-    <section class="career-panel"><h2>Player development</h2><p>Earn XP by playing games to level up and unlock attribute points.</p><div class="skill-grid">${(['speed','shot','handling','defense'] as const).map(k=>`<div class="skill-row"><span>${k.toUpperCase()} · ${career[k]}</span><button data-skill="${k}" ${career.skillPoints<1||career[k]>=99?'disabled':''}>+ Upgrade</button></div>`).join('')}</div><p>Available skill points: <b>${career.skillPoints}</b></p></section>
+    <section class="career-panel"><h2>Player development · ${p.position==='G'?'Goalie':'Skater'} attributes</h2><p>Spend one point to improve an attribute by exactly <strong>+1</strong> (maximum 99). Ratings influence gameplay through their category averages.</p>
+     <p class="attribute-available">Available points: <strong>${career.skillPoints}</strong> · XP: ${career.xp} · Level ${career.level}</p>
+     ${[...new Set(visibleAttributes(p.position).map(a=>a.category))].map(category=>
+      `<div class="attribute-category"><h3>${category}</h3><div class="attribute-grid">${visibleAttributes(p.position).filter(a=>a.category===category).map(a=>
+       `<div class="attribute-row"><div class="attribute-caption"><strong>${a.label}</strong><small>${a.description}</small></div><div class="attribute-meter"><div style="width:${career.attributes![a.key]}%"></div></div><span class="attribute-number">${career.attributes![a.key]}</span><button type="button" data-attribute="${a.key}" aria-label="Increase ${a.label} by one" ${career.skillPoints<1||career.attributes![a.key]>=99?'disabled':''}>+1</button></div>`).join('')}</div></div>`
+     ).join('')}
+    </section>
     <section class="career-panel"><h2>${teamCrest(home.id,36)} Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
    </div>
    <div data-season-view="trophies" hidden>
@@ -290,6 +311,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    if(!post?.champion)return;
    const result=advanceCareerSeason(career.season!,post,career.startingPath!,p.birthdate);
    career.seasonHistory!.push(result.history);
+   career.seasonLedgers!.push(career.seasonLedger!);
+   career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
    // Career-wide experience and records persist; new season has fresh standings.
    selectedDay=0;visibleMonth=0;
@@ -303,10 +326,12 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
-  root.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach(b=>b.addEventListener('click',()=>{
+  root.querySelectorAll<HTMLButtonElement>('[data-attribute]').forEach(b=>b.addEventListener('click',()=>{
    if(simRunning)return;
-   const k=b.dataset.skill as 'speed'|'shot'|'handling'|'defense';
-   if(career.skillPoints&&career[k]<99){career[k]=clamp(career[k]+3,0,99);career.skillPoints--;persist();drawHub();}
+   const k=b.dataset.attribute!;
+   if(upgradeAttribute(career.attributes!,k,career.skillPoints)){
+    career.skillPoints--;persist();drawHub();
+   }
   }));
   const calendarGrid=root.querySelector<HTMLElement>('[data-calendar-grid]');
   calendarGrid?.addEventListener('click',e=>{
@@ -351,7 +376,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const reversed=series.seedB===career.teamId;
   const home=getTeam(reversed?series.seedB:series.seedA);
   const away=getTeam(reversed?series.seedA:series.seedB);
-  return mountHockeyMatch(root,p.position==='G',career,(result)=>{
+  return mountHockeyMatch(root,p.position==='G',{...career,...matchRatings(career.attributes!,p.position)},(result)=>{
    // Until on-ice overtime is added, resolve regulation ties as a short
    // simulated extra-time goal before recording the elimination result.
    const overtime=result.home===result.away;
@@ -386,6 +411,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    recordUserResult(season,fixture,result.home,result.away);
    creditSimulation(season,season.day);
    career.games+=1;
+   addPlayedStat(career.seasonLedger!,fixture.id,p.position,result.home,result.away,
+    {goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots});
    applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false,career.periodMinutes!*3);
    if(result.home>result.away)career.wins++;else if(result.home<result.away)career.losses++;
    career.goals+=result.goals;career.assists+=result.assists;career.saves+=result.saves;

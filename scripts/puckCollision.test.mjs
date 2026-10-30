@@ -634,3 +634,59 @@ test('credited game is not counted twice by simulating a completed fixture again
  assert.equal(again.userGames,0);
  assert.ok(xp>0);
 });
+
+test('position-aware attribute systems expose complete skater and goalie categories',async()=>{
+ const {ATTRIBUTES,visibleAttributes,defaultAttributes,matchRatings}=await loadTS('src/game/careerAttributes.ts');
+ assert.ok(ATTRIBUTES.length>=32);
+ const base={speed:50,shot:50,handling:50,defense:50};
+ const skater=visibleAttributes('C'),goalie=visibleAttributes('G');
+ assert.ok(skater.some(a=>a.key==='faceoffs')&&!skater.some(a=>a.key==='butterfly'));
+ assert.ok(goalie.some(a=>a.key==='butterfly')&&!goalie.some(a=>a.key==='slapShot'));
+ assert.ok(goalie.some(a=>a.key==='postIntegration'));
+ assert.equal(matchRatings(defaultAttributes('G',base),'G').defense,50);
+});
+test('upgrades increase one point and cannot spend below zero or exceed 99',async()=>{
+ const {defaultAttributes,upgradeAttribute,matchRatings}=await loadTS('src/game/careerAttributes.ts');
+ const v=defaultAttributes('G',{speed:50,shot:50,handling:50,defense:50});
+ const before=matchRatings(v,'G').defense;
+ assert.equal(upgradeAttribute(v,'positioning',1),true);
+ assert.equal(v.positioning,51);
+ assert.equal(upgradeAttribute(v,'positioning',0),false);
+ assert.equal(upgradeAttribute(v,'fake',1),false);
+ v.positioning=99;assert.equal(upgradeAttribute(v,'positioning',1),false);
+ assert.ok(matchRatings(v,'G').defense>before);
+});
+test('per-season ledger never double credits played/simulated fixtures',async()=>{
+ const {newSeason,simulateThrough}=await loadTS('src/game/seasonLeague.ts');
+ const {newSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,normalizeSeasonLedger}=await loadTS('src/game/seasonPlayerLedger.ts');
+ const season=newSeason('northport');const fixture=season.fixtures.find(x=>x.homeId==='northport'||x.awayId==='northport');
+ const ledger=newSeasonLedger(2026);
+ simulateThrough(season,0);
+ assert.equal(addSimulatedStat(ledger,fixture,'G','northport'),true);
+ assert.equal(addSimulatedStat(ledger,fixture,'G','northport'),false);
+ assert.equal(addPlayedStat(ledger,fixture.id,'G',2,1,{goals:0,assists:0,saves:10,shotsAgainst:11}),false);
+ assert.equal(ledgerTotals(ledger).gp,1);
+ assert.equal(normalizeSeasonLedger(JSON.parse(JSON.stringify(ledger)),2026).games.length,1);
+ assert.equal(normalizeSeasonLedger(ledger,2027).games.length,0);
+});
+test('individual trophies use annual skater points and goalie win totals against AI league leaders',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY,botStats}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,simulateRemainingPlayoffs}=await loadTS('src/game/careerPlayoffs.ts');
+ const {newSeasonLedger}=await loadTS('src/game/seasonPlayerLedger.ts');
+ const {emptyTrophyCase,awardSeason}=await loadTS('src/game/careerAwards.ts');
+ const {emptyPositionStats}=await loadTS('src/game/careerPositionStats.ts');
+ const season=newSeason('northport');simulateThrough(season,MAX_SEASON_DAY);
+ const post=createPlayoffs(season,'junior');simulateRemainingPlayoffs(post);
+ const bots=botStats(season),maxPoints=Math.max(...bots.map(b=>b.points));
+ const maxWins=Math.max(...bots.filter(b=>b.position==='G').map(b=>b.wins));
+ const skater=newSeasonLedger(2026),goalie=newSeasonLedger(2026);
+ skater.games.push({fixtureId:'custom',goals:maxPoints+10,assists:0,saves:0,shotsAgainst:0,goalsAgainst:0,won:true,simulated:false});
+ goalie.games.push({fixtureId:'custom',goals:0,assists:0,saves:10000,shotsAgainst:10000,goalsAgainst:0,won:true,simulated:false});
+ for(let k=0;k<maxWins;k++)goalie.games.push({...goalie.games[0],fixtureId:'g'+k});
+ const a=emptyTrophyCase(),b=emptyTrophyCase();
+ awardSeason(a,season,post,'C',emptyPositionStats(),'Junior',skater);
+ awardSeason(b,season,post,'G',emptyPositionStats(),'Junior',goalie);
+ assert.ok(a.items.some(x=>x.award==='scoring-title'));
+ assert.ok(b.items.some(x=>x.award==='goalie-wins-title'));
+ assert.ok(b.items.some(x=>x.award==='goalie-saves-title'));
+});
