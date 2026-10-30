@@ -152,8 +152,15 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   // A shadow and contrast halo make the puck readable over dark equipment.
   oval(c,puck.x,puck.y,Math.max(4,7*puck.scale),Math.max(2,3*puck.scale),'rgba(19,42,59,.24)');
   oval(c,puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(3,8*puck.scale),Math.max(2,3*puck.scale),'#182631');
-  c.beginPath();c.ellipse(puck.x,puck.y-m.puck.height*puck.scale*.8,Math.max(8,15*puck.scale),Math.max(5,9*puck.scale),0,0,TAU);
-  c.strokeStyle='#ffd34f';c.lineWidth=2.8;c.stroke();
+  // A moving, non-occluding reticle remains legible even at centre ice.
+  const markerY=puck.y-m.puck.height*puck.scale*.8;
+  const ring=Math.max(12,19*puck.scale);
+  c.beginPath();c.ellipse(puck.x,markerY,ring,Math.max(7,ring*.52),0,0,TAU);
+  c.strokeStyle='#f6c83b';c.lineWidth=2.4;c.stroke();
+  if(m.puck.owner<0&&Math.hypot(m.puck.vx,m.puck.vy)>130){
+   c.beginPath();c.moveTo(puck.x,markerY-ring*.78);c.lineTo(puck.x,markerY-ring*.78-8);
+   c.strokeStyle='#183244';c.lineWidth=3;c.stroke();
+  }
   if(Math.hypot(m.puck.vx,m.puck.vy)>125){
    const mag=Math.hypot(m.puck.vx,m.puck.vy);
    const trail=project(m.puck.x-m.puck.vx/mag*22,m.puck.y-m.puck.vy/mag*22);
