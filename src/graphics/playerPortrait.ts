@@ -1,3 +1,4 @@
+import {teamCrest} from '../game/fictionalBranding';
 import type {PlayerAppearance} from '../player/appearance';
 import {portraitHair} from './portraitHair';
 import type {Equipment} from '../player/equipment';
@@ -9,7 +10,7 @@ const EYES:Record<string,string>={Brown:'#6b4a34',Blue:'#568eb2',Green:'#56846b'
 let portraitSequence=0;
 
 /** V3 broadcast-style vector portrait, with hairstyle layers anchored to one head silhouette. */
-export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
+export function playerPortrait(p:PlayerAppearance,e:Equipment,teamId?:string):string {
  const id='headshot-v3-'+(++portraitSequence);
  const skin=SKIN[p.skinTone]??SKIN.Fair,hair=HAIR[p.hairColor]??HAIR.Brown,iris=EYES[p.eyeColor]??EYES.Blue;
  const jersey=COLORS[e.jersey]??'#9b2836';
@@ -34,6 +35,7 @@ export function playerPortrait(p:PlayerAppearance,e:Equipment):string {
  <path d="M131 259 L130 309 Q160 331 190 309 L189 259Z" fill="${skin}"/>
  <path d="M132 262 Q159 297 188 262 L189 280 Q159 308 131 281Z" fill="#38221d" opacity=".16"/>
  <path d="M-12 390 Q-2 327 88 297 L126 282 L160 317 L194 282 L232 297 Q322 327 332 390Z" fill="url(#${id}-shirt)"/>
+ ${teamId?`<g transform="translate(127 321)">${teamCrest(teamId,66)}</g>`:""}
  <path d="M125 285L160 321L195 285" stroke="#eef3f6" stroke-width="8" fill="none"/><path d="M27 351L102 327 M293 351L218 327" stroke="#e7eefa" stroke-opacity=".28" stroke-width="4" fill="none"/>
  <path d="M91 171 Q74 167 80 194 Q83 205 96 207 L103 185Z M229 171 Q246 167 240 194 Q237 205 224 207 L217 185Z" fill="${skin}"/>
  <path d="${face}" fill="${skin}"/><path d="${face}" fill="url(#${id}-skin)"/>
