@@ -437,3 +437,65 @@ test('goalie GAA uses actual minutes of played-game ice time',async()=>{
  applyCareerResult(goalie,'G',1,0,{saves:22,shotsAgainst:22},false,60);
  assert.equal(goalsAgainstAverage(goalie),1.6);
 });
+
+test('Peewee U13 league accepts ages 11 and 12, but not younger or older',async()=>{
+ const {eligibleDivisions,startingPath}=await loadTS('src/game/careerPath.ts');
+ assert.ok(eligibleDivisions(11).some(d=>d.id==='u13'));
+ assert.ok(eligibleDivisions(12).some(d=>d.id==='u13'));
+ assert.equal(eligibleDivisions(10).some(d=>d.id==='u13'),false);
+ assert.equal(eligibleDivisions(13).some(d=>d.id==='u13'),false);
+ const p=startingPath('2009-08-26',12,'u13','aaa');
+ assert.deepEqual({age:p.age,division:p.division,tier:p.tier,seasonYear:p.seasonYear},
+ {age:12,division:'u13',tier:'aaa',seasonYear:2021});
+ assert.throws(()=>startingPath('2009-08-26',12,'u9','house'));
+ assert.throws(()=>startingPath('2009-08-26',12,'u13','jra'));
+});
+test('junior ages may choose between eligible junior and U18 paths',async()=>{
+ const {eligibleDivisions,startingPath}=await loadTS('src/game/careerPath.ts');
+ const choices=eligibleDivisions(16).map(d=>d.id);
+ assert.ok(choices.includes('u18')&&choices.includes('junior'));
+ assert.deepEqual(eligibleDivisions(12).map(d=>d.id),['u13']);
+ assert.equal(startingPath('2009-08-26',18,'junior','jrb').seasonYear,2027);
+ assert.throws(()=>startingPath('2009-08-26',11,'junior','jra'));
+});
+test('career birthdate stays consistent with Dec 31 registration age and legacy saves',async()=>{
+ const {startingPath,ageOnDec31,actualAgeOn,normalizeCareerStart,leagueTitle}=await loadTS('src/game/careerPath.ts');
+ const p=startingPath('2014-12-12',12,'u13','aa');
+ assert.equal(p.seasonYear,2026);
+ assert.equal(ageOnDec31('2014-12-12',2026),12);
+ assert.equal(actualAgeOn('2014-12-12','2026-10-01'),11);
+ assert.match(leagueTitle(p),/Peewee/);
+ const legacy=normalizeCareerStart(null,'2009-08-26','2026-10-01');
+ assert.equal(legacy.division,'development');
+ assert.equal(legacy.seasonYear,2026);
+ assert.match(leagueTitle(legacy),/Development League/);
+});
+test('different divisions create different season schedules while preserving old careers',async()=>{
+ const {newSeason,normalizeSeason,leagueStandings}=await loadTS('src/game/seasonLeague.ts');
+ const {startingPath,startCycles,startPace}=await loadTS('src/game/careerPath.ts');
+ const data=[
+  {age:12,division:'u13',tier:'house',games:28},
+  {age:14,division:'u15',tier:'aa',games:42},
+  {age:18,division:'junior',tier:'jra',games:56}
+ ];
+ let last=0;
+ for(const d of data){
+  const p=startingPath('2009-08-26',d.age,d.division,d.tier);
+  const season=newSeason('northport',p.seasonYear+'-10-01',startCycles(p));
+  assert.equal(season.fixtures.length,d.games*4);
+  assert.equal(season.fixtures.filter(f=>f.homeId==='northport'||f.awayId==='northport').length,d.games);
+  assert.equal(normalizeSeason(season,'northport').fixtures.length,season.fixtures.length);
+  assert.equal(season.fixtures[0].day,0);
+  assert.equal(Math.max(...season.fixtures.map(f=>f.day)),196);
+  assert.ok(startPace(p)>last);last=startPace(p);
+  assert.equal(leagueStandings(season)[0].gp,0);
+ }
+});
+test('youth career match pace is lower than junior match pace',async()=>{
+ const {startingPath,startPace}=await loadTS('src/game/careerPath.ts');
+ const youth=startPace(startingPath('2009-08-26',12,'u13','house'));
+ const junior=startPace(startingPath('2009-08-26',18,'junior','jra'));
+ const a=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5,youth);
+ const b=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5,junior);
+ assert.ok(a.paceFactor<b.paceFactor);
+});
