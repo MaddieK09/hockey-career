@@ -33,7 +33,28 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  career.periodMinutes=validPeriodMinutes(career.periodMinutes??loadPeriodMinutes());
  career.teamId=getTeam(career.teamId).id;
  career.season=normalizeSeason(career.season,career.teamId);
- career.positionStats=normalizePositionStats(career.positionStats,career);
+ if(!career.positionStats){
+  // Existing PR100/101 careers already have simulated league fixtures. Recover
+  // their individual projections once without counting the same games twice.
+  const previousSim=career.season.fixtures.filter(f=>
+   f.homeGoals!==undefined&&f.awayGoals!==undefined&&f.played===false&&
+   (f.homeId===career.teamId||f.awayId===career.teamId));
+  const simWins=previousSim.filter(f=>{
+   const own=f.homeId===career.teamId?f.homeGoals!:f.awayGoals!;
+   const against=f.homeId===career.teamId?f.awayGoals!:f.homeGoals!;
+   return own>against;
+  }).length;
+  const baseline={...career,games:Math.max(0,career.games-previousSim.length),
+   wins:Math.max(0,career.wins-simWins),
+   losses:Math.max(0,career.losses-(previousSim.length-simWins))};
+  const upgraded=normalizePositionStats(null,baseline);
+  for(const fixture of previousSim)
+   applySimulatedCareerFixture(upgraded,p.position,fixture,career.teamId);
+  career.positionStats=upgraded;
+  saveCareer(career);
+ }else{
+  career.positionStats=normalizePositionStats(career.positionStats,career);
+ }
  let selectedDay=career.season.day;
  const persist=()=>saveCareer(career);
  const creditSimulation=(season:SeasonSave,day:number)=>{
