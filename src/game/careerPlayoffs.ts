@@ -37,7 +37,7 @@ export function simPlayoffGame(p:PlayoffSave,s:PlayoffSeries):void{
 export function simulateRemainingPlayoffs(p:PlayoffSave):void{
  let count=0;while(!p.champion&&count++<28){const s=nextSeries(p);if(!s)break;simPlayoffGame(p,s);}
 }
-export function isQualified(p:PlayoffSave,teamId:string):boolean=>
+export const isQualified=(p:PlayoffSave,teamId:string):boolean=>
  p.series.slice(0,2).some(s=>s.seedA===teamId||s.seedB===teamId);
 export function nextCareerStart(p:CareerStart,birthdate:string):CareerStart{
  const year=p.seasonYear+1;
