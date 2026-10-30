@@ -1,4 +1,4 @@
-import {newSeason,normalizeSeason,dateAt,seasonDay,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
+import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
 import {DEFAULT_TEAM_ID,getTeam,nextOpponent,teamChoiceOptions} from '../game/fictionalLeague';
 import {loadPeriodMinutes,validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 import type {PlayerDraft} from '../player/types';
@@ -33,6 +33,77 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  career.season=normalizeSeason(career.season,career.teamId);
  let selectedDay=career.season.day;
  const persist=()=>saveCareer(career);
+ // The season is seven browsable months rather than a single 197-cell strip.
+ const months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
+ let visibleMonth=Math.max(0,months.indexOf(dateAt(career.season,selectedDay).slice(0,7)));
+ let simRunning=false;
+ let simTimer:ReturnType<typeof setTimeout>|null=null;
+ let simDelay=70;
+ let simTarget=career.season.day;
+ const cancelSim=()=>{
+  if(simTimer!==null){clearTimeout(simTimer);simTimer=null;}
+  simRunning=false;
+ };
+ const monthTitle=()=>new Date(months[visibleMonth]+'-01T12:00:00Z')
+  .toLocaleDateString('en-CA',{month:'long',year:'numeric',timeZone:'UTC'});
+ const renderCalendarMonth=()=>{
+  const season=career.season!,month=months[visibleMonth];
+  const first=new Date(month+'-01T12:00:00Z').getUTCDay();
+  const pads=(first+6)%7; // Monday-first column order
+  let html=Array.from({length:pads},()=>'<span class="season-day-empty"></span>').join('');
+  for(let d=0;d<=MAX_SEASON_DAY;d++){
+   const iso=dateAt(season,d);if(iso.slice(0,7)!==month)continue;
+   const plan=dayPlan(season,d),fixture=plan.fixture;
+   const score=fixture&&fixture.homeGoals!==undefined&&fixture.awayGoals!==undefined
+    ?'<em class="season-day-score">'+fixture.homeGoals+'–'+fixture.awayGoals+'</em>':'';
+   const content=fixture
+    ?'<small class="season-day-match">'+getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr+'</small>'+score
+    :'<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+(plan.kind==='rest'?'R':'T')+'</small>';
+   html+='<button type="button" data-day="'+d+'" class="season-date'+
+    (selectedDay===d?' selected':'')+(d<season.day?' elapsed':'')+
+    (d===season.day?' current':'')+(fixture?' player-game':'')+
+    '" title="'+iso+' · '+(fixture?getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr:plan.kind)+
+    '"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
+  }
+  return html;
+ };
+ const renderDayResults=(day:number)=>{
+  const season=career.season!,games=season.fixtures.filter(f=>f.day===day);
+  if(!games.length){
+   const plan=dayPlan(season,day);
+   return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+' — '+dateAt(season,day)+'</div>';
+  }
+  return games.map(f=>'<div class="season-sim-line"><span>'+
+   getTeam(f.homeId).abbr+' vs. '+getTeam(f.awayId).abbr+'</span><strong>'+
+   (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('');
+ };
+ const simTick=()=>{
+  if(!simRunning)return;
+  if(!root.isConnected||!root.querySelector('[data-calendar-grid]')){cancelSim();return;}
+  const season=career.season!;
+  if(season.day>=simTarget){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
+  const next=season.day+1;
+  const summary=simulateThrough(season,next);
+  career.games+=summary.userGames;career.wins+=summary.wins;career.losses+=summary.losses;
+  persist();
+  selectedDay=season.day;
+  const currentMonth=months.indexOf(dateAt(season,season.day).slice(0,7));
+  if(currentMonth>=0)visibleMonth=currentMonth;
+  const grid=root.querySelector<HTMLElement>('[data-calendar-grid]');
+  const monthName=root.querySelector<HTMLElement>('[data-month-name]');
+  const current=root.querySelector<HTMLElement>('[data-calendar-today]');
+  const progress=root.querySelector<HTMLProgressElement>('[data-sim-progress]');
+  const status=root.querySelector<HTMLElement>('[data-sim-status]');
+  const results=root.querySelector<HTMLElement>('[data-sim-results]');
+  if(grid)grid.innerHTML=renderCalendarMonth();
+  if(monthName)monthName.textContent=monthTitle();
+  if(current)current.textContent=dateAt(season,season.day);
+  if(progress){progress.value=season.day;progress.max=simTarget;}
+  if(status)status.textContent='SIMULATING · '+dateAt(season,season.day)+' · Day '+season.day+' / '+simTarget;
+  if(results)results.innerHTML=renderDayResults(season.day);
+  if(season.day>=simTarget){cancelSim();activeTab='calendar';drawHub();return;}
+  simTimer=setTimeout(simTick,simDelay);
+ };
  const name=(p.firstName+' '+p.lastName).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));
  const drawHub=()=>{
   match?.stop();match=null;
@@ -48,11 +119,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    const done=f.homeGoals!==undefined,ours=f.homeId===home.id||f.awayId===home.id;
    return '<div class="season-fixture'+(ours?' season-ours':'')+'"><span>'+dateAt(season,f.day).slice(5)+'</span><span>'+getTeam(f.homeId).abbr+' vs '+getTeam(f.awayId).abbr+'</span><strong>'+(done?f.homeGoals+'–'+f.awayGoals:ours?'YOUR GAME':'Scheduled')+'</strong></div>';
   }).join('');
-  const calendar=Array.from({length:MAX_SEASON_DAY+1},(_,d)=>{
-   const date=dateAt(season,d),games=season.fixtures.filter(f=>f.day===d),ours=games.some(f=>f.homeId===home.id||f.awayId===home.id);
-   const hasGame=games.length>0;
-   return '<button type="button" data-day="'+d+'" class="season-date'+(selectedDay===d?' selected':'')+(d<season.day?' elapsed':'')+(ours?' player-game':'')+'" title="'+date+' '+(games.length?games.length+' league games':'Off day')+'"><span>'+date.slice(5)+'</span><small>'+(ours?'★':hasGame?'●':'·')+'</small></button>';
-  }).join('');
+  const calendar=renderCalendarMonth();
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><strong>FICTIONAL DEVELOPMENT LEAGUE</strong><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · DEVELOPMENT LEAGUE</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality}</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
