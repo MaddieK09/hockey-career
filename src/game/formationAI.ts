@@ -11,7 +11,9 @@ export function supportPosition(role:SkaterRole,team:0|1,carrier:RinkPoint,attac
  const forward=role==='C'||role==='LW'||role==='RW';
  if(attacking){
   const depth=role==='C'?42:forward?95:-190;
-  const x=clamp(carrier.x+direction*depth,100,700);
+  // Support players hold the high slot and points rather than piling into
+  // the blue paint when the carrier reaches the goal line.
+  const x=clamp(carrier.x+direction*depth,forward?158:135,forward?642:665);
   const y=role==='C'?clamp(center+(carrier.y-center)*.16,185,255):lane;
   return {x,y};
  }
