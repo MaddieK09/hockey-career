@@ -44,7 +44,9 @@ export function nextCareerStart(p:CareerStart,birthdate:string):CareerStart{
  if(p.legacy||p.division==='development')return {...p,age:year-Number(birthdate.slice(0,4)),seasonYear:year};
  const age=year-Number(birthdate.slice(0,4));
  const available=eligibleDivisions(age);
- if(!available.length)return {...p,age,seasonYear:year,division:'junior',tier:'jrb'};
+ // Until real pro leagues are added, players aging out of junior continue
+ // in the fictional development division without becoming ineligible.
+ if(!available.length)return {...p,age,seasonYear:year,division:'development',tier:'development',legacy:true};
  let division=available.find(d=>d.id===p.division)??available[0];
  // On ageing out of youth, advance to the next available division;
  // 16/17-year-olds remain in U18 until they choose junior later.
