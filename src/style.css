@@ -278,3 +278,19 @@
 .trophy-card small{color:#9fc4d3;font-size:11px}
 .trophy-card p{font-size:12px;color:#c9d8e1;margin:3px 0 0}
 @media(max-width:420px){.season-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Expanded single-point position-specific attribute progression. */
+.attribute-available{padding:12px;background:#18445a;border:1px solid #6396af;border-radius:10px;color:#d9f6ff;font-size:13px}
+.attribute-category{margin:16px 0 9px}
+.attribute-category h3{font-size:13px;letter-spacing:.08em;color:#b6e2f6;text-transform:uppercase;margin-bottom:8px}
+.attribute-grid{display:grid;gap:7px}
+.attribute-row{display:grid;grid-template-columns:minmax(110px,1fr) minmax(45px,90px) 27px 45px;align-items:center;gap:8px;padding:8px;border:1px solid #345d74;border-radius:8px;background:#14354a}
+.attribute-caption{display:flex;flex-direction:column;gap:4px;min-width:0}
+.attribute-caption strong{font-size:12px;line-height:1.2;color:#f4fbff}
+.attribute-caption small{font-size:10px;color:#a1c1d1;line-height:1.2}
+.attribute-meter{height:8px;background:#071f30;border-radius:20px;overflow:hidden}
+.attribute-meter>div{height:100%;border-radius:20px;background:linear-gradient(90deg,#4d9cbf,#a4e4bd)}
+.attribute-number{font-weight:800;text-align:center;color:#ffe3a6;font-variant-numeric:tabular-nums;font-size:12px}
+.attribute-row button{border:1px solid #b0e1f5;border-radius:8px;background:#8dd7ef;color:#092c40;font-weight:900;min-height:35px;cursor:pointer}
+.attribute-row button:disabled{opacity:.4;cursor:default}
+@media(max-width:390px){.attribute-row{grid-template-columns:minmax(90px,1fr) 44px 24px 41px;gap:5px}.attribute-caption small{font-size:9px}}
