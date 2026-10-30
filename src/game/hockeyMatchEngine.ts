@@ -91,10 +91,11 @@ export class HockeyMatch {
  private skaterDeflectionTime=0;
  private lastBlockAnnouncement=0;
  private creaseMomentum:[number,number]=[0,0];
- constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5){
+ constructor(goalieCareer:boolean,rating:MatchRating,rng:()=>number=Math.random,periodMinutes:PeriodMinutes=5,leaguePace=1){
   this.periodMinutes=validPeriodMinutes(periodMinutes);
   this.timeRemaining=this.periodMinutes*60;
-  this.paceFactor=1-.24*(this.periodMinutes-1)/19;
+  // Youth divisions move more slowly; competitive and junior tiers increase pace.
+   this.paceFactor=(1-.24*(this.periodMinutes-1)/19)*clamp(leaguePace,.65,1.10);
   this.shotClock=[5,7];
   this.goalieCareer=goalieCareer;this.rating=rating;this.rng=rng;
   for(const team of [0,1] as Team[])for(let i=0;i<5;i++){

@@ -1,3 +1,4 @@
+import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
 import {positionStatsMarkup} from './careerStatPanels';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
@@ -9,15 +10,18 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
 export function loadCareer():CareerSave|null {
  try {const raw=localStorage.getItem(KEY);if(!raw)return null;const s=JSON.parse(raw) as CareerSave;return s?.player&&Number.isFinite(s.games)?s:null;}catch{return null;}
 }
-export function startCareer(p:PlayerDraft):CareerSave {
- const s:CareerSave={player:p,teamId:DEFAULT_TEAM_ID,season:newSeason(DEFAULT_TEAM_ID),positionStats:emptyPositionStats(),periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
+ const start=path??normalizeCareerStart(null,p.birthdate,'2026-10-01');
+ const firstSeason=start.seasonYear+'-10-01';
+ const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
+  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -33,6 +37,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  career.periodMinutes=validPeriodMinutes(career.periodMinutes??loadPeriodMinutes());
  career.teamId=getTeam(career.teamId).id;
  career.season=normalizeSeason(career.season,career.teamId);
+ career.startingPath=normalizeCareerStart(career.startingPath,p.birthdate,career.season.startDate);
  if(!career.positionStats){
   // Existing PR100/101 careers already have simulated league fixtures. Recover
   // their individual projections once without counting the same games twice.
@@ -142,6 +147,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const drawHub=()=>{
   match?.stop();match=null;
   const season=career.season!,home=getTeam(career.teamId),fixture=nextUserFixture(season);
+  const start=career.startingPath!,leagueName=leagueTitle(start);
+  const actualAge=actualAgeOn(p.birthdate,dateAt(season,season.day));
   const away=fixture?getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId):undefined;
   const standings=leagueStandings(season),leaders=botStats(season).filter(x=>x.position!=='G')
    .sort((a,b)=>b.points-a.points||b.goals-a.goals).slice(0,10);
@@ -155,12 +162,12 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   }).join('');
   const calendar=renderCalendarMonth();
   root.innerHTML=`<main class="career-shell">
-   <header class="career-top"><button data-menu>← Menu</button><strong>FICTIONAL DEVELOPMENT LEAGUE</strong><span>LEVEL ${career.level}</span></header>
-   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · DEVELOPMENT LEAGUE</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality}</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
+   <header class="career-top"><button data-menu>← Menu</button><strong>${leagueName.toUpperCase()}</strong><span>LEVEL ${career.level}</span></header>
+   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
    ${positionStatsMarkup(p.position,career.positionStats!)}
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button></nav>
    <div data-season-view="home">
-    <section class="career-panel"><h2>Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
+    <section class="career-panel"><h2>${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
     <section class="career-panel"><h2>Player development</h2><p>Earn XP by playing games to level up and unlock attribute points.</p><div class="skill-grid">${(['speed','shot','handling','defense'] as const).map(k=>`<div class="skill-row"><span>${k.toUpperCase()} · ${career[k]}</span><button data-skill="${k}" ${career.skillPoints<1||career[k]>=99?'disabled':''}>+ Upgrade</button></div>`).join('')}</div><p>Available skill points: <b>${career.skillPoints}</b></p></section>
     <section class="career-panel"><h2>Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
    </div>
@@ -207,7 +214,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
    if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate);selectedDay=0;visibleMonth=0;
+   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
   root.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach(b=>b.addEventListener('click',()=>{
@@ -274,7 +281,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    persist();
   },()=>{activeTab='home';drawHub();},(minutes)=>{
    career.periodMinutes=minutes;persist();
-  },home,opponent);
+  },home,opponent,startPace(career.startingPath!),leagueTitle(career.startingPath!));
  };
  drawHub();
 }

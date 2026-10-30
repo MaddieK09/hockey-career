@@ -17,9 +17,9 @@ export interface MatchSummary {
 export function mountHockeyMatch(
  root:HTMLElement,goalieCareer:boolean,rating:MatchRating,
  onComplete:(result:MatchSummary)=>void,onReturn:()=>void,onPeriodChange?:(minutes:PeriodMinutes)=>void,
- homeTeam:LeagueTeam=getTeam(),awayTeam:LeagueTeam=getTeam('lakehaven')
+ homeTeam:LeagueTeam=getTeam(),awayTeam:LeagueTeam=getTeam('lakehaven'),leaguePace=1,leagueLabel='Development League'
 ):{stop:()=>void}{
- const match=new HockeyMatch(goalieCareer,rating,Math.random,validPeriodMinutes((rating as MatchRating & {periodMinutes?:number}).periodMinutes));
+ const match=new HockeyMatch(goalieCareer,rating,Math.random,validPeriodMinutes((rating as MatchRating & {periodMinutes?:number}).periodMinutes),leaguePace);
  match.setTeams(homeTeam,awayTeam);
  let active=true,completed=false,last=performance.now(),raf=0,pointerId=-1;
  let visualTime=0;const puckTrail:{x:number;y:number}[]=[];
@@ -39,7 +39,7 @@ export function mountHockeyMatch(
   +'<div class="scorebug-team scorebug-away"><span>'+awayTeam.abbr+'</span><strong data-away-score>0</strong></div>'
   +'<div class="scorebug-timer"><strong data-clock>'+match.periodMinutes+':00</strong><small data-period>1ST</small></div>'
   +'</div></header>'
-  +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
+  +'<div class="match-meta"><span data-shots>SOG 0 - 0</span><span class="match-league-name">'+leagueLabel+'</span><button type="button" data-camera>Ⅱ PAUSE / CAMERA</button><button type="button" data-arena>⛶ BIG RINK</button></div>'
   +'<div class="rink-stage"><canvas data-rink width="800" height="440" aria-label="Side-view animated five-on-five hockey game with selectable camera angles"></canvas>'
   +'<div class="rink-scorebug-slot" data-rink-scorebug></div>'
   +'<div class="goal-banner" data-goal-banner hidden><span data-goal-team>HOME</span><strong>GOAL!</strong></div>'

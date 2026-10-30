@@ -28,17 +28,19 @@ export function seasonDay(iso:string,start:string):number{
  const a=Date.parse(iso+'T12:00:00Z'),b=Date.parse(start+'T12:00:00Z');
  return Number.isFinite(a)&&Number.isFinite(b)?clamp(Math.round((a-b)/86400000),0,MAX_SEASON_DAY):0;
 }
-export function newSeason(teamId:string,startDate=SEASON_START_DATE):SeasonSave{
+export function newSeason(teamId:string,startDate=SEASON_START_DATE,cycles=8):SeasonSave{
+ // Youth leagues play shorter calendars; junior and legacy leagues play 56 games.
+ const numberOfCycles=[4,6,8].includes(cycles)?cycles:8;
  const ids=LEAGUE_TEAMS.map(t=>t.id);
  // Eight round-robin cycles: 56 games per team, with four home/four away
  // meetings against each opponent. Each round plays on its own calendar day,
  // usually 3-4 days after the preceding one, leaving training/rest days.
  const fixtures:Fixture[]=[];
- for(let cycle=0;cycle<8;cycle++){
+ for(let cycle=0;cycle<numberOfCycles;cycle++){
   const order=[...ids];
   for(let round=0;round<7;round++){
    const globalRound=cycle*7+round;
-   const day=Math.round(globalRound*MAX_SEASON_DAY/(ROUNDS_PER_SEASON-1));
+   const day=Math.round(globalRound*MAX_SEASON_DAY/(numberOfCycles*7-1));
    for(let i=0;i<4;i++){
     const a=order[i],b=order[7-i];
     const swap=(round+i+cycle)%2===1;
@@ -58,7 +60,7 @@ export function normalizeSeason(raw:unknown,teamId:string):SeasonSave{
  if(!raw||typeof raw!=='object')return newSeason(teamId);
  const s=raw as Omit<Partial<SeasonSave>,'version'> & {version?:number};
  if(!Array.isArray(s.fixtures)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s.startDate??''))return newSeason(teamId);
- if(s.version===2&&s.fixtures.length===224){
+ if(s.version===2&&[112,168,224].includes(s.fixtures.length)){
   return {...s,version:2,startDate:s.startDate!,day:clamp(Math.floor(Number(s.day)||0),0,MAX_SEASON_DAY),
    teamId:getTeam(teamId).id,fixtures:s.fixtures.map(f=>({...f}))};
  }
