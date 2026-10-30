@@ -1,3 +1,4 @@
+import {ageOnDec31,suggestedDivision,divisionChoices,tierChoices,startingPath,leagueTitle,type DivisionId,type TierId} from '../game/careerPath';
 import {loadPeriodMinutes,savePeriodMinutes,periodOptions,validPeriodMinutes} from '../config/matchSettings';
 import {GAME_VERSION} from '../config/game';
 import {loadPlayerDraft,savePlayerDraft} from '../player/draft';
@@ -17,7 +18,7 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  <form id="player-form" novalidate><fieldset class="identity-fields"><legend>Player identity</legend><div class="form-grid">
  <label>First name<input name="firstName" autocomplete="given-name" maxlength="40" required value="${esc(p.firstName)}"></label>
  <label>Last name<input name="lastName" autocomplete="family-name" maxlength="40" required value="${esc(p.lastName)}"></label>
- <label>Date of birth<input name="birthdate" type="date" required value="${esc(p.birthdate)}"></label>
+ <label>Date of birth<input name="birthdate" type="date" required value="${esc(p.birthdate)}"><small class="career-start-hint">Choose your career starting age and league after reviewing your player. The starting season will match your birthdate.</small></label>
  <label>Nationality<input name="nationality" autocomplete="country-name" maxlength="80" required value="${esc(p.nationality)}"></label>
  <label>Position<select name="position">${POSITIONS.map(pos=>`<option value="${pos}" ${p.position===pos?'selected':''}>${LABELS[pos]}</option>`).join('')}</select></label>
  <label><span data-hand-label>${p.position==='G'?'Catching hand':'Shooting hand'}</span><select name="hand"><option value="Left" ${p.hand==='Left'?'selected':''}>Left</option><option value="Right" ${p.hand==='Right'?'selected':''}>Right</option></select></label>
@@ -66,5 +67,33 @@ export function renderPlayerCreator(root:HTMLElement,onBack:()=>void):void {
  root.querySelector<HTMLButtonElement>('[data-back]')!.addEventListener('click',()=>{window.removeEventListener('scroll',syncMini);window.removeEventListener('resize',syncMini);mini.remove();onBack();});
  renderAppearanceDetails(root,p.appearance);
  switchMode('appearance');
- form.addEventListener('submit',event=>{event.preventDefault();const player=read();const invalid=validatePlayer(player);if(Object.keys(invalid).length){errors.textContent=Object.values(invalid).join(' ');review.hidden=true;errors.scrollIntoView({behavior:'smooth',block:'center'});return;}savePlayerDraft(player);errors.textContent='';review.hidden=false;review.innerHTML=`<h2>Player preview</h2><p><strong>${esc(player.firstName)} ${esc(player.lastName)}</strong> · #${player.jerseyNumber}</p><p>${LABELS[player.position]} · ${esc(player.nationality)}</p><p>Born ${esc(player.birthdate)} · ${player.hand}-handed ${player.position==='G'?'catch':'shot'}</p><p>${player.appearance.heightCm} cm · ${player.appearance.weightKg} kg · ${esc(player.appearance.faceShape)} face · ${esc(player.appearance.eyeColor)} eyes</p><p>${esc(player.appearance.hairStyle)} ${esc(player.appearance.hairColor.toLowerCase())} hair · ${esc(player.appearance.skinTone)} skin tone</p><label>Period length <select data-career-period>${periodOptions(loadPeriodMinutes())}</select></label><p class="review-note">Choose the period length for your new career. Change it later only from main menu Settings, between games.</p><button type="button" class="secondary-action" data-edit>Edit details</button><button type="button" class="primary-action" data-start-career>START CAREER →</button>`;review.querySelector<HTMLButtonElement>('[data-edit]')!.addEventListener('click',()=>{review.hidden=true;form.querySelector<HTMLInputElement>('input')?.focus();});review.querySelector<HTMLButtonElement>('[data-start-career]')?.addEventListener('click',()=>{window.removeEventListener('scroll',syncMini);window.removeEventListener('resize',syncMini);mini.remove();savePeriodMinutes(validPeriodMinutes(Number(review.querySelector<HTMLSelectElement>('[data-career-period]')?.value)));renderCareer(root,startCareer(player),onBack);});requestAnimationFrame(()=>review.scrollIntoView({behavior:'smooth',block:'start'}));});
+ form.addEventListener('submit',event=>{event.preventDefault();const player=read();const invalid=validatePlayer(player);if(Object.keys(invalid).length){errors.textContent=Object.values(invalid).join(' ');review.hidden=true;errors.scrollIntoView({behavior:'smooth',block:'center'});return;}savePlayerDraft(player);errors.textContent='';review.hidden=false;review.innerHTML=`<h2>Player preview</h2><p><strong>${esc(player.firstName)} ${esc(player.lastName)}</strong> · #${player.jerseyNumber}</p><p>${LABELS[player.position]} · ${esc(player.nationality)}</p><p>Born ${esc(player.birthdate)} · ${player.hand}-handed ${player.position==='G'?'catch':'shot'}</p><p>${player.appearance.heightCm} cm · ${player.appearance.weightKg} kg · ${esc(player.appearance.faceShape)} face · ${esc(player.appearance.eyeColor)} eyes</p><p>${esc(player.appearance.hairStyle)} ${esc(player.appearance.hairColor.toLowerCase())} hair · ${esc(player.appearance.skinTone)} skin tone</p><section class="creator-career-start"><h3>CHOOSE YOUR CAREER START</h3><p>Start as young as Novice, in <strong>Peewee (U13)</strong>, Bantam, U18 or Junior. Age is measured on December 31 of your opening season.</p>
+ <div class="start-path-grid">
+ <label>Starting age (season age)<select data-start-age>${Array.from({length:14},(_,i)=>i+7).map(age=>`<option value="${age}" ${age===Math.max(7,Math.min(20,ageOnDec31(player.birthdate,2026)))?'selected':''}>${age} years</option>`).join('')}</select></label>
+ <label>Age division<select data-start-division></select></label>
+ <label>Competition level<select data-start-tier></select></label>
+ </div>
+ <p class="start-path-preview" data-start-preview aria-live="polite"></p>
+ <p class="review-note">Your fictional career begins in the matching historical or future season, keeping the date of birth consistent. Promotions and multiple seasons will come in a future update.</p>
+ </section>
+ <label>Period length <select data-career-period>${periodOptions(loadPeriodMinutes())}</select></label><p class="review-note">Choose the period length for your new career. Change it later only from main menu Settings, between games.</p><button type="button" class="secondary-action" data-edit>Edit details</button><button type="button" class="primary-action" data-start-career>START CAREER →</button>`;const ageSelect=review.querySelector<HTMLSelectElement>('[data-start-age]')!;
+ const divisionSelect=review.querySelector<HTMLSelectElement>('[data-start-division]')!;
+ const tierSelect=review.querySelector<HTMLSelectElement>('[data-start-tier]')!;
+ const preview=review.querySelector<HTMLElement>('[data-start-preview]')!;
+ const refreshPath=(from:'age'|'division'|'tier')=>{
+  const age=Number(ageSelect.value);
+  if(from==='age'||!divisionSelect.value)divisionSelect.innerHTML=divisionChoices(age,suggestedDivision(age).id);
+  const division=divisionSelect.value as DivisionId;
+  if(from!=='tier')tierSelect.innerHTML=tierChoices(division);
+  try{
+   const path=startingPath(player.birthdate,age,division,tierSelect.value as TierId);
+   preview.textContent=leagueTitle(path)+' · '+path.seasonYear+'–'+String(path.seasonYear+1).slice(-2)+
+    ' season · '+((division==='junior')?'56':division==='u9'||division==='u11'||division==='u13'?'28':'42')+' games';
+  }catch(e){preview.textContent=e instanceof Error?e.message:'Select an eligible starting pathway.';}
+ };
+ ageSelect.addEventListener('change',()=>refreshPath('age'));
+ divisionSelect.addEventListener('change',()=>refreshPath('division'));
+ tierSelect.addEventListener('change',()=>refreshPath('tier'));
+ refreshPath('age');
+ review.querySelector<HTMLButtonElement>('[data-edit]')!.addEventListener('click',()=>{review.hidden=true;form.querySelector<HTMLInputElement>('input')?.focus();});review.querySelector<HTMLButtonElement>('[data-start-career]')?.addEventListener('click',()=>{window.removeEventListener('scroll',syncMini);window.removeEventListener('resize',syncMini);mini.remove();savePeriodMinutes(validPeriodMinutes(Number(review.querySelector<HTMLSelectElement>('[data-career-period]')?.value)));const careerStart=startingPath(player.birthdate,Number(ageSelect.value),divisionSelect.value as DivisionId,tierSelect.value as TierId);renderCareer(root,startCareer(player,careerStart),onBack);});requestAnimationFrame(()=>review.scrollIntoView({behavior:'smooth',block:'start'}));});
 }
