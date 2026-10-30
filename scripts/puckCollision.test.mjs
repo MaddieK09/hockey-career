@@ -427,3 +427,13 @@ test('existing career save retains prior stats with unknown historical save perc
  assert.equal(stats.saves,57);
  assert.equal(savePercentage(stats),null,'never invent old shots-against numbers');
 });
+
+test('goalie GAA uses actual minutes of played-game ice time',async()=>{
+ const {emptyPositionStats,applyCareerResult,goalsAgainstAverage}=await loadTS('src/game/careerPositionStats.ts');
+ const goalie=emptyPositionStats();
+ applyCareerResult(goalie,'G',3,2,{saves:18,shotsAgainst:20},false,15);
+ assert.equal(goalie.minutesPlayed,15);
+ assert.equal(goalsAgainstAverage(goalie),8);
+ applyCareerResult(goalie,'G',1,0,{saves:22,shotsAgainst:22},false,60);
+ assert.equal(goalsAgainstAverage(goalie),1.6);
+});
