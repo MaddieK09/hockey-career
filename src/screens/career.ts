@@ -221,6 +221,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    return '<div class="season-fixture'+(ours?' season-ours':'')+'"><span>'+dateAt(season,f.day).slice(5)+'</span><span>'+getTeam(f.homeId).abbr+' vs '+getTeam(f.awayId).abbr+'</span><strong>'+(done?f.homeGoals+'–'+f.awayGoals:ours?'YOUR GAME':'Scheduled')+'</strong></div>';
   }).join('');
   const calendar=renderCalendarMonth();
+  const ovr=overallRating(career.attributes!,p.position),scout=scoutingEstimate(career.development!);
+  const activeDev=career.development!;
+  const progressReport=activeDev.reports.slice().reverse().slice(0,4);
+  const comparison=visibleAttributes(p.position).map(a=>({
+   label:a.label,old:activeDev.startingAttributes[a.key]??career.attributes![a.key],
+   current:career.attributes![a.key]
+  })).filter(a=>a.current!==a.old);
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
@@ -228,6 +235,20 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
    <div data-season-view="home">
     <section class="career-panel"><h2>${leagueCrest(start,28)} ${teamCrest(home.id,30)} ${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
+    <section class="career-panel"><h2>🏒 Player development & scouting</h2>
+      <div class="development-overview"><div><strong class="development-ovr">${ovr}</strong><span>OVERALL</span></div>
+       <div><strong>${scout.label}</strong><span>Potential projection · ${scout.min}–${scout.max}</span></div>
+       <div><strong>${scout.confidence}</strong><span>Scouting confidence</span></div></div>
+      <p class="career-muted">Your true potential stays hidden. Scouting estimates improve as you play more games.</p>
+      <label class="development-focus-label">Training focus
+       <select data-training-focus>${trainingFocuses(p.position).map(f=>'<option value="'+f.id+'"'+(activeDev.focus===f.id?' selected':'')+'>'+f.label+'</option>').join('')}</select>
+      </label>
+      <p class="career-muted">${activeDev.trainingDays} training days completed this season. Training can gradually improve attributes without spending XP.</p>
+      <h3>Attribute growth this season</h3>
+      <div class="development-changes">${comparison.length?comparison.map(a=>'<div class="development-change"><span>'+a.label+'</span><strong>'+a.old+' → '+a.current+' ('+(a.current>a.old?'+':'')+(a.current-a.old)+')</strong></div>').join(''):'<p>No training growth yet. Advance through training days.</p>'}</div>
+      <h3>Season development reports</h3>
+      <div class="development-reports">${progressReport.length?progressReport.map(r=>'<article><strong>'+r.year+'–'+String(r.year+1).slice(-2)+' · '+r.summary+'</strong><span>OVR '+r.startOverall+' → '+r.endOverall+' · '+r.games+' GP · '+r.wins+' wins</span></article>').join(''):'<p>Your first report appears after the offseason.</p>'}</div>
+     </section>
     <section class="career-panel"><h2>Player development · ${p.position==='G'?'Goalie':'Skater'} attributes</h2><p>Spend one point to improve an attribute by exactly <strong>+1</strong> (maximum 99). Ratings influence gameplay through their category averages.</p>
      <p class="attribute-available">Available points: <strong>${career.skillPoints}</strong> · XP: ${career.xp} · Level ${career.level}</p>
      ${[...new Set(visibleAttributes(p.position).map(a=>a.category))].map(category=>
@@ -336,6 +357,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
    career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));selectedDay=0;visibleMonth=0;
    persist();drawHub();
+  });
+  root.querySelector<HTMLSelectElement>('[data-training-focus]')?.addEventListener('change',e=>{
+   if(simRunning)return;
+   const selection=(e.currentTarget as HTMLSelectElement).value;
+   if(trainingFocuses(p.position).some(f=>f.id===selection)){
+    career.development!.focus=selection as DevelopmentSave['focus'];persist();drawHub();
+   }
   });
   root.querySelectorAll<HTMLButtonElement>('[data-attribute]').forEach(b=>b.addEventListener('click',()=>{
    if(simRunning)return;
