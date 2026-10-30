@@ -1,4 +1,4 @@
-import {supportPosition,separateFormation} from './formationAI';
+import {supportPosition,separateFormation,openPassingLane} from './formationAI';
 import {getTeam,type LeagueTeam} from './fictionalLeague';
 import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
 import {validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
@@ -252,7 +252,9 @@ export class HockeyMatch {
   }
   const base=supportPosition(skater.role,team,
    carrier&&friendly?carrier:puck,!!friendly);
-  return separateFormation(base,skater,mates);
+  const defenders=this.skaters.filter(other=>other.team!==team);
+  const lane=friendly?openPassingLane(skater.role,base,defenders):base;
+  return separateFormation(lane,skater,mates);
  }
  private updateSkaters(dt:number):void {
   const humanIndex=this.goalieCareer?-1:this.selected;
