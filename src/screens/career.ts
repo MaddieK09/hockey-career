@@ -264,7 +264,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    recordUserResult(season,fixture,result.home,result.away);
    creditSimulation(season,season.day);
    career.games+=1;
-   applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false);
+   applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false,career.periodMinutes!*3);
    if(result.home>result.away)career.wins++;else if(result.home<result.away)career.losses++;
    career.goals+=result.goals;career.assists+=result.assists;career.saves+=result.saves;
    const gained=40+result.goals*35+result.assists*20+result.saves*10+(result.home>result.away?30:0);
