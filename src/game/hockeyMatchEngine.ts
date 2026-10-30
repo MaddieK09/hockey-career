@@ -42,6 +42,7 @@ export class HockeyMatch {
  readonly paceFactor:number;
  period=1;timeRemaining=60;
  private shotClock:[number,number]=[0,0];
+ private liveSinceFaceoff=0;
  phase:MatchPhase='live';phaseTime=0;
  message='PUCK DROP';messageTime=1.8;
  selected=0;lastPasser=-1;
@@ -183,6 +184,7 @@ export class HockeyMatch {
    vx:0,vy:0,owner:carrier,lock:.55,shotTeam:null,countedShotTeam:null,shotHeight:'low',lastShooter:-1,height:0,vz:0};
   this.lastPasser=-1;this.decisionCooldown=[1.5,1.5];this.possessionTime=[0,0];
   this.shotClock=[8+this.rng()*4,8+this.rng()*4];
+  this.liveSinceFaceoff=0;
   this.phase='live';this.phaseTime=0;this.emit('faceoff','FACE OFF',team);
  }
  private release(owner:number,targetX:number,targetY:number,power:number,shot:boolean):void {
@@ -401,7 +403,7 @@ export class HockeyMatch {
    const laneY=carrier.y+(targetY-carrier.y)*t;
    return Math.abs(def.y-laneY)<16;
   });
-  if(this.shotClock[team]<=0&&carrier.carriedFor>1.2&&offensive&&inShootingLane&&!laneBlocked&&(team===0?carrier.x>515:carrier.x<285)){
+  if(this.liveSinceFaceoff>=4.5&&this.shotClock[team]<=0&&carrier.carriedFor>1.2&&offensive&&inShootingLane&&!laneBlocked&&(team===0?carrier.x>515:carrier.x<285)){
    this.shoot(owner,targetY);return;
   }
   // Longer periods need possession cycles, not skaters camping in the slot.
@@ -523,6 +525,21 @@ export class HockeyMatch {
   const impact=left&&right?(left.time<=right.time?left:right):left??right;
   if(!impact)return false;
   if(impact.surface==='goal'){
+   // A goal may result from a shot, a rebound, or a genuine loose-puck play.
+   // During the first five seconds after a faceoff, however, only an actual
+   // shot sequence may score. This blocks physics-induced instant goals while
+   // preserving valid loose-puck/own-goal scoring later in the shift.
+   // Keep the puck live with a rebound from the goal line.
+   const genuineAttempt=this.puck.shotTeam!==null||this.puck.countedShotTeam===0||this.puck.countedShotTeam===1;
+   if(!genuineAttempt&&this.liveSinceFaceoff<5){
+    const incoming=to.x>from.x?1:-1;
+    this.puck.x=impact.point.x-incoming*8;
+    this.puck.y=impact.point.y;
+    this.puck.vx=-incoming*Math.max(85,Math.abs(this.puck.vx)*.42);
+    this.puck.vy*=.65;this.puck.lock=.28;
+    this.announce('LOOSE PUCK AT THE CREASE',.85);
+    return true;
+   }
    // Both the puck and goal are world-space objects. A shot grazing
    // the post or crossbar is rejected by the frame sweep before scoring.
    const scorer:Team=to.x>from.x?0:1;
@@ -680,6 +697,7 @@ export class HockeyMatch {
    if(this.phaseTime===0)this.resetFaceoff(this.faceoffNext);
    return;
   }
+  this.liveSinceFaceoff+=dt;
   this.timeRemaining=Math.max(0,this.timeRemaining-dt);
   if(this.timeRemaining===0){
    if(this.period===3){this.phase='final';this.emit('final','FINAL BUZZER');return;}

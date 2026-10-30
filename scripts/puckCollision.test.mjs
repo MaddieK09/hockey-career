@@ -176,7 +176,7 @@ test('separation steers away from overlap without abandoning rink limits',async(
 });
 
 test('uncredited loose puck goal increases both score and shots on goal',()=>{
- const m=setup();
+ const m=setup();m.liveSinceFaceoff=6;
  m.puck.owner=-1;m.puck.x=40;m.puck.y=220;m.puck.height=8;
  m.puck.countedShotTeam=null;
  const before=m.shots[1];
@@ -224,4 +224,40 @@ test('open-lane selection leaves a clear receiving option unchanged',async()=>{
 test('defensemen keep point assignments instead of wandering after defenders',async()=>{
  const {openPassingLane}=await loadTS('src/game/formationAI.ts');
  for(const role of ['LD','RD'])assert.deepEqual(openPassingLane(role,{x:340,y:150},[{x:340,y:150}]),{x:340,y:150});
+});
+
+test('unshot loose puck cannot score two seconds after faceoff',()=>{
+ const m=setup();m.puck.owner=-1;
+ m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.shotTeam=null;m.puck.countedShotTeam=null;
+ m.liveSinceFaceoff=2;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.deepEqual(m.scores,[0,0]);
+ assert.ok(m.puck.vx>0,'the puck must rebound back into the rink');
+});
+test('genuine shot still scores near a faceoff',()=>{
+ const m=setup();m.puck.owner=-1;
+ m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.shotTeam=1;m.puck.countedShotTeam=1;
+ m.liveSinceFaceoff=2;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.equal(m.scores[1],1);
+});
+test('AI cannot shoot before new faceoff build-up ends',()=>{
+ const m=setup();m.resetFaceoff(1);
+ m.skaters[5].x=245;m.skaters[5].y=220;
+ m.puck.owner=5;m.skaters[5].carriedFor=4;
+ m.shotClock[1]=0;m.decisionCooldown[1]=0;
+ m.liveSinceFaceoff=2;
+ m.aiDecisions(.02);
+ assert.equal(m.shots[1],0);
+});
+test('later loose puck crossing can still score and count shot',()=>{
+ const m=setup();m.puck.owner=-1;
+ m.puck.x=40;m.puck.y=220;m.puck.height=8;
+ m.puck.shotTeam=null;m.puck.countedShotTeam=null;
+ m.liveSinceFaceoff=7;
+ assert.equal(m.resolveGoalPlane(100,220,8),true);
+ assert.equal(m.scores[1],1);
+ assert.ok(m.shots[1]>=m.scores[1]);
 });
