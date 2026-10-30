@@ -213,3 +213,14 @@
  .season-date .season-day-score{font-size:11px}
  .season-weekdays span{font-size:9px}
 }
+
+/* Per-position career stat panels and goalie analytics. */
+.position-profile{border-color:#4c819d;background:#102d43}
+.position-profile h2{margin-bottom:7px}
+.position-profile>p:first-of-type{font-weight:700;color:#addced;font-size:.82rem}
+.position-stat-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 3px;border-bottom:1px solid #34536c;font-variant-numeric:tabular-nums}
+.position-stat-row span{color:#b8d4e3;font-size:clamp(11px,2.7vw,14px)}
+.position-stat-row strong{color:#f4fbff;font-size:clamp(12px,3vw,15px);white-space:nowrap}
+.position-profile .career-muted{font-size:11px;margin-top:13px}
+.career-stats>div strong{font-variant-numeric:tabular-nums;font-size:clamp(1.15rem,4vw,1.6rem);overflow-wrap:anywhere}
+.career-stats>div span{display:block;font-size:clamp(.62rem,2.2vw,.75rem);line-height:1.3}

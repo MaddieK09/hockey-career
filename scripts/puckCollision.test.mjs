@@ -379,3 +379,61 @@ test('home and away balance is four games each against every opponent',async()=>
   }
  }
 });
+
+test('goalie simulated stats include saves, shot volume, GAA and save percentage',async()=>{
+ const {newSeason,simulateThrough}=await loadTS('src/game/seasonLeague.ts');
+ const {emptyPositionStats,applySimulatedCareerFixture,savePercentage,goalsAgainstAverage,statCards}=await loadTS('src/game/careerPositionStats.ts');
+ const season=newSeason('northport');simulateThrough(season,40);
+ const stats=emptyPositionStats();
+ for(const f of season.fixtures.filter(f=>f.homeGoals!==undefined&&(f.homeId==='northport'||f.awayId==='northport')))
+  applySimulatedCareerFixture(stats,'G',f,'northport');
+ assert.ok(stats.gp>0&&stats.saves>0&&stats.shotsAgainst>stats.goalsAgainst);
+ assert.ok(stats.saves<=stats.shotsAgainst);
+ assert.ok(savePercentage(stats)>0&&savePercentage(stats)<1);
+ assert.ok(goalsAgainstAverage(stats)>=0);
+ assert.ok(statCards('G',stats).some(c=>c.label==='Save %'));
+ assert.equal(stats.simulatedGames,stats.gp);
+});
+test('career skaters show role-based stats without goalie save metrics',async()=>{
+ const {emptyPositionStats,applyCareerResult,statCards}=await loadTS('src/game/careerPositionStats.ts');
+ for(const role of ['C','LW','RW','LD','RD']){
+  const stats=emptyPositionStats();
+  applyCareerResult(stats,role,4,2,{goals:2,assists:1},false);
+  assert.equal(stats.gp,1);
+  assert.equal(stats.goals+stats.assists,3);
+  assert.equal(stats.saves,0);
+  const cards=statCards(role,stats);
+  assert.ok(cards.some(c=>c.label==='Points'));
+  assert.ok(!cards.some(c=>c.label==='Save %'));
+ }
+});
+test('player statistics update exactly once for one simulated fixture and preserve reloads',async()=>{
+ const {newSeason,simulateThrough}=await loadTS('src/game/seasonLeague.ts');
+ const {emptyPositionStats,applySimulatedCareerFixture,normalizePositionStats}=await loadTS('src/game/careerPositionStats.ts');
+ const s=newSeason('ironvale'),stats=emptyPositionStats();
+ const pending=s.fixtures.filter(f=>f.day<=8&&(f.homeId==='ironvale'||f.awayId==='ironvale'));
+ simulateThrough(s,8);
+ for(const f of pending)applySimulatedCareerFixture(stats,'C',f,'ironvale');
+ assert.equal(stats.gp,pending.length);
+ assert.deepEqual(normalizePositionStats(stats),stats);
+ assert.equal(simulateThrough(s,8).userGames,0);
+ assert.equal(stats.gp,pending.length);
+});
+test('existing career save retains prior stats with unknown historical save percentage',async()=>{
+ const {normalizePositionStats,savePercentage}=await loadTS('src/game/careerPositionStats.ts');
+ const legacy={games:8,wins:5,losses:3,goals:0,assists:0,saves:57};
+ const stats=normalizePositionStats(null,legacy);
+ assert.equal(stats.gp,8);
+ assert.equal(stats.saves,57);
+ assert.equal(savePercentage(stats),null,'never invent old shots-against numbers');
+});
+
+test('goalie GAA uses actual minutes of played-game ice time',async()=>{
+ const {emptyPositionStats,applyCareerResult,goalsAgainstAverage}=await loadTS('src/game/careerPositionStats.ts');
+ const goalie=emptyPositionStats();
+ applyCareerResult(goalie,'G',3,2,{saves:18,shotsAgainst:20},false,15);
+ assert.equal(goalie.minutesPlayed,15);
+ assert.equal(goalsAgainstAverage(goalie),8);
+ applyCareerResult(goalie,'G',1,0,{saves:22,shotsAgainst:22},false,60);
+ assert.equal(goalsAgainstAverage(goalie),1.6);
+});
