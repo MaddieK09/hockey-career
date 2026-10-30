@@ -124,10 +124,13 @@ export function offseasonDevelopment(dev:DevelopmentSave,attributes:AttributeVal
   attributes[key]=value+1;changes.push({key,from:value,to:value+1,source:'offseason'});
  }
  const endRating=overallRating(attributes,position);
+ const annualChanges=available.filter(a=>(attributes[a.key]??50)!==(dev.startingAttributes[a.key]??50))
+  .map(a=>({key:a.key,from:dev.startingAttributes[a.key]??50,to:attributes[a.key]??50,
+   source:changes.some(c=>c.key===a.key)?'offseason' as const:'training' as const}));
  const delta=endRating-startRating;
  const summary=delta>2?'Breakout development':delta>0?'Steady progress':delta===0?'Maintained development':'Development plateau';
  const report:DevelopmentReport={year:seasonYear,startOverall:startRating,endOverall:endRating,
-  changes,games:performance.games,points:performance.points,wins:performance.wins,summary};
+  changes:annualChanges,games:performance.games,points:performance.points,wins:performance.wins,summary};
  dev.reports.push(report);
  dev.seasonStartOverall=endRating;dev.startingAttributes={...attributes};
  dev.trainingDays=0;dev.lastDay=0;dev.progress={};return report;
