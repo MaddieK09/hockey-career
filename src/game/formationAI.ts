@@ -35,3 +35,19 @@ export function separateFormation(target:RinkPoint,self:RinkPoint,teammates:read
  }
  return {x:clamp(target.x+clamp(dx,-40,40),85,715),y:clamp(target.y+clamp(dy,-50,50),55,385)};
 }
+
+/** Pick an actual empty receiving lane instead of blindly following the puck.
+ * Retains the player's role lane, but steps away from a nearby opponent.
+ */
+export function openPassingLane(role:SkaterRole,base:RinkPoint,defenders:readonly RinkPoint[]):RinkPoint{
+ if(role==='LD'||role==='RD')return base;
+ const offsets=role==='C'?[0,-45,45,-82,82]:role==='LW'?[0,34,-24,65]:[0,-34,24,-65];
+ let best=base,bestScore=-Infinity;
+ for(const offset of offsets){
+  const y=clamp(base.y+offset,55,385),candidate={x:base.x,y};
+  const clearance=Math.min(180,...defenders.map(d=>Math.hypot((d.x-candidate.x)*.9,d.y-candidate.y)));
+  const score=clearance-Math.abs(offset)*.35;
+  if(score>bestScore){bestScore=score;best=candidate;}
+ }
+ return best;
+}
