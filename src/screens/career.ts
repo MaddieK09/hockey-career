@@ -82,7 +82,10 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   if(!root.isConnected||!root.querySelector('[data-calendar-grid]')){cancelSim();return;}
   const season=career.season!;
   if(season.day>=simTarget){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
-  const next=season.day+1;
+  // Simulate the opening day's fixtures before advancing the calendar.
+  // Otherwise Oct 1 scores only appear once the clock reaches Oct 2.
+  const hasUnplayedToday=season.fixtures.some(f=>f.day===season.day&&f.homeGoals===undefined);
+  const next=hasUnplayedToday?season.day:season.day+1;
   const summary=simulateThrough(season,next);
   career.games+=summary.userGames;career.wins+=summary.wins;career.losses+=summary.losses;
   persist();
