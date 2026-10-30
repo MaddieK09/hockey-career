@@ -1,4 +1,4 @@
-import {normalizeCareerStart,leagueTitle,startingPath,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
+import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
 import {positionStatsMarkup} from './careerStatPanels';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
@@ -148,7 +148,6 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   match?.stop();match=null;
   const season=career.season!,home=getTeam(career.teamId),fixture=nextUserFixture(season);
   const start=career.startingPath!,leagueName=leagueTitle(start);
-  const seasonAge=Number(dateAt(season,season.day).slice(0,4))-Number(p.birthdate.slice(0,4));
   const actualAge=actualAgeOn(p.birthdate,dateAt(season,season.day));
   const away=fixture?getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId):undefined;
   const standings=leagueStandings(season),leaders=botStats(season).filter(x=>x.position!=='G')
@@ -164,7 +163,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const calendar=renderCalendarMonth();
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><strong>${leagueName.toUpperCase()}</strong><span>LEVEL ${career.level}</span></header>
-   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${seasonAge})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
+   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
    ${positionStatsMarkup(p.position,career.positionStats!)}
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button></nav>
    <div data-season-view="home">
