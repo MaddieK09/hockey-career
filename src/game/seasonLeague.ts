@@ -6,7 +6,7 @@ export interface Fixture {
  id:string;day:number;homeId:string;awayId:string;
  homeGoals?:number;awayGoals?:number;played?:boolean;
 }
-export interface SeasonSave {version:1;startDate:string;day:number;teamId:string;fixtures:Fixture[]}
+export interface SeasonSave {version:2;startDate:string;day:number;teamId:string;fixtures:Fixture[]}
 export interface TeamStanding {team:LeagueTeam;gp:number;w:number;l:number;gf:number;ga:number;pts:number;diff:number}
 export interface BotStat {id:string;name:string;teamId:string;position:'F'|'D'|'G';gp:number;goals:number;assists:number;points:number;saves:number;wins:number}
 const firstNames=['Evan','Mason','Leo','Theo','Owen','Nolan','Finn','Alex','Riley','Jordan','Carter','Max','Jamie','Dylan','Quinn','Parker'];
@@ -16,33 +16,80 @@ const scoreSeed=(id:string)=>{let h=2166136261;for(let i=0;i<id.length;i++)h=Mat
 const rand=(n:number)=>{let x=(n+0x6D2B79F5)>>>0;x=Math.imul(x^(x>>>15),x|1);x^=x+Math.imul(x^(x>>>7),x|61);return ((x^(x>>>14))>>>0)/4294967296;};
 const offsetDate=(iso:string,days:number)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10)};
 export const dateAt=(season:SeasonSave,day:number)=>offsetDate(season.startDate,day);
-export const MAX_SEASON_DAY=60;
+/** Full regular season runs from October 1 through April 15, inclusive. */
+export const SEASON_START_DATE='2026-10-01';
+export const SEASON_END_DATE='2027-04-15';
+export const MAX_SEASON_DAY=196;
+export const ROUNDS_PER_SEASON=56;
+export type DayActivity='game'|'training'|'rest';
+export interface DayPlan {day:number;kind:DayActivity;fixture?:Fixture}
+
 export function seasonDay(iso:string,start:string):number{
  const a=Date.parse(iso+'T12:00:00Z'),b=Date.parse(start+'T12:00:00Z');
  return Number.isFinite(a)&&Number.isFinite(b)?clamp(Math.round((a-b)/86400000),0,MAX_SEASON_DAY):0;
 }
-export function newSeason(teamId:string,startDate='2026-10-30'):SeasonSave{
+export function newSeason(teamId:string,startDate=SEASON_START_DATE):SeasonSave{
  const ids=LEAGUE_TEAMS.map(t=>t.id);
- // Circle-method round robin: each team plays once per round, each pairing
- // occurs twice (home and away), with a real off-day between games.
- const order=[...ids],fixtures:Fixture[]=[];
- for(let round=0;round<7;round++){
-  for(let i=0;i<4;i++){
-   const a=order[i],b=order[7-i],swap=(round+i)%2===1;
-   fixtures.push({id:'R'+round+'-'+i,day:round*4,homeId:swap?b:a,awayId:swap?a:b});
-   fixtures.push({id:'R'+(round+7)+'-'+i,day:(round+7)*4,homeId:swap?a:b,awayId:swap?b:a});
+ // Eight round-robin cycles: 56 games per team, with four home/four away
+ // meetings against each opponent. Each round plays on its own calendar day,
+ // usually 3-4 days after the preceding one, leaving training/rest days.
+ const fixtures:Fixture[]=[];
+ for(let cycle=0;cycle<8;cycle++){
+  const order=[...ids];
+  for(let round=0;round<7;round++){
+   const globalRound=cycle*7+round;
+   const day=Math.round(globalRound*MAX_SEASON_DAY/(ROUNDS_PER_SEASON-1));
+   for(let i=0;i<4;i++){
+    const a=order[i],b=order[7-i];
+    const swap=(round+i+cycle)%2===1;
+    fixtures.push({id:'R'+globalRound+'-'+i,day,
+     homeId:swap?b:a,awayId:swap?a:b});
+   }
+   order.splice(1,0,order.pop()!);
   }
-  order.splice(1,0,order.pop()!);
  }
- return {version:1,startDate,day:0,teamId:getTeam(teamId).id,fixtures};
+ return {version:2,startDate,day:0,teamId:getTeam(teamId).id,fixtures};
 }
+/** Migrate PR100 prototype saves without wiping any played or simulated score.
+ * Their old calendar dates are remapped to the longer season's fixture rounds.
+ * Older seasons have 56 fixtures rather than 224.
+ */
 export function normalizeSeason(raw:unknown,teamId:string):SeasonSave{
  if(!raw||typeof raw!=='object')return newSeason(teamId);
- const s=raw as Partial<SeasonSave>;
- if(s.version!==1||!Array.isArray(s.fixtures)||s.fixtures.length!==56||
-    !/^\d{4}-\d{2}-\d{2}$/.test(s.startDate??''))return newSeason(teamId);
- return {...s,version:1,startDate:s.startDate!,day:clamp(Number(s.day)||0,0,MAX_SEASON_DAY),
-  teamId:getTeam(teamId).id,fixtures:s.fixtures.map(f=>({...f}))};
+ const s=raw as Omit<Partial<SeasonSave>,'version'> & {version?:number};
+ if(!Array.isArray(s.fixtures)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s.startDate??''))return newSeason(teamId);
+ if(s.version===2&&s.fixtures.length===224){
+  return {...s,version:2,startDate:s.startDate!,day:clamp(Math.floor(Number(s.day)||0),0,MAX_SEASON_DAY),
+   teamId:getTeam(teamId).id,fixtures:s.fixtures.map(f=>({...f}))};
+ }
+ if(s.version===1&&s.fixtures.length===56){
+  const year=Number(s.startDate!.slice(0,4))||2026;
+  const next=newSeason(teamId,year+'-10-01');
+  const previous=new Map(s.fixtures.map(f=>[f.id,f]));
+  let latestCompleted=0;
+  for(const f of next.fixtures){
+   const old=previous.get(f.id);
+   if(!old||old.homeId!==f.homeId||old.awayId!==f.awayId||
+      !Number.isFinite(old.homeGoals)||!Number.isFinite(old.awayGoals))continue;
+   f.homeGoals=old.homeGoals;f.awayGoals=old.awayGoals;f.played=old.played;
+   latestCompleted=Math.max(latestCompleted,f.day);
+  }
+  // Preserve completed results without advancing beyond an unplayed fixture.
+  next.day=latestCompleted;
+  return next;
+ }
+ return newSeason(teamId);
+}
+/** Each club has games on the same league-wide match dates. Between games,
+ * practice/training is a calendar placeholder only (no gameplay or XP).
+ * The day after a match and every seventh off-day are designated rest days.
+ */
+export function dayPlan(s:SeasonSave,day:number,teamId=s.teamId):DayPlan{
+ const d=clamp(Math.floor(day),0,MAX_SEASON_DAY);
+ const fixture=s.fixtures.find(f=>f.day===d&&(f.homeId===teamId||f.awayId===teamId));
+ if(fixture)return {day:d,kind:'game',fixture};
+ const playedYesterday=s.fixtures.some(f=>f.day===d-1&&(f.homeId===teamId||f.awayId===teamId));
+ return {day:d,kind:playedYesterday||d%7===6?'rest':'training'};
 }
 function simulateScore(f:Fixture):[number,number]{
  const seed=scoreSeed(f.id+'|'+f.homeId+'|'+f.awayId),strengthA=scoreSeed(f.homeId)%7,strengthB=scoreSeed(f.awayId)%7;

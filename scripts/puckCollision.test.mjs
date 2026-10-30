@@ -262,10 +262,10 @@ test('later loose puck crossing can still score and count shot',()=>{
  assert.ok(m.shots[1]>=m.scores[1]);
 });
 
-test('season fixture schedule has every two-club pairing twice, with no same-day team repeats',async()=>{
+test('October–April schedule has eight balanced meetings per pair and no same-day conflicts',async()=>{
  const {newSeason}=await loadTS('src/game/seasonLeague.ts');
  const s=newSeason('northport');
- assert.equal(s.fixtures.length,56);
+ assert.equal(s.fixtures.length,224);
  const pairings=new Map();
  for(const f of s.fixtures){
   assert.notEqual(f.homeId,f.awayId);
@@ -275,7 +275,11 @@ test('season fixture schedule has every two-club pairing twice, with no same-day
   assert.equal(dayGames.length,1);
  }
  assert.equal(pairings.size,28);
- assert.ok([...pairings.values()].every(v=>v===2));
+ assert.ok([...pairings.values()].every(v=>v===8));
+ const allDates=new Set(s.fixtures.map(f=>f.day));
+ assert.equal(allDates.size,56);
+ assert.ok(Math.max(...allDates)===196);
+ assert.ok(s.fixtures.every(f=>f.day>=0&&f.day<=196));
 });
 test('simulating a chosen date is deterministic, monotonic, and never overwrites played results',async()=>{
  const {newSeason,simulateThrough,recordUserResult,nextUserFixture}=await loadTS('src/game/seasonLeague.ts');
@@ -293,14 +297,14 @@ test('simulating a chosen date is deterministic, monotonic, and never overwrites
  assert.equal(b.day,12);
 });
 test('season standings agree with fixture results and bot points sum correctly',async()=>{
- const {newSeason,simulateThrough,leagueStandings,botStats}=await loadTS('src/game/seasonLeague.ts');
- const s=newSeason('lakehaven');simulateThrough(s,60);
+ const {newSeason,simulateThrough,leagueStandings,botStats,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('lakehaven');simulateThrough(s,MAX_SEASON_DAY);
  const table=leagueStandings(s),bots=botStats(s);
  assert.equal(table.length,8);
- assert.ok(table.every(t=>t.gp===14&&t.pts===t.w*2&&t.w+t.l===t.gp));
- assert.equal(table.reduce((n,t)=>n+t.w,0),56);
+ assert.ok(table.every(t=>t.gp===56&&t.pts===t.w*2&&t.w+t.l===t.gp));
+ assert.equal(table.reduce((n,t)=>n+t.w,0),224);
  assert.equal(table.reduce((n,t)=>n+t.gf,0),table.reduce((n,t)=>n+t.ga,0));
- assert.ok(bots.every(p=>p.points===p.goals+p.assists&&p.gp===14));
+ assert.ok(bots.every(p=>p.points===p.goals+p.assists&&p.gp===56));
 });
 test('season date calculation clamps to valid future days',async()=>{
  const {newSeason,dateAt,seasonDay}=await loadTS('src/game/seasonLeague.ts');
@@ -308,4 +312,70 @@ test('season date calculation clamps to valid future days',async()=>{
  assert.equal(dateAt(s,0),'2026-10-30');
  assert.equal(seasonDay('2026-11-09',s.startDate),10);
  assert.equal(seasonDay('2026-01-01',s.startDate),0);
+});
+
+test('new season begins October 1 and finishes April 15 with visible T/R days',async()=>{
+ const {newSeason,dateAt,dayPlan,MAX_SEASON_DAY,SEASON_START_DATE,SEASON_END_DATE}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('northport');
+ assert.equal(dateAt(s,0),SEASON_START_DATE);
+ assert.equal(dateAt(s,MAX_SEASON_DAY),SEASON_END_DATE);
+ assert.equal(MAX_SEASON_DAY,196);
+ assert.equal(dayPlan(s,0).kind,'game');
+ assert.equal(dayPlan(s,1).kind,'rest');
+ assert.equal(dayPlan(s,2).kind,'training');
+ const matchDays=Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dayPlan(s,i)).filter(d=>d.kind==='game');
+ assert.equal(matchDays.length,56);
+ assert.ok(matchDays.every(d=>d.fixture?.homeId===s.teamId||d.fixture?.awayId===s.teamId));
+});
+test('day-by-day sim advances exactly one day and reveals scores on game dates only',async()=>{
+ const {newSeason,simulateThrough,dayPlan,dateAt}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('northport');
+ assert.equal(dayPlan(s,0).fixture?.homeGoals,undefined);
+ const day0=simulateThrough(s,0);
+ assert.equal(day0.games,4);
+ assert.equal(s.day,0);
+ const day1=simulateThrough(s,1);
+ assert.equal(day1.games,0);
+ assert.equal(s.day,1);
+ const next=s.fixtures.find(f=>f.day>0);
+ assert.ok(next);
+ assert.equal(next.homeGoals,undefined);
+ for(let day=2;day<=next.day;day++)simulateThrough(s,day);
+ assert.ok(next.homeGoals!==undefined&&next.awayGoals!==undefined);
+ assert.equal(dateAt(s,s.day).slice(0,7),'2026-10');
+ const prior=JSON.stringify(s.fixtures);
+ assert.equal(simulateThrough(s,s.day).games,0);
+ assert.equal(JSON.stringify(s.fixtures),prior,'re-simulation never overwrites final scores');
+});
+test('legacy PR100 seasons retain previously simulated and played results in migration',async()=>{
+ const {newSeason,normalizeSeason}=await loadTS('src/game/seasonLeague.ts');
+ const full=newSeason('northport');
+ const first14=full.fixtures.filter(f=>Number(f.id.split('-')[0].slice(1))<14).map(f=>({...f}));
+ assert.equal(first14.length,56);
+ const original=first14.find(f=>f.id==='R0-0');
+ original.homeGoals=4;original.awayGoals=2;original.played=true;
+ const original2=first14.find(f=>f.id==='R7-0');
+ original2.homeGoals=1;original2.awayGoals=5;original2.played=false;
+ const old={version:1,startDate:'2026-10-30',day:31,teamId:'northport',fixtures:first14};
+ const migrated=normalizeSeason(old,'northport');
+ assert.equal(migrated.version,2);
+ assert.equal(migrated.startDate,'2026-10-01');
+ assert.equal(migrated.fixtures.length,224);
+ assert.equal(migrated.fixtures.find(f=>f.id==='R0-0').homeGoals,4);
+ assert.equal(migrated.fixtures.find(f=>f.id==='R7-0').awayGoals,5);
+ assert.equal(migrated.fixtures.find(f=>f.id==='R0-0').played,true);
+ assert.equal(normalizeSeason(migrated,'northport').fixtures.length,224);
+});
+test('home and away balance is four games each against every opponent',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('lakehaven');
+ for(const team of new Set(s.fixtures.flatMap(f=>[f.homeId,f.awayId]))){
+  const opponents=new Set(s.fixtures.filter(f=>f.homeId===team||f.awayId===team)
+   .map(f=>f.homeId===team?f.awayId:f.homeId));
+  assert.equal(opponents.size,7);
+  for(const opponent of opponents){
+   assert.equal(s.fixtures.filter(f=>f.homeId===team&&f.awayId===opponent).length,4);
+   assert.equal(s.fixtures.filter(f=>f.awayId===team&&f.homeId===opponent).length,4);
+  }
+ }
 });
