@@ -577,3 +577,14 @@ test('league crests label Peewee, U18, Junior and legacy development paths',asyn
   assert.ok(svg.includes(start.division==='development'?'DEV':start.division.toUpperCase()));
  }
 });
+
+test('career portrait jersey includes the chosen club crest without changing creator portraits',async()=>{
+ const {playerPortrait}=await loadTS('src/graphics/playerPortrait.ts');
+ const {DEFAULT_APPEARANCE}=await loadTS('src/player/appearance.ts');
+ const {DEFAULT_EQUIPMENT}=await loadTS('src/player/equipment.ts');
+ const careerSvg=playerPortrait(DEFAULT_APPEARANCE,DEFAULT_EQUIPMENT,'northport');
+ const draftSvg=playerPortrait(DEFAULT_APPEARANCE,DEFAULT_EQUIPMENT);
+ assert.match(careerSvg,/Northport Wolves crest/);
+ assert.ok(careerSvg.includes('translate(127 321)'));
+ assert.ok(!draftSvg.includes('Northport Wolves crest'));
+});
