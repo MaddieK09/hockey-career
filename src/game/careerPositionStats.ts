@@ -5,13 +5,13 @@ export interface CareerPositionStats {
  version:1;
  gp:number;wins:number;losses:number;
  goals:number;assists:number;
- saves:number;shotsAgainst:number;goalsAgainst:number;shutouts:number;
+ saves:number;shotsAgainst:number;goalsAgainst:number;shutouts:number;minutesPlayed:number;
  teamGoalsFor:number;teamGoalsAgainst:number;
  playedGames:number;simulatedGames:number;
 }
 export const emptyPositionStats=():CareerPositionStats=>({
  version:1,gp:0,wins:0,losses:0,goals:0,assists:0,
- saves:0,shotsAgainst:0,goalsAgainst:0,shutouts:0,
+ saves:0,shotsAgainst:0,goalsAgainst:0,shutouts:0,minutesPlayed:0,
  teamGoalsFor:0,teamGoalsAgainst:0,playedGames:0,simulatedGames:0
 });
 const hash=(value:string):number=>{
@@ -43,10 +43,11 @@ export function applyCareerResult(
  stats:CareerPositionStats,position:Position,
  ownGoals:number,otherGoals:number,
  contributions:{goals?:number;assists?:number;saves?:number;shotsAgainst?:number},
- simulated:boolean
+ simulated:boolean,minutes=60
 ):void{
  stats.gp++;if(ownGoals>otherGoals)stats.wins++;else if(ownGoals<otherGoals)stats.losses++;
  stats.teamGoalsFor+=ownGoals;stats.teamGoalsAgainst+=otherGoals;
+ stats.minutesPlayed+=Math.max(0,minutes);
  if(simulated)stats.simulatedGames++;else stats.playedGames++;
  if(position==='G'){
   const saves=Math.max(0,Math.floor(contributions.saves??0));
@@ -81,7 +82,7 @@ export function applySimulatedCareerFixture(stats:CareerPositionStats,position:P
 export const savePercentage=(s:CareerPositionStats):number|null=>
  s.shotsAgainst>0?s.saves/s.shotsAgainst:null;
 export const goalsAgainstAverage=(s:CareerPositionStats):number|null=>
- s.gp>0?s.goalsAgainst/s.gp:null;
+ s.minutesPlayed>0?s.goalsAgainst*60/s.minutesPlayed:null;
 export function statCards(position:Position,s:CareerPositionStats):{label:string;value:string}[]{
  const n=(x:number)=>String(x);
  if(position==='G')return [
