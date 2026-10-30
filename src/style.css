@@ -148,3 +148,33 @@
 .match-shell .action-pad [data-action="g"],.match-shell .action-pad [data-action="h"]{border-color:#77c6de;background:#164761}
 .match-shell .action-pad [data-action="g"][aria-pressed="true"],.match-shell .action-pad [data-action="h"][aria-pressed="true"]{background:#c4edfa;color:#0b293e}
 .match-shell .action-pad [hidden]{display:none!important}
+
+/* PR100: readable mobile career calendar, league tables and scheduled games. */
+.season-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:18px 0 10px}
+.season-tabs button{background:#16344a;color:#d2e5f0;border:1px solid #50748d;border-radius:9px;padding:11px 4px;font-size:clamp(10px,2.6vw,14px);font-weight:800}
+.season-tabs button[aria-pressed=true]{background:#a0e1f4;color:#082a42;border-color:#b3edff}
+.career-shell [hidden]{display:none!important}
+.season-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;max-height:310px;overflow:auto;margin:14px 0}
+.season-date{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:47px;background:#17384f;border:1px solid #446882;border-radius:8px;color:#eaf7ff;padding:4px 1px;cursor:pointer}
+.season-date span{font-size:clamp(9px,2.2vw,12px);font-variant-numeric:tabular-nums}
+.season-date small{font-size:14px;color:#8aa6b9}
+.season-date.player-game{border-color:#e9c367}
+.season-date.player-game small{color:#ffd15b}
+.season-date.selected{border:2px solid #b4edfa;background:#236585}
+.season-date.elapsed{opacity:.65}
+.season-sim-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
+.season-sim-controls label{width:100%;font-weight:700;font-size:.86rem}
+.season-sim-controls input{flex:1;min-width:150px;background:#17384f;border:1px solid #80b3cd;border-radius:8px;color:#fff;padding:12px;font:inherit}
+.season-sim-controls button,.career-panel [data-play]{background:#9fe4f3;border:1px solid #b8edfd;border-radius:8px;color:#073247;font-weight:800;padding:12px 16px;cursor:pointer}
+.season-sim-controls button:disabled,.career-panel [data-play]:disabled{opacity:.5;cursor:default}
+.season-fixtures{display:grid;gap:6px;max-height:300px;overflow:auto}
+.season-fixture{display:grid;grid-template-columns:60px 1fr auto;align-items:center;gap:7px;background:#17344b;border:1px solid #31516b;border-radius:8px;padding:9px 7px;font-size:clamp(10px,2.7vw,13px)}
+.season-fixture span:first-child{color:#9dc5d9;font-variant-numeric:tabular-nums}
+.season-fixture strong{font-size:11px;white-space:nowrap}
+.season-fixture.season-ours{border-color:#cba64c}
+.season-table-wrap{width:100%;overflow:auto}
+.season-table{border-collapse:collapse;width:100%;font-size:clamp(11px,2.65vw,13px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.season-table th{position:sticky;top:0;text-align:right;color:#a7cade;border-bottom:1px solid #5e91b0;padding:9px 6px}
+.season-table td{text-align:right;padding:9px 6px;border-bottom:1px solid #294e67}
+.season-table th:first-child,.season-table td:first-child{text-align:left}
+.season-table .season-highlight{background:#24556c;font-weight:800}

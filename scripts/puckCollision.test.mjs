@@ -261,3 +261,51 @@ test('later loose puck crossing can still score and count shot',()=>{
  assert.equal(m.scores[1],1);
  assert.ok(m.shots[1]>=m.scores[1]);
 });
+
+test('season fixture schedule has every two-club pairing twice, with no same-day team repeats',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('northport');
+ assert.equal(s.fixtures.length,56);
+ const pairings=new Map();
+ for(const f of s.fixtures){
+  assert.notEqual(f.homeId,f.awayId);
+  const key=[f.homeId,f.awayId].sort().join('|');
+  pairings.set(key,(pairings.get(key)||0)+1);
+  const dayGames=s.fixtures.filter(x=>x.day===f.day&&(x.homeId===f.homeId||x.awayId===f.homeId));
+  assert.equal(dayGames.length,1);
+ }
+ assert.equal(pairings.size,28);
+ assert.ok([...pairings.values()].every(v=>v===2));
+});
+test('simulating a chosen date is deterministic, monotonic, and never overwrites played results',async()=>{
+ const {newSeason,simulateThrough,recordUserResult,nextUserFixture}=await loadTS('src/game/seasonLeague.ts');
+ const a=newSeason('northport'),b=newSeason('northport');
+ const first=nextUserFixture(a);
+ recordUserResult(a,first,4,1);
+ const r=simulateThrough(a,12),other=simulateThrough(b,12);
+ assert.equal(a.fixtures.find(f=>f.id===first.id).homeGoals,4);
+ assert.equal(a.fixtures.find(f=>f.id===first.id).played,true);
+ assert.equal(other.games,r.games+1);
+ const saved=JSON.stringify(a.fixtures);
+ assert.equal(simulateThrough(a,12).games,0);
+ assert.equal(JSON.stringify(a.fixtures),saved);
+ assert.equal(a.day,12);
+ assert.equal(b.day,12);
+});
+test('season standings agree with fixture results and bot points sum correctly',async()=>{
+ const {newSeason,simulateThrough,leagueStandings,botStats}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('lakehaven');simulateThrough(s,60);
+ const table=leagueStandings(s),bots=botStats(s);
+ assert.equal(table.length,8);
+ assert.ok(table.every(t=>t.gp===14&&t.pts===t.w*2&&t.w+t.l===t.gp));
+ assert.equal(table.reduce((n,t)=>n+t.w,0),56);
+ assert.equal(table.reduce((n,t)=>n+t.gf,0),table.reduce((n,t)=>n+t.ga,0));
+ assert.ok(bots.every(p=>p.points===p.goals+p.assists&&p.gp===14));
+});
+test('season date calculation clamps to valid future days',async()=>{
+ const {newSeason,dateAt,seasonDay}=await loadTS('src/game/seasonLeague.ts');
+ const s=newSeason('ironvale','2026-10-30');
+ assert.equal(dateAt(s,0),'2026-10-30');
+ assert.equal(seasonDay('2026-11-09',s.startDate),10);
+ assert.equal(seasonDay('2026-01-01',s.startDate),0);
+});
