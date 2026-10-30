@@ -316,22 +316,26 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  };
  let activeTab='home';
  const startPlayoffGame=(post:PlayoffSave,series:PlayoffSave['series'][number])=>{
-  const home=getTeam(series.seedA),away=getTeam(series.seedB);
+  // The engine controls the first side. Even as the lower seed, the player
+  // must skate for their own club and scores must map back to bracket seeds.
+  const reversed=series.seedB===career.teamId;
+  const home=getTeam(reversed?series.seedB:series.seedA);
+  const away=getTeam(reversed?series.seedA:series.seedB);
   return mountHockeyMatch(root,p.position==='G',career,(result)=>{
-   // HockeyMatch displays series host as the scorebug home side; winner is
-   // credited to that team irrespective of the user's selected club.
-   const a=result.home,b=result.away;
-   recordPlayoffGame(post,series,a===b?a+1:a,b);
+   // Until on-ice overtime is added, resolve regulation ties as a short
+   // simulated extra-time goal before recording the elimination result.
+   const overtime=result.home===result.away;
+   const homeGoals=overtime&&Math.random()>.5?result.home+1:result.home;
+   const awayGoals=overtime&&homeGoals===result.home?result.away+1:result.away;
+   const a=reversed?awayGoals:homeGoals;
+   const b=reversed?homeGoals:awayGoals;
+   recordPlayoffGame(post,series,a,b);
    nextSeries(post);
-   if(series.seedA===career.teamId||series.seedB===career.teamId){
-    const own=series.seedA===career.teamId?a:b;
-    const against=series.seedA===career.teamId?b:a;
-    career.games++;if(own>against)career.wins++;else career.losses++;
-    applyCareerResult(career.positionStats!,p.position,own,against,
-     {goals:result.goals,assists:result.assists,saves:result.saves,
-      shotsAgainst:series.seedA===career.teamId?result.awayShots:result.homeShots},
-     false,career.periodMinutes!*3);
-   }
+   const own=homeGoals,against=awayGoals;
+   career.games++;if(own>against)career.wins++;else career.losses++;
+   applyCareerResult(career.positionStats!,p.position,own,against,
+    {goals:result.goals,assists:result.assists,saves:result.saves,
+     shotsAgainst:result.awayShots},false,career.periodMinutes!*3);
    persist();
   },()=>{activeTab='playoffs';drawHub();},(minutes)=>{
    career.periodMinutes=minutes;persist();
