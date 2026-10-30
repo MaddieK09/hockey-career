@@ -525,12 +525,13 @@ export class HockeyMatch {
   const impact=left&&right?(left.time<=right.time?left:right):left??right;
   if(!impact)return false;
   if(impact.surface==='goal'){
-   // A goal can result from a shot, rebound or shot deflection. Loose
-   // dribbles / passes that physics carry across the line are not credited as
-   // an instant shot and goal. This prevents accidental faceoff goals.
+   // A goal may result from a shot, a rebound, or a genuine loose-puck play.
+   // During the first five seconds after a faceoff, however, only an actual
+   // shot sequence may score. This blocks physics-induced instant goals while
+   // preserving valid loose-puck/own-goal scoring later in the shift.
    // Keep the puck live with a rebound from the goal line.
    const genuineAttempt=this.puck.shotTeam!==null||this.puck.countedShotTeam===0||this.puck.countedShotTeam===1;
-   if(!genuineAttempt){
+   if(!genuineAttempt&&this.liveSinceFaceoff<5){
     const incoming=to.x>from.x?1:-1;
     this.puck.x=impact.point.x-incoming*8;
     this.puck.y=impact.point.y;
