@@ -1,3 +1,4 @@
+import {teamCrest,leagueCrest} from '../game/fictionalBranding';
 import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
 import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
@@ -160,7 +161,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    const first=getTeam(round.seedA),second=getTeam(round.seedB);
    const roundTitle=round.round===0?'SEMIFINAL '+(i+1):'CHAMPIONSHIP FINAL';
    return '<div class="playoff-series"><strong>'+roundTitle+'</strong><div>'+
-     first.abbr+' '+round.winsA+' – '+round.winsB+' '+second.abbr+'</div>'+
+     teamCrest(first.id,35)+' '+first.abbr+' '+round.winsA+' – '+round.winsB+' '+second.abbr+' '+teamCrest(second.id,35)+'</div>'+
      '<small>'+round.results.map(g=>g.a+'–'+g.b).join(' · ')+
      (round.winsA===0&&round.winsB===0?'Awaiting first game':'')+'</small></div>';
   }).join(''):'';
@@ -180,14 +181,14 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   }).join('');
   const calendar=renderCalendarMonth();
   root.innerHTML=`<main class="career-shell">
-   <header class="career-top"><button data-menu>← Menu</button><strong>${leagueName.toUpperCase()}</strong><span>LEVEL ${career.level}</span></header>
-   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment)}</div><div><p class="eyebrow">ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
+   <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
+   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
    ${positionStatsMarkup(p.position,career.positionStats!)}
    <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button></nav>
    <div data-season-view="home">
-    <section class="career-panel"><h2>${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
+    <section class="career-panel"><h2>${leagueCrest(start,28)} ${teamCrest(home.id,30)} ${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
     <section class="career-panel"><h2>Player development</h2><p>Earn XP by playing games to level up and unlock attribute points.</p><div class="skill-grid">${(['speed','shot','handling','defense'] as const).map(k=>`<div class="skill-row"><span>${k.toUpperCase()} · ${career[k]}</span><button data-skill="${k}" ${career.skillPoints<1||career[k]>=99?'disabled':''}>+ Upgrade</button></div>`).join('')}</div><p>Available skill points: <b>${career.skillPoints}</b></p></section>
-    <section class="career-panel"><h2>Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
+    <section class="career-panel"><h2>${teamCrest(home.id,36)} Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
    </div>
    <div data-season-view="playoffs" hidden>
     <section class="career-panel"><h2>🏆 Playoff bracket</h2>

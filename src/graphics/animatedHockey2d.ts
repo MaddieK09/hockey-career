@@ -1,3 +1,4 @@
+import {drawTeamCrest} from '../game/fictionalBranding';
 import {GOAL_HALF_WIDTH} from '../game/puckCollision';
 /** Hockey Career V5 — layered, resolution-independent Canvas 2D renderer.
  * Players are purpose-built top-down illustrated sprites drawn procedurally:
@@ -5,7 +6,7 @@ import {GOAL_HALF_WIDTH} from '../game/puckCollision';
  */
 export type HockeyPose='skate'|'glide'|'shoot'|'save'|'butterfly'|'blocker'|'vh'|'rvh';
 export interface CharacterFrame {
- x:number;y:number;team:0|1;goalie?:boolean;angle:number;jerseyColor?:string;trimColor?:string;helmetColor?:string;
+ x:number;y:number;team:0|1;goalie?:boolean;angle:number;jerseyColor?:string;trimColor?:string;helmetColor?:string;teamId?:string;
  time:number;speed:number;pose?:HockeyPose;selected?:boolean;number?:number;hasPuck?:boolean;
 }
 const TAU=Math.PI*2;
@@ -48,6 +49,7 @@ export function drawHockeyCharacter(c:CanvasRenderingContext2D,p:CharacterFrame)
   }
   oval(c,-1,0,18,18,dark,'#203a4b');
   oval(c,1,0,15,15,jersey);
+  if(p.teamId)drawTeamCrest(c,p.teamId,0,0,17);
   line(c,-5,-14,8,-14,3,trim);line(c,-5,14,8,14,3,trim);
   // Catching glove with an open pocket, blocker with squared face.
   line(c,0,-13,8,-25,8,jersey);
@@ -76,6 +78,7 @@ export function drawHockeyCharacter(c:CanvasRenderingContext2D,p:CharacterFrame)
   line(c,-31+kick,15,-39+kick,15,1.6,'#d5e2ea');
   oval(c,0,0,19,14,dark,'#172f42');
   oval(c,2,0,16,12,jersey);
+  if(p.teamId)drawTeamCrest(c,p.teamId,0,0,17);
   line(c,-8,-11,-8,11,3.3,trim);
   line(c,10,-10,10,10,2.8,trim);
   const windup=p.pose==='shoot'?8:0;
