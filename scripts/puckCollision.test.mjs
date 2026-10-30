@@ -499,3 +499,51 @@ test('youth career match pace is lower than junior match pace',async()=>{
  const b=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5,junior);
  assert.ok(a.paceFactor<b.paceFactor);
 });
+
+test('top-four seeded playoff bracket advances by best-of-five in Peewee',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY,leagueStandings}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,nextSeries,recordPlayoffGame,simulateRemainingPlayoffs}=await loadTS('src/game/careerPlayoffs.ts');
+ const season=newSeason('northport','2026-10-01',4);
+ simulateThrough(season,MAX_SEASON_DAY);
+ const seeds=leagueStandings(season).slice(0,4).map(x=>x.team.id);
+ const p=createPlayoffs(season,'u13');
+ assert.equal(p.bestOf,5);assert.equal(p.series.length,2);
+ assert.deepEqual([p.series[0].seedA,p.series[0].seedB],[seeds[0],seeds[3]]);
+ for(let k=0;k<3;k++)recordPlayoffGame(p,p.series[0],2,1);
+ assert.equal(p.series[0].winsA,3);
+ const remaining=nextSeries(p);assert.equal(remaining,p.series[1]);
+ simulateRemainingPlayoffs(p);
+ assert.ok(p.champion);assert.equal(p.series.length,3);
+ assert.ok(seeds.includes(p.champion));
+});
+test('playoffs cannot start with unfinished regular games or allow extra games after elimination',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,recordPlayoffGame}=await loadTS('src/game/careerPlayoffs.ts');
+ const s=newSeason('ironvale');assert.throws(()=>createPlayoffs(s,'junior'));
+ simulateThrough(s,MAX_SEASON_DAY);
+ const p=createPlayoffs(s,'junior');assert.equal(p.bestOf,7);
+ for(let i=0;i<4;i++)recordPlayoffGame(p,p.series[0],1,2);
+ assert.throws(()=>recordPlayoffGame(p,p.series[0],1,2));
+ assert.throws(()=>recordPlayoffGame(p,p.series[1],2,2));
+});
+test('offseason preserves birthdate and promotes eligible Peewee player to Bantam',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {startingPath}=await loadTS('src/game/careerPath.ts');
+ const {createPlayoffs,simulateRemainingPlayoffs,advanceCareerSeason,nextCareerStart}=await loadTS('src/game/careerPlayoffs.ts');
+ const birth='2014-08-26',start=startingPath(birth,12,'u13','aa');
+ const season=newSeason('northport','2026-10-01',4);simulateThrough(season,MAX_SEASON_DAY);
+ const playoffs=createPlayoffs(season,'u13');simulateRemainingPlayoffs(playoffs);
+ const rolled=advanceCareerSeason(season,playoffs,start,birth);
+ assert.equal(rolled.start.age,13);assert.equal(rolled.start.division,'u15');
+ assert.equal(rolled.start.seasonYear,2027);assert.equal(rolled.season.startDate,'2027-10-01');
+ assert.equal(rolled.season.fixtures.length,168);
+ assert.equal(rolled.history.seasonYear,2026);
+ assert.equal(nextCareerStart(start,birth).division,'u15');
+});
+test('players aging out of junior continue in development without invalid age eligibility',async()=>{
+ const {startingPath}=await loadTS('src/game/careerPath.ts');
+ const {nextCareerStart}=await loadTS('src/game/careerPlayoffs.ts');
+ const p=startingPath('2006-02-02',20,'junior','jra');
+ const next=nextCareerStart(p,'2006-02-02');
+ assert.equal(next.age,21);assert.equal(next.division,'development');
+});

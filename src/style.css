@@ -238,3 +238,17 @@
 .career-start-hint{display:block;font-size:.7rem;color:#a6c8d9;line-height:1.4;margin-top:5px}
 .match-shell .match-league-name{font-size:clamp(9px,2.4vw,12px);color:#b7e5f5;max-width:34%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:420px){.creator-career-start{padding:12px}.creator-career-start .start-path-grid{grid-template-columns:1fr}.creator-career-start .start-path-grid label:last-child{grid-column:auto}}
+
+/* Fictional league post-season bracket and offseason progression. */
+.season-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.playoff-bracket{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px;margin:15px 0}
+.playoff-series{display:flex;flex-direction:column;gap:8px;border:1px solid #608ca4;background:#142f45;border-radius:12px;padding:14px}
+.playoff-series strong{font-size:12px;letter-spacing:.04em;color:#c6e9f5}
+.playoff-series div{font-weight:900;font-size:clamp(17px,4vw,23px);color:#fff}
+.playoff-series small{color:#a7c8d7;line-height:1.5}
+.playoff-actions{display:flex;flex-wrap:wrap;gap:8px;margin:13px 0}
+.playoff-actions button,.career-panel [data-next-season],.career-panel [data-finish-regular]{flex:1;min-width:145px;min-height:46px;padding:10px;background:#9fe4f3;color:#092c40;border:1px solid #b6edfc;border-radius:10px;font-weight:800;cursor:pointer}
+.playoff-actions button:disabled{opacity:.4;cursor:default}
+.season-history{background:#0e2b40;border-radius:9px;padding:6px 12px}
+.season-history p{padding:8px 0;border-bottom:1px solid #335269;font-size:12px}
+@media(max-width:420px){.season-tabs{gap:3px}.season-tabs button{font-size:10px;padding:10px 1px}}
