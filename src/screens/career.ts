@@ -224,10 +224,10 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const ovr=overallRating(career.attributes!,p.position),scout=scoutingEstimate(career.development!);
   const activeDev=career.development!;
   const progressReport=activeDev.reports.slice().reverse().slice(0,4);
-  const comparison=visibleAttributes(p.position).map(a=>({
-   label:a.label,old:activeDev.startingAttributes[a.key]??career.attributes![a.key],
+  const comparison=visibleAttributes(p.position).filter(a=>(activeDev.trainingGains[a.key]??0)>0).map(a=>({
+   label:a.label,old:career.attributes![a.key]-activeDev.trainingGains[a.key],
    current:career.attributes![a.key]
-  })).filter(a=>a.current!==a.old);
+  }));
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
