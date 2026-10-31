@@ -12,7 +12,7 @@ export interface DevelopmentReport{
 }
 export interface DevelopmentSave{
  version:1;seed:number;potential:number;tier:PotentialTier;focus:TrainingFocus;
- progress:Record<string,number>;lastDay:number;trainingDays:number;
+ progress:Record<string,number>;trainingGains:Record<string,number>;lastDay:number;trainingDays:number;
  startingAttributes:AttributeValues;seasonStartOverall:number;
  scoutingObservations:number;reports:DevelopmentReport[];
 }
@@ -42,7 +42,7 @@ export function overallRating(values:AttributeValues,position:Position):number{
 export function newDevelopment(start:CareerStart,attributes:AttributeValues,identity:string,position:Position):DevelopmentSave{
  const seed=hash(identity+'|'+start.seasonYear+'|'+position);
  const potential=clamp(70+Math.floor(noise(seed,'ceiling')*29),70,98);
- return {version:1,seed,potential,tier:tierFor(potential),focus:'balanced',progress:{},
+ return {version:1,seed,potential,tier:tierFor(potential),focus:'balanced',progress:{},trainingGains:{},
   lastDay:0,trainingDays:0,startingAttributes:{...attributes},
   seasonStartOverall:overallRating(attributes,position),scoutingObservations:0,reports:[]};
 }
@@ -55,7 +55,7 @@ export function normalizeDevelopment(raw:unknown,start:CareerStart,attributes:At
   ...newDevelopment(start,attributes,identity,position),...data,version:1,
   seed:data.seed!,potential:clamp(Math.floor(data.potential!),70,98),
   tier:tierFor(data.potential!),focus:options.includes(data.focus!)?data.focus!:'balanced',
-  progress:{...(data.progress??{})},
+  progress:{...(data.progress??{})},trainingGains:{...(data.trainingGains??{})},
   lastDay:clamp(Math.floor(data.lastDay??seasonDay),0,196),
   trainingDays:Math.max(0,Math.floor(data.trainingDays??0)),
   startingAttributes:{...(data.startingAttributes??attributes)},
@@ -101,6 +101,7 @@ export function processTrainingThrough(dev:DevelopmentSave,attributes:AttributeV
     dev.progress[def.key]-=1;
     const before=attributes[def.key];
     attributes[def.key]=Math.min(99,before+1);
+    dev.trainingGains[def.key]=(dev.trainingGains[def.key]??0)+1;
     changes.push({key:def.key,from:before,to:attributes[def.key],source:'training'});
    }
   }
@@ -124,16 +125,21 @@ export function offseasonDevelopment(dev:DevelopmentSave,attributes:AttributeVal
   attributes[key]=value+1;changes.push({key,from:value,to:value+1,source:'offseason'});
  }
  const endRating=overallRating(attributes,position);
- const annualChanges=available.filter(a=>(attributes[a.key]??50)!==(dev.startingAttributes[a.key]??50))
-  .map(a=>({key:a.key,from:dev.startingAttributes[a.key]??50,to:attributes[a.key]??50,
-   source:changes.some(c=>c.key===a.key)?'offseason' as const:'training' as const}));
+ // Only count growth earned automatically. Manually bought attribute points
+ // are already visible on the player and must NOT be misreported as training.
+ const annualChanges=available.filter(a=>(dev.trainingGains[a.key]??0)>0||changes.some(c=>c.key===a.key))
+  .map(a=>{
+   const gain=(dev.trainingGains[a.key]??0)+changes.filter(c=>c.key===a.key).length;
+   return {key:a.key,from:(attributes[a.key]??50)-gain,to:attributes[a.key]??50,
+    source:(dev.trainingGains[a.key]??0)>0?'training' as const:'offseason' as const};
+  });
  const delta=endRating-startRating;
  const summary=delta>2?'Breakout development':delta>0?'Steady progress':delta===0?'Maintained development':'Development plateau';
  const report:DevelopmentReport={year:seasonYear,startOverall:startRating,endOverall:endRating,
   changes:annualChanges,games:performance.games,points:performance.points,wins:performance.wins,summary};
  dev.reports.push(report);
  dev.seasonStartOverall=endRating;dev.startingAttributes={...attributes};
- dev.trainingDays=0;dev.lastDay=0;dev.progress={};return report;
+ dev.trainingDays=0;dev.lastDay=0;dev.progress={};dev.trainingGains={};return report;
 }
 /** Scouts initially know a wide potential range, with a progressively
  * narrower estimate after real games / seasons. Exact hidden ceiling is
