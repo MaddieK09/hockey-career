@@ -310,3 +310,14 @@
 .development-reports article strong{color:#e6f2ff;font-size:13px}
 .development-reports article span{color:#a6cedb;font-size:11px}
 .development-changes p,.development-reports p{color:#a6c2d4;font-size:12px}
+
+/* PR109: prioritize the actual career hub; move deep progression to its tab. */
+.season-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.season-tabs button{min-width:0;overflow-wrap:anywhere;white-space:normal;line-height:1.25}
+.career-hub-summary{margin-top:12px}
+.career-hub-development{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.career-hub-development>div{display:flex;flex-direction:column;gap:5px;align-items:center;background:#14384d;border:1px solid #4b7b99;border-radius:11px;padding:13px 5px}
+.career-hub-development strong{font-size:clamp(24px,5.2vw,36px);color:#eafaff;font-variant-numeric:tabular-nums}
+.career-hub-development span{font-size:11px;font-weight:700;color:#aad1e3}
+.career-hub-summary [data-open-development]{width:100%;padding:13px 9px;min-height:43px}
+@media(max-width:420px){.season-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.season-tabs button{font-size:10px;padding:9px 2px}.career-hub-development span{font-size:10px}}
