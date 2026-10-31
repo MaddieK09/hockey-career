@@ -804,3 +804,39 @@ test('career development season history uses stored completed seasons, not curre
  assert.equal(dev.reports.length,0);
  assert.equal(scoutingEstimate(dev).confidence,'Low');
 });
+
+test('separate playoff ledger deduplicates games and is saved for the correct season',async()=>{
+ const {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary}=await loadTS('src/game/careerStatsHistory.ts');
+ const p=newPlayoffLedger(2026);
+ const game={goals:0,assists:0,saves:25,shotsAgainst:28,goalsAgainst:3,won:true,simulated:false};
+ assert.equal(addPlayoffResult(p,'2026:semifinal:1',game),true);
+ assert.equal(addPlayoffResult(p,'2026:semifinal:1',game),false);
+ const stored=normalizePlayoffLedger(JSON.parse(JSON.stringify(p)),2026);
+ assert.equal(stored.games.length,1);
+ assert.equal(seasonSummary(stored).gp,1);
+ assert.equal(seasonSummary(stored).savePct,25/28);
+ assert.equal(normalizePlayoffLedger(stored,2027).games.length,0);
+});
+test('goalie regular and playoff statistics do not contaminate each other',async()=>{
+ const {newSeasonLedger,addPlayedStat}=await loadTS('src/game/seasonPlayerLedger.ts');
+ const {newPlayoffLedger,addPlayoffResult,seasonSummary,combineSummaries}=await loadTS('src/game/careerStatsHistory.ts');
+ const regular=newSeasonLedger(2026),playoffs=newPlayoffLedger(2026);
+ addPlayedStat(regular,'round-1','G',3,2,{goals:0,assists:0,saves:20,shotsAgainst:22});
+ addPlayoffResult(playoffs,'semifinal-1',{goals:0,assists:0,saves:27,shotsAgainst:28,goalsAgainst:1,won:true,simulated:false});
+ const a=seasonSummary(regular),b=seasonSummary(playoffs),combined=combineSummaries([a,b]);
+ assert.equal(a.gp,1);assert.equal(a.saves,20);
+ assert.equal(b.gp,1);assert.equal(b.saves,27);
+ assert.equal(combined.gp,2);assert.equal(combined.saves,47);
+ assert.equal(combined.shotsAgainst,50);
+ assert.equal(combined.savePct,47/50);
+});
+test('career stats use lifetime position counters and don't fabricate missing historical shot data',async()=>{
+ const {emptyPositionStats}=await loadTS('src/game/careerPositionStats.ts');
+ const {careerSummary,statTableSummary}=await loadTS('src/game/careerStatsHistory.ts');
+ const old=emptyPositionStats();old.gp=40;old.wins=25;old.saves=500;
+ const summary=careerSummary(old,'G');
+ assert.equal(summary.gp,40);assert.equal(summary.savePct,null);
+ assert.ok(statTableSummary('G',summary).some(x=>x.label==='SV%'&&x.value==='—'));
+ const c=careerSummary(old,'C');
+ assert.equal(c.goals,0);assert.equal(c.points,0);
+});
