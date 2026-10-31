@@ -830,7 +830,7 @@ test('goalie regular and playoff statistics do not contaminate each other',async
  assert.equal(combined.shotsAgainst,50);
  assert.equal(combined.savePct,47/50);
 });
-test('career stats use lifetime position counters and don't fabricate missing historical shot data',async()=>{
+test('career stats use lifetime position counters without fabricating historical shot data',async()=>{
  const {emptyPositionStats}=await loadTS('src/game/careerPositionStats.ts');
  const {careerSummary,statTableSummary}=await loadTS('src/game/careerStatsHistory.ts');
  const old=emptyPositionStats();old.gp=40;old.wins=25;old.saves=500;
