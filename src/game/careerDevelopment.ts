@@ -149,7 +149,11 @@ export function scoutingEstimate(dev:DevelopmentSave):{label:string;min:number;m
  const radius=observations>=40?3:observations>=20?6:observations>=8?10:16;
  const offset=Math.round((noise(dev.seed,'scout')-.5)*radius);
  const estimate=clamp(dev.potential+offset,65,99);
- return {label:observations>=20?tierFor(estimate):'Uncertain',
-  min:clamp(estimate-radius,60,99),max:clamp(estimate+radius,60,99),
+ const min=clamp(estimate-radius,60,99),max=clamp(estimate+radius,60,99);
+ const lower=tierFor(min),upper=tierFor(max);
+ // A wide projection is not a confirmed elite designation. Show the range
+ // of plausible tiers until scout confidence narrows sufficiently.
+ const label=observations<20?'Uncertain':lower===upper?lower:lower+'–'+upper;
+ return {label,min,max,
   confidence:observations>=40?'High':observations>=20?'Moderate':'Low'};
 }
