@@ -1,3 +1,4 @@
+import {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary,careerSummary,statTableSummary,type PlayoffStatLedger} from '../game/careerStatsHistory';
 import {newDevelopment,normalizeDevelopment,overallRating,trainingFocuses,processTrainingThrough,offseasonDevelopment,scoutingEstimate,type DevelopmentSave} from '../game/careerDevelopment';
 import {ATTRIBUTES,visibleAttributes,normalizeAttributes,upgradeAttribute,matchRatings,type AttributeValues} from '../game/careerAttributes';
 import {newSeasonLedger,normalizeSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,type SeasonPlayerLedger} from '../game/seasonPlayerLedger';
@@ -16,7 +17,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -27,7 +28,7 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const start=path??normalizeCareerStart(null,p.birthdate,'2026-10-01');
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
-  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -74,6 +75,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   p.firstName+' '+p.lastName+'|'+p.birthdate,p.position,career.season.day);
  career.seasonLedger=normalizeSeasonLedger(career.seasonLedger,Number(career.season.startDate.slice(0,4)));
  career.seasonLedgers??=[];
+ career.playoffLedger=normalizePlayoffLedger(career.playoffLedger,Number(career.season.startDate.slice(0,4)));
+ career.playoffLedgers??=[];
  // Recover existing completed simulation records into the new annual ledger,
  // without replaying career statistics, awarding XP again, or altering scores.
  for(const fixture of career.season.fixtures){
@@ -356,6 +359,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    const result=advanceCareerSeason(career.season!,post,career.startingPath!,p.birthdate);
    career.seasonHistory!.push(result.history);
    career.seasonLedgers!.push(career.seasonLedger!);
+   career.playoffLedgers!.push(career.playoffLedger!);
+   career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
    // Career-wide experience and records persist; new season has fresh standings.
