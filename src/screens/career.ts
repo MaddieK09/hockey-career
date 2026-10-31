@@ -447,7 +447,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   persist();
   const home=getTeam(career.teamId);
   const opponent=getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId);
-  return mountHockeyMatch(root,p.position==='G',career,(result)=>{
+  return mountHockeyMatch(root,p.position==='G',{...career,...matchRatings(career.attributes!,p.position)},(result)=>{
    recordUserResult(season,fixture,result.home,result.away);
    creditSimulation(season,season.day);
    career.development!.scoutingObservations+=2;
