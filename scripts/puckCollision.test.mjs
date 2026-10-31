@@ -778,3 +778,29 @@ test('existing saves begin development tracking at the current season day withou
  assert.equal(dev.trainingDays,0);
  assert.ok(Object.values(attrs).every(v=>v===50));
 });
+
+test('scouting projection never confirms a single tier while the range crosses tiers',async()=>{
+ const {newDevelopment,scoutingEstimate}=await loadTS('src/game/careerDevelopment.ts');
+ const {defaultAttributes}=await loadTS('src/game/careerAttributes.ts');
+ const start={age:12,division:'u13',tier:'aa',seasonYear:2026};
+ const a=defaultAttributes('G',{speed:50,shot:50,handling:50,defense:50});
+ const dev=newDevelopment(start,a,'player','G');
+ assert.equal(scoutingEstimate(dev).label,'Uncertain');
+ dev.scoutingObservations=24;
+ const estimate=scoutingEstimate(dev);
+ assert.equal(estimate.confidence,'Moderate');
+ if(estimate.min<91&&estimate.max>=91)assert.ok(estimate.label.includes('–'));
+ dev.scoutingObservations=45;
+ const high=scoutingEstimate(dev);
+ assert.ok(high.max-high.min<=estimate.max-estimate.min);
+});
+test('career development season history uses stored completed seasons, not current date alone',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const {newDevelopment,normalizeDevelopment,scoutingEstimate}=await loadTS('src/game/careerDevelopment.ts');
+ const {defaultAttributes}=await loadTS('src/game/careerAttributes.ts');
+ const attrs=defaultAttributes('C',{speed:50,shot:50,handling:50,defense:50});
+ const start={age:13,division:'u15',tier:'aa',seasonYear:2026};
+ const dev=normalizeDevelopment(null,start,attrs,'player','C',newSeason('northport').day);
+ assert.equal(dev.reports.length,0);
+ assert.equal(scoutingEstimate(dev).confidence,'Low');
+});
