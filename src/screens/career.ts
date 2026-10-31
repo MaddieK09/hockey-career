@@ -230,11 +230,23 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   }));
   root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
-   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ROOKIE SEASON · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
+   <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ${career.seasonHistory?.length ? `SEASON ${career.seasonHistory.length+1}` : "ROOKIE SEASON"} · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
    ${positionStatsMarkup(p.position,career.positionStats!)}
-   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
+   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="development">Development</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
    <div data-season-view="home">
     <section class="career-panel"><h2>${leagueCrest(start,28)} ${teamCrest(home.id,30)} ${leagueName} · Next scheduled game</h2><p>${fixture&&away?home.city+' '+home.name+' vs. '+away.city+' '+away.name+' · '+dateAt(season,fixture.day):'Season schedule complete'} · 3 × ${career.periodMinutes}-minute periods</p><button class="career-primary" data-play ${fixture?'':'disabled'}>PLAY NEXT GAME 🏒</button><p class="career-muted">Current season day: ${current}. Upcoming games can be played or simulated from the calendar.</p></section>
+    <section class="career-panel career-hub-summary">
+     <h2>Player development</h2><div class="career-hub-development">
+      <div><strong>${ovr}</strong><span>OVR</span></div>
+      <div><strong>${career.level}</strong><span>Level</span></div>
+      <div><strong>${career.skillPoints}</strong><span>Skill points</span></div>
+     </div>
+     <p class="career-muted">${activeDev.trainingDays} training days completed this season · ${comparison.length} attributes improved through training</p>
+     <button type="button" data-open-development class="career-primary">DEVELOPMENT, SCOUTING & UPGRADES →</button>
+    </section>
+    <section class="career-panel"><h2>${teamCrest(home.id,36)} Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
+   </div>
+   <div data-season-view="development" hidden>
     <section class="career-panel"><h2>🏒 Player development & scouting</h2>
       <div class="development-overview"><div><strong class="development-ovr">${ovr}</strong><span>OVERALL</span></div>
        <div><strong>${scout.label}</strong><span>Potential projection · ${scout.min}–${scout.max}</span></div>
@@ -256,7 +268,6 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
        `<div class="attribute-row"><div class="attribute-caption"><strong>${a.label}</strong><small>${a.description}</small></div><div class="attribute-meter"><div style="width:${career.attributes![a.key]}%"></div></div><span class="attribute-number">${career.attributes![a.key]}</span><button type="button" data-attribute="${a.key}" aria-label="Increase ${a.label} by one" ${career.skillPoints<1||career.attributes![a.key]>=99?'disabled':''}>+1</button></div>`).join('')}</div></div>`
      ).join('')}
     </section>
-    <section class="career-panel"><h2>${teamCrest(home.id,36)} Your team</h2><p>Change clubs before the season begins. Once a game is complete, the season stays attached to your team.</p><select data-team-choice ${season.fixtures.some(f=>f.homeGoals!==undefined)?'disabled':''}>${teamChoiceOptions(home.id)}</select></section>
    </div>
    <div data-season-view="trophies" hidden>
     <section class="career-panel">
@@ -319,6 +330,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const showTab=(tab:string)=>{tabs.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));root.querySelectorAll<HTMLElement>('[data-season-view]').forEach(v=>v.hidden=v.dataset.seasonView!==tab);};
   tabs.forEach(b=>b.addEventListener('click',()=>{if(simRunning)return;activeTab=b.dataset.tab!;showTab(activeTab);}));
   showTab(activeTab);
+  root.querySelector<HTMLButtonElement>('[data-open-development]')?.addEventListener('click',()=>{activeTab='development';showTab(activeTab);});
   root.querySelector('[data-play]')?.addEventListener('click',()=>{if(fixture&&!simRunning){cancelSim();match=startMatch(fixture);}});
   root.querySelector('[data-finish-regular]')?.addEventListener('click',()=>{
    if(simRunning)return;
