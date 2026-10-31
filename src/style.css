@@ -294,3 +294,19 @@
 .attribute-row button{border:1px solid #b0e1f5;border-radius:8px;background:#8dd7ef;color:#092c40;font-weight:900;min-height:35px;cursor:pointer}
 .attribute-row button:disabled{opacity:.4;cursor:default}
 @media(max-width:390px){.attribute-row{grid-template-columns:minmax(90px,1fr) 44px 24px 41px;gap:5px}.attribute-caption small{font-size:9px}}
+
+/* PR108 · dynamic career development / potential / scouting panels. */
+.development-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.development-overview>div{background:#163b53;border:1px solid #416d89;border-radius:11px;padding:11px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.development-overview strong{font-size:clamp(13px,3.2vw,19px);color:#f8e1ab}
+.development-overview .development-ovr{font-size:clamp(24px,6vw,34px);color:#f4fbff;line-height:1}
+.development-overview span{color:#b1d1e1;font-size:clamp(9px,2.15vw,11px);line-height:1.3}
+.development-focus-label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:800;color:#d9ebfa;margin:13px 0}
+.development-focus-label select{min-height:43px;padding:9px 12px;border-radius:8px;border:1px solid #78afc7;background:#17374d;color:#fff;font:inherit}
+.development-changes,.development-reports{display:grid;gap:7px;margin:11px 0}
+.development-change{display:flex;justify-content:space-between;gap:10px;border:1px solid #3b647c;padding:9px 11px;border-radius:8px;font-size:12px}
+.development-change span{color:#c1d7e5}.development-change strong{color:#b8eabf;font-variant-numeric:tabular-nums}
+.development-reports article{padding:12px;border-radius:10px;border:1px solid #456e8c;background:#163b53;display:flex;flex-direction:column;gap:5px}
+.development-reports article strong{color:#e6f2ff;font-size:13px}
+.development-reports article span{color:#a6cedb;font-size:11px}
+.development-changes p,.development-reports p{color:#a6c2d4;font-size:12px}
