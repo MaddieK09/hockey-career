@@ -258,19 +258,25 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   }).join(''):'';
 
   const start=career.startingPath!,leagueName=leagueTitle(start);
-  const actualAge=actualAgeOn(p.birthdate,dateAt(season,season.day));
+  const actualAge=actualAgeOn(p.birthdate,dateAt(season,career.timelineDay!));
   const away=fixture?getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId):undefined;
   const standings=leagueStandings(season),leaders=botStats(season).filter(x=>x.position!=='G')
    .sort((a,b)=>b.points-a.points||b.goals-a.goals).slice(0,10);
   const goalieLeaders=botStats(season).filter(x=>x.position==='G').sort((a,b)=>b.wins-a.wins||b.saves-a.saves);
-  const selected=dateAt(season,selectedDay),current=dateAt(season,season.day);
-  const schedule=season.fixtures.filter(f=>f.day>=season.day&&f.day<=season.day+28)
+  const selected=dateAt(season,selectedDay),current=dateAt(season,career.timelineDay!);
+  const schedule=season.fixtures.filter(f=>f.day>=career.timelineDay!&&f.day<=career.timelineDay!+28)
    .sort((x,y)=>x.day-y.day||x.id.localeCompare(y.id));
   const scheduleMarkup=schedule.slice(0,24).map(f=>{
    const done=f.homeGoals!==undefined,ours=f.homeId===home.id||f.awayId===home.id;
    return '<div class="season-fixture'+(ours?' season-ours':'')+'"><span>'+dateAt(season,f.day).slice(5)+'</span><span>'+getTeam(f.homeId).abbr+' vs '+getTeam(f.awayId).abbr+'</span><strong>'+(done?f.homeGoals+'–'+f.awayGoals:ours?'YOUR GAME':'Scheduled')+'</strong></div>';
   }).join('');
   const calendar=renderCalendarMonth();
+  const postFixtures=post?playoffCalendarGames(post):[];
+  const nextPlayerPost=postFixtures.find(g=>g.homeGoals===undefined&&[g.homeId,g.awayId].includes(home.id));
+  const playoffSummary=seasonSummary(career.playoffLedger!,career.periodMinutes!*3);
+  const playoffLeaders=post?playoffBotStats(post,botStats(season)):[];
+  const skaterPost=playoffLeaders.filter(x=>x.position!=='G').sort((a,b)=>b.points-a.points||b.goals-a.goals);
+  const goaliePost=playoffLeaders.filter(x=>x.position==='G').sort((a,b)=>b.wins-a.wins||b.saves-a.saves);
   const ovr=overallRating(career.attributes!,p.position),scout=scoutingEstimate(career.development!);
   const activeDev=career.development!;
   const progressReport=activeDev.reports.slice().reverse().slice(0,4);
@@ -360,15 +366,33 @@ root.innerHTML=`<main class="career-shell">
     </section>
    </div>
    <div data-season-view="playoffs" hidden>
-    <section class="career-panel"><h2>🏆 Playoff bracket</h2>
-    ${!regularComplete?'<p>Complete the regular season before playoffs begin. The top four teams qualify.</p><button data-finish-regular>SIM REGULAR SEASON TO APRIL 15</button>':
-     '<p>Top four teams qualify. '+(post?.bestOf===5?'Best of five':'Best of seven')+' series · 1 vs 4 and 2 vs 3.</p>'+
+    <section class="career-panel"><h2>🏆 Playoff series tracker</h2>
+     ${!regularComplete?'<p>The top four qualify after April 15. Find playoff matchups on the Calendar.</p>':
+      '<p>'+(post?.bestOf===5?'Best-of-five':'Best-of-seven')+' series. Game dates and scores live on the Calendar.</p>'+
       '<p>'+(post?.champion?'CHAMPIONS: '+getTeam(post.champion).city+' '+getTeam(post.champion).name:
-      isQualified(post!,home.id)?'Your team qualified for the postseason!':'Your team missed the playoffs; you can still simulate the championship.')+'</p>'+
-      '<div class="playoff-bracket">'+bracket+'</div>'+
-      (post?.champion?'<button data-next-season>BEGIN NEXT SEASON →</button>':
-       '<div class="playoff-actions"><button data-play-playoff '+(mySeries?'':'disabled')+'>PLAY NEXT PLAYOFF GAME</button><button data-sim-playoff>SIM NEXT PLAYOFF GAME</button><button data-sim-postseason>SIM REMAINING PLAYOFFS</button></div>')}
-    <h3>Career season history</h3><div class="season-history">${(career.seasonHistory??[]).slice().reverse().map(h=>'<p>'+h.seasonYear+'–'+String(h.seasonYear+1).slice(-2)+' · '+h.division+' · Rank #'+h.clubRank+' · '+(h.champion?'Champion '+getTeam(h.champion).abbr:'—')+'</p>').join('')||'<p>No completed seasons yet</p>'}</div>
+       isQualified(post!,home.id)?'Your club qualified!':'Your club missed the postseason.')+'</p>'+
+      '<div class="playoff-bracket">'+bracket+'</div>'}
+     <button type="button" class="career-primary" data-open-calendar>OPEN PLAYOFF CALENDAR →</button>
+    </section>
+    <section class="career-panel"><h2>Your playoff statistics</h2>
+     ${isPostseason&&isQualified(post!,home.id)?
+      '<div class="my-stats-highlights">'+statTableSummary(p.position,playoffSummary).map(v=>
+       '<div><strong>'+v.value+'</strong><span>'+v.label+'</span></div>').join('')+'</div>':
+      '<p class="career-muted">You have no playoff games this season.</p>'}
+    </section>
+    <section class="career-panel"><h2>Playoff skater leaders</h2>
+     <div class="season-table-wrap"><table class="season-table"><thead><tr><th>Player</th><th>Club</th><th>GP</th><th>G</th><th>A</th><th>PTS</th></tr></thead><tbody>
+      ${skaterPost.slice(0,12).map(v=>'<tr><td>'+v.name+'</td><td>'+getTeam(v.teamId).abbr+'</td><td>'+v.gp+'</td><td>'+v.goals+'</td><td>'+v.assists+'</td><td>'+v.points+'</td></tr>').join('')}
+     </tbody></table></div>
+    </section>
+    <section class="career-panel"><h2>Playoff goalie leaders</h2>
+     <div class="season-table-wrap"><table class="season-table"><thead><tr><th>Goalie</th><th>Club</th><th>GP</th><th>W</th><th>SV</th><th>SV%</th></tr></thead><tbody>
+      ${goaliePost.map(v=>'<tr><td>'+v.name+'</td><td>'+getTeam(v.teamId).abbr+'</td><td>'+v.gp+'</td><td>'+v.wins+'</td><td>'+v.saves+'</td><td>'+(v.shotsAgainst?(v.saves/v.shotsAgainst*100).toFixed(1)+'%':'—')+'</td></tr>').join('')}
+     </tbody></table></div>
+    </section>
+    <section class="career-panel"><h2>Previous seasons</h2>
+     <div class="season-history">${(career.seasonHistory??[]).slice().reverse().map(h=>
+      '<p>'+h.seasonYear+'–'+String(h.seasonYear+1).slice(-2)+' · '+h.division+' · #'+h.clubRank+' · '+(h.champion?'Champion '+getTeam(h.champion).abbr:'—')+'</p>').join('')||'<p>No completed seasons yet</p>'}</div>
     </section>
    </div>
    <div data-season-view="calendar" hidden>
