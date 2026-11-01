@@ -1,3 +1,4 @@
+import {newCareerRosters,normalizeCareerRosters,processRosterMovesThrough,rosterRatings,teamRoster,teamOverall,tradeDeadline,isTradeWindow,nextSeasonRosters,updateManagementAfterGame,type CareerRosters} from '../game/careerRosters';
 import {careerLastDay,playoffCalendarGames,simulatePostseasonDay,calendarGameToFixture,playoffFixtureId,playoffBotStats,type PostseasonCalendarGame} from '../game/careerYear';
 import {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary,combineSummaries,careerSummary,statTableSummary,type PlayoffStatLedger} from '../game/careerStatsHistory';
 import {newDevelopment,normalizeDevelopment,overallRating,trainingFocuses,processTrainingThrough,offseasonDevelopment,scoutingEstimate,type DevelopmentSave} from '../game/careerDevelopment';
@@ -17,7 +18,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;organization?:CareerRosters;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -29,6 +30,8 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
   season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),timelineDay:0,positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+ s.organization=newCareerRosters(start,DEFAULT_TEAM_ID);
+ s.season!.teamRatings=rosterRatings(s.organization);
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -73,6 +76,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   career.timelineDay=Math.max(career.season.day,...completed.map(g=>g.day));
  }
  career.timelineDay=clamp(Math.floor(career.timelineDay!),0,careerLastDay(career.season));
+ career.organization=normalizeCareerRosters(career.organization,career.startingPath,career.teamId,career.timelineDay);
+ career.season.teamRatings=rosterRatings(career.organization);
  let selectedDay=career.timelineDay;
  career.seasonHistory??=[];
  career.trophyCase=normalizeTrophyCase(career.trophyCase);
@@ -105,6 +110,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const creditSimulation=(season:SeasonSave,day:number)=>{
   const pending=season.fixtures.filter(f=>f.homeGoals===undefined&&(f.homeId===career.teamId||f.awayId===career.teamId)&&f.day<=day);
   trainThrough(season,day);
+  season.teamRatings=rosterRatings(career.organization!);
   const report=simulateThrough(season,day);
   for(const fixture of pending){
    if(fixture.homeGoals===undefined||fixture.awayGoals===undefined)continue;
@@ -114,6 +120,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.development!.scoutingObservations++;
    const own=fixture.homeId===career.teamId?fixture.homeGoals:fixture.awayGoals;
    const opponent=fixture.homeId===career.teamId?fixture.awayGoals:fixture.homeGoals;
+   updateManagementAfterGame(career.organization!,own>opponent,true);
    addXP(simulatedGameXP(
     career.positionStats!.goals-before.goals,
     career.positionStats!.assists-before.assists,
@@ -143,6 +150,12 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  };
  const processTimelineDay=(day:number)=>{
   const season=career.season!,d=clamp(Math.floor(day),0,careerLastDay(season));
+  const moves=processRosterMovesThrough(career.organization!,season,d,career.startingPath!);
+  if(moves.teamId!==career.teamId){
+   career.teamId=moves.teamId;
+   season.teamId=moves.teamId;
+  }
+  season.teamRatings=rosterRatings(career.organization!);
   if(d<=MAX_SEASON_DAY)creditSimulation(season,d);
   else{
    if(season.day<MAX_SEASON_DAY)creditSimulation(season,MAX_SEASON_DAY);
