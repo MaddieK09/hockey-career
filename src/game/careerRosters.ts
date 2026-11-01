@@ -151,7 +151,15 @@ export function nextSeasonRosters(world:CareerRosters,start:CareerStart):CareerR
  const [minAge,maxAge]=ageRange(start);
  world.players=world.players.map((p,i)=>{
   const age=p.age+1;
-  if(age>maxAge||age<minAge)return recruit(p.teamId,start.seasonYear,i%20,start);
+  if(age>maxAge||age<minAge){
+   const replacement=recruit(p.teamId,start.seasonYear,i%20,start);
+   // Trades change a player's team without changing their array index.
+   // Preserve each club's positional composition and use the retiring
+   // player's stable ID to guarantee unique prospect IDs after rollover.
+   replacement.id='rookie-'+start.seasonYear+'-'+p.id;
+   replacement.position=p.position;
+   return replacement;
+  }
   const growth=age<=18?1:age<24?0:age>32?-1:0;
   return {...p,age,overall:clamp(p.overall+growth,30,p.potential)};
  });
