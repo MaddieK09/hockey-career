@@ -244,9 +244,9 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   if(regularComplete&&!career.playoffs){
    career.playoffs=createPlayoffs(season,career.startingPath!.division);persist();
   }
-  const post=career.playoffs,series=post?nextSeries(post):undefined;
+  const post=career.playoffs; if(post)nextSeries(post);
   if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
-  const mySeries=series&&(series.seedA===home.id||series.seedB===home.id);
+
   const isPostseason=!!post;
   const bracket=post?post.series.map((round,i)=>{
    const first=getTeam(round.seedA),second=getTeam(round.seedB);
@@ -452,44 +452,37 @@ root.innerHTML=`<main class="career-shell">
   }));
   root.querySelector<HTMLButtonElement>('[data-open-development]')?.addEventListener('click',()=>{activeTab='development';showTab(activeTab,true);});
   root.querySelector('[data-play]')?.addEventListener('click',()=>{if(fixture&&!simRunning){cancelSim();match=startMatch(fixture);}});
-  root.querySelector('[data-finish-regular]')?.addEventListener('click',()=>{
-   if(simRunning)return;
-   creditSimulation(career.season!,MAX_SEASON_DAY);selectedDay=MAX_SEASON_DAY;
-   activeTab='playoffs';drawHub();
+  root.querySelector<HTMLButtonElement>('[data-open-calendar]')?.addEventListener('click',()=>{
+   activeTab='calendar';showTab(activeTab,true);
   });
-  root.querySelector('[data-sim-playoff]')?.addEventListener('click',()=>{
-   if(series){simPlayoffGame(post!,series);nextSeries(post!);persist();activeTab='playoffs';drawHub();}
+  root.querySelector<HTMLButtonElement>('[data-play-playoff]')?.addEventListener('click',()=>{
+   if(simRunning||!post||!nextPlayerPost)return;
+   cancelSim();
+   if(career.timelineDay!<nextPlayerPost.day)processTimelineDay(nextPlayerPost.day-1);
+   match=startPlayoffGame(post,nextPlayerPost);
   });
-  root.querySelector('[data-sim-postseason]')?.addEventListener('click',()=>{
-   if(post){simulateRemainingPlayoffs(post);persist();activeTab='playoffs';drawHub();}
-  });
-  root.querySelector('[data-play-playoff]')?.addEventListener('click',()=>{
-   if(series&&mySeries&&!simRunning){cancelSim();match=startPlayoffGame(post!,series);}
-  });
-  root.querySelector('[data-next-season]')?.addEventListener('click',()=>{
-   if(!post?.champion)return;
-   const year=Number(career.season!.startDate.slice(0,4));
-   trainThrough(career.season!,MAX_SEASON_DAY);
+  root.querySelector<HTMLButtonElement>('[data-next-season]')?.addEventListener('click',()=>{
+   if(!post?.champion||career.timelineDay!<careerLastDay(season))return;
+   const year=Number(season.startDate.slice(0,4));
+   trainThrough(season,careerLastDay(season));
    const seasonStats=ledgerTotals(career.seasonLedger!);
    offseasonDevelopment(career.development!,career.attributes!,p.position,career.startingPath!.age,year,
     {games:seasonStats.gp,points:seasonStats.goals+seasonStats.assists,wins:seasonStats.wins});
-   const result=advanceCareerSeason(career.season!,post,career.startingPath!,p.birthdate);
+   const result=advanceCareerSeason(season,post,career.startingPath!,p.birthdate);
    career.seasonHistory!.push(result.history);
    career.seasonLedgers!.push(career.seasonLedger!);
    career.playoffLedgers!.push(career.playoffLedger!);
    career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
-   // Career-wide experience and records persist; new season has fresh standings.
-   selectedDay=0;visibleMonth=0;
-   months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
+   career.timelineDay=0;selectedDay=0;visibleMonth=0;
+   months=[...new Set(Array.from({length:careerLastDay(result.season)+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
    persist();activeTab='home';drawHub();
   });
-
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
    if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));selectedDay=0;visibleMonth=0;
+   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));career.timelineDay=0;career.playoffs=undefined;selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
   root.querySelector<HTMLSelectElement>('[data-training-focus]')?.addEventListener('change',e=>{
@@ -521,7 +514,7 @@ root.innerHTML=`<main class="career-shell">
   const input=root.querySelector<HTMLInputElement>('[data-target-date]');
   input?.addEventListener('change',()=>{
    if(simRunning)return;
-   selectedDay=Math.max(season.day,seasonDay(input.value,season.startDate));
+   selectedDay=Math.max(career.timelineDay!,seasonDay(input.value,season.startDate));
    visibleMonth=Math.max(0,months.indexOf(dateAt(season,selectedDay).slice(0,7)));
    activeTab='calendar';drawHub();
   });
@@ -530,22 +523,23 @@ root.innerHTML=`<main class="career-shell">
    simDelay=[35,70,130].includes(speed)?speed:70;
   });
   root.querySelector<HTMLButtonElement>('[data-sim-target]')?.addEventListener('click',()=>{
-   if(simRunning){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
-   if(selectedDay<=season.day)return;
+   if(simRunning){cancelSim();selectedDay=career.timelineDay!;activeTab='calendar';drawHub();return;}
+   if(selectedDay<=career.timelineDay!)return;
    simTarget=selectedDay;simRunning=true;
    const button=root.querySelector<HTMLButtonElement>('[data-sim-target]');
    if(button)button.textContent='STOP SIM';
    const progress=root.querySelector<HTMLProgressElement>('[data-sim-progress]');
-   if(progress){progress.hidden=false;progress.max=simTarget;progress.value=season.day;}
+   if(progress){progress.hidden=false;progress.max=simTarget;progress.value=career.timelineDay!;}
    const status=root.querySelector<HTMLElement>('[data-sim-status]');
-   if(status)status.textContent='Advancing day by day from '+dateAt(season,season.day)+'…';
+   if(status)status.textContent='Advancing day by day from '+dateAt(season,career.timelineDay!)+'…';
    simTimer=setTimeout(simTick,simDelay);
   });
  };
  let activeTab='home';
  let statsSelectedYear:number|null=null;
  let statsScope:'regular'|'playoffs'|'combined'='combined';
- const startPlayoffGame=(post:PlayoffSave,series:PlayoffSave['series'][number])=>{
+ const startPlayoffGame=(post:PlayoffSave,game:PostseasonCalendarGame)=>{
+  const series=game.series;
   // The engine controls the first side. Even as the lower seed, the player
   // must skate for their own club and scores must map back to bracket seeds.
   const reversed=series.seedB===career.teamId;
@@ -562,7 +556,7 @@ root.innerHTML=`<main class="career-shell">
    recordPlayoffGame(post,series,a,b);
    nextSeries(post);
    const own=homeGoals,against=awayGoals;
-   addPlayoffResult(career.playoffLedger!,post.seasonYear+':'+series.round+':'+series.seedA+':'+series.seedB+':'+series.results.length,
+   addPlayoffResult(career.playoffLedger!,game.id,
     {goals:p.position==='G'?0:result.goals,assists:p.position==='G'?0:result.assists,
      saves:p.position==='G'?result.saves:0,shotsAgainst:p.position==='G'?Math.max(result.awayShots,result.saves+against):0,
      goalsAgainst:p.position==='G'?against:0,won:own>against,simulated:false});
@@ -574,8 +568,9 @@ root.innerHTML=`<main class="career-shell">
    addXP(playedGameXP(result.goals,result.assists,result.saves,own>against));
    checkMilestoneAwards(career.trophyCase!,career.positionStats!,p.position,
     Number(career.season!.startDate.slice(0,4)),leagueTitle(career.startingPath!));
+   processTimelineDay(game.day);
    persist();
-  },()=>{activeTab='playoffs';drawHub();},(minutes)=>{
+  },()=>{activeTab='calendar';drawHub();},(minutes)=>{
    career.periodMinutes=minutes;persist();
   },home,away,startPace(career.startingPath!),leagueTitle(career.startingPath!)+' · PLAYOFFS');
  };
@@ -590,6 +585,7 @@ root.innerHTML=`<main class="career-shell">
   return mountHockeyMatch(root,p.position==='G',{...career,...matchRatings(career.attributes!,p.position)},(result)=>{
    recordUserResult(season,fixture,result.home,result.away);
    creditSimulation(season,season.day);
+   career.timelineDay=Math.max(career.timelineDay!,fixture.day);
    career.development!.scoutingObservations+=2;
    career.games+=1;
    addPlayedStat(career.seasonLedger!,fixture.id,p.position,result.home,result.away,
