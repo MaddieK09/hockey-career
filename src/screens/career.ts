@@ -1,3 +1,4 @@
+import {newCareerRosters,normalizeCareerRosters,processRosterMovesThrough,rosterRatings,teamRoster,teamOverall,tradeDeadline,isTradeWindow,nextSeasonRosters,updateManagementAfterGame,type CareerRosters,type RosterPlayer} from '../game/careerRosters';
 import {careerLastDay,playoffCalendarGames,simulatePostseasonDay,calendarGameToFixture,playoffFixtureId,playoffBotStats,type PostseasonCalendarGame} from '../game/careerYear';
 import {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary,combineSummaries,careerSummary,statTableSummary,type PlayoffStatLedger} from '../game/careerStatsHistory';
 import {newDevelopment,normalizeDevelopment,overallRating,trainingFocuses,processTrainingThrough,offseasonDevelopment,scoutingEstimate,type DevelopmentSave} from '../game/careerDevelopment';
@@ -17,7 +18,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;organization?:CareerRosters;playoffRosters?:RosterPlayer[];playoffTeamId?:string;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -29,6 +30,8 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
   season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),timelineDay:0,positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+ s.organization=newCareerRosters(start,DEFAULT_TEAM_ID);
+ s.season!.teamRatings=rosterRatings(s.organization);
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -73,6 +76,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   career.timelineDay=Math.max(career.season.day,...completed.map(g=>g.day));
  }
  career.timelineDay=clamp(Math.floor(career.timelineDay!),0,careerLastDay(career.season));
+ career.organization=normalizeCareerRosters(career.organization,career.startingPath,career.teamId,career.timelineDay);
+ career.season.teamRatings=rosterRatings(career.organization);
  let selectedDay=career.timelineDay;
  career.seasonHistory??=[];
  career.trophyCase=normalizeTrophyCase(career.trophyCase);
@@ -105,6 +110,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const creditSimulation=(season:SeasonSave,day:number)=>{
   const pending=season.fixtures.filter(f=>f.homeGoals===undefined&&(f.homeId===career.teamId||f.awayId===career.teamId)&&f.day<=day);
   trainThrough(season,day);
+  season.teamRatings=rosterRatings(career.organization!);
   const report=simulateThrough(season,day);
   for(const fixture of pending){
    if(fixture.homeGoals===undefined||fixture.awayGoals===undefined)continue;
@@ -114,6 +120,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.development!.scoutingObservations++;
    const own=fixture.homeId===career.teamId?fixture.homeGoals:fixture.awayGoals;
    const opponent=fixture.homeId===career.teamId?fixture.awayGoals:fixture.homeGoals;
+   updateManagementAfterGame(career.organization!,own>opponent,true);
    addXP(simulatedGameXP(
     career.positionStats!.goals-before.goals,
     career.positionStats!.assists-before.assists,
@@ -136,6 +143,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    const own=g.homeId===career.teamId?g.homeGoals!:g.awayGoals!;
    const against=g.homeId===career.teamId?g.awayGoals!:g.homeGoals!;
    career.games++;if(own>against)career.wins++;else career.losses++;
+   updateManagementAfterGame(career.organization!,own>against,true);
    career.development!.scoutingObservations++;
    addXP(simulatedGameXP(career.positionStats!.goals-before.goals,
     career.positionStats!.assists-before.assists,career.positionStats!.saves-before.saves,own>against));
@@ -143,10 +151,21 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  };
  const processTimelineDay=(day:number)=>{
   const season=career.season!,d=clamp(Math.floor(day),0,careerLastDay(season));
+  const moves=processRosterMovesThrough(career.organization!,season,d,career.startingPath!);
+  if(moves.teamId!==career.teamId){
+   rosterViewedTeam=moves.teamId;
+   career.teamId=moves.teamId;
+   season.teamId=moves.teamId;
+  }
+  season.teamRatings=rosterRatings(career.organization!);
   if(d<=MAX_SEASON_DAY)creditSimulation(season,d);
   else{
    if(season.day<MAX_SEASON_DAY)creditSimulation(season,MAX_SEASON_DAY);
-   if(!career.playoffs)career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   if(!career.playoffs){
+    career.playoffs=createPlayoffs(season,career.startingPath!.division);
+    career.playoffRosters=career.organization!.players.map(p=>({...p}));
+    career.playoffTeamId=career.teamId;
+   }
    const results=simulatePostseasonDay(career.playoffs,d);
    awardSimulatedPlayoff(results);
    trainThrough(season,d);
@@ -187,12 +206,16 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
      ((completed??score)!==undefined?'<em class="season-day-score">'+(completed??score)+'</em>':''):
     '<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+
      (plan.kind==='rest'?'R':'T')+'</small>';
+   const news=career.organization!.events.some(e=>e.date===iso);
+   const deadline=d===tradeDeadline(season);
    const ours=!!(fixture&&[fixture.homeId,fixture.awayId].includes(career.teamId!))||
     matches.some(g=>[g.homeId,g.awayId].includes(career.teamId!));
    html+='<button type="button" data-day="'+d+'" class="season-date'+
     (selectedDay===d?' selected':'')+(d<career.timelineDay!?' elapsed':'')+
     (d===career.timelineDay?' current':'')+(ours?' player-game':'')+(playoff?' playoff-game':'')+
-    '" title="'+iso+' · '+(matchup||plan.kind)+'"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
+    '" title="'+iso+' · '+(matchup||plan.kind)+'"><span class="season-day-number">'+iso.slice(8)+'</span>'+
+     content+(news?'<small class="season-transaction-marker">↔</small>':'')+
+     (deadline?'<small class="season-trade-deadline">TD</small>':'')+'</button>';
   }
   return html;
  };
@@ -200,15 +223,18 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const season=career.season!;
   const games=season.fixtures.filter(f=>f.day===day);
   const playoffs=career.playoffs?playoffCalendarGames(career.playoffs).filter(g=>g.day===day):[];
+  const news=career.organization!.events.filter(e=>e.date===dateAt(season,day)).map(e=>
+   '<div class="season-sim-line"><span>'+e.kind.toUpperCase()+'</span><strong>'+
+   e.description+'</strong></div>').join('');
   if(playoffs.length)return playoffs.map(g=>'<div class="season-sim-line"><span>PLAYOFFS · '+
    getTeam(g.homeId).abbr+' vs. '+getTeam(g.awayId).abbr+'</span><strong>'+
-   (g.homeGoals!==undefined?g.homeGoals+'–'+g.awayGoals:'Scheduled')+'</strong></div>').join('');
+   (g.homeGoals!==undefined?g.homeGoals+'–'+g.awayGoals:'Scheduled')+'</strong></div>').join('')+news;
   if(games.length)return games.map(f=>'<div class="season-sim-line"><span>'+
    getTeam(f.homeId).abbr+' vs. '+getTeam(f.awayId).abbr+'</span><strong>'+
-   (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('');
+   (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('')+news;
   const plan=dayPlan(season,day);
   return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+
-   (day>MAX_SEASON_DAY?' · OFFSEASON':'')+' — '+dateAt(season,day)+'</div>';
+   (day>MAX_SEASON_DAY?' · OFFSEASON':'')+' — '+dateAt(season,day)+'</div>'+news;
  };
  const simTick=()=>{
   if(!simRunning)return;
@@ -242,10 +268,17 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const season=career.season!,home=getTeam(career.teamId),fixture=nextUserFixture(season);
   const regularComplete=season.fixtures.every(f=>f.homeGoals!==undefined);
   if(regularComplete&&!career.playoffs){
-   career.playoffs=createPlayoffs(season,career.startingPath!.division);persist();
+   career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   career.playoffRosters=career.organization!.players.map(p=>({...p}));
+   persist();
+  }
+  if(career.playoffs&&!career.playoffTeamId)career.playoffTeamId=career.teamId;
+  if(career.playoffs&&!career.playoffRosters){
+   career.playoffRosters=career.organization!.players.map(p=>({...p}));
+   persist();
   }
   const post=career.playoffs; if(post)nextSeries(post);
-  if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
+  if(post?.champion&&awardSeason(career.trophyCase!,{...season,teamId:career.playoffTeamId??season.teamId},post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
 
   const isPostseason=!!post;
   const bracket=post?post.series.map((round,i)=>{
@@ -271,10 +304,16 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    return '<div class="season-fixture'+(ours?' season-ours':'')+'"><span>'+dateAt(season,f.day).slice(5)+'</span><span>'+getTeam(f.homeId).abbr+' vs '+getTeam(f.awayId).abbr+'</span><strong>'+(done?f.homeGoals+'–'+f.awayGoals:ours?'YOUR GAME':'Scheduled')+'</strong></div>';
   }).join('');
   const calendar=renderCalendarMonth();
+  const world=career.organization!,rosterClub=getTeam(rosterViewedTeam);
+  const currentRoster=teamRoster(world,rosterViewedTeam).slice().sort((a,b)=>
+   a.position.localeCompare(b.position)||b.overall-a.overall);
+  const transactionNews=world.events.filter(e=>e.date>=season.startDate&&e.date<=dateAt(season,careerLastDay(season))).slice(-28).reverse();
+  const deadlineDate=dateAt(season,tradeDeadline(season));
+  const moveWindow=isTradeWindow(season,career.timelineDay!);
   const postFixtures=post?playoffCalendarGames(post):[];
   const nextPlayerPost=postFixtures.find(g=>g.homeGoals===undefined&&[g.homeId,g.awayId].includes(home.id));
   const playoffSummary=seasonSummary(career.playoffLedger!,career.periodMinutes!*3);
-  const playoffLeaders=post?playoffBotStats(post,botStats(season)):[];
+  const playoffLeaders=post?playoffBotStats(post,career.playoffRosters??world.players):[];
   const skaterPost=playoffLeaders.filter(x=>x.position!=='G').sort((a,b)=>b.points-a.points||b.goals-a.goals);
   const goaliePost=playoffLeaders.filter(x=>x.position==='G').sort((a,b)=>b.wins-a.wins||b.saves-a.saves);
   const ovr=overallRating(career.attributes!,p.position),scout=scoutingEstimate(career.development!);
@@ -306,7 +345,32 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
 root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ${career.seasonHistory?.length ? `SEASON ${career.seasonHistory.length+1}` : "ROOKIE SEASON"} · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
-   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="my-stats">My Stats</button><button data-tab="development">Development</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
+   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="roster">Roster</button><button data-tab="my-stats">My Stats</button><button data-tab="development">Development</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
+   <div data-season-view="roster" hidden>
+    <section class="career-panel"><h2>🏒 Team rosters & front office</h2>
+     <p class="career-muted">Real fictional players move between the eight clubs, and trades change team strength and future results.</p>
+     <div class="front-office-trust">
+      <div><strong>Coach trust</strong><span>${world.coachTrust}/100</span><progress max="100" value="${world.coachTrust}"></progress></div>
+      <div><strong>GM trust</strong><span>${world.gmTrust}/100</span><progress max="100" value="${world.gmTrust}"></progress></div>
+     </div>
+     <p class="career-muted">Your results influence management. A low rating raises the chance of a trade or club transfer; nothing is guaranteed.</p>
+     <div class="roster-market"><strong>${moveWindow?'TRANSACTION WINDOW OPEN':'TRANSACTION WINDOW CLOSED'}</strong>
+       <span>Trade deadline: ${deadlineDate} · No in-season trades after March 1. Offseason deals begin June 1.</span></div>
+     <label class="roster-selector">View club
+       <select data-roster-team>${teamChoiceOptions(rosterViewedTeam)}</select>
+     </label>
+     <h3>${teamCrest(rosterClub.id,28)} ${rosterClub.city} ${rosterClub.name} · ${teamOverall(world,rosterClub.id)} team OVR</h3>
+     <div class="season-table-wrap"><table class="season-table"><thead><tr><th>Player</th><th>Pos</th><th>#</th><th>Age</th><th>OVR</th></tr></thead><tbody>
+      ${rosterViewedTeam===career.teamId?'<tr class="season-highlight"><td>'+name+' (YOU)</td><td>'+p.position+'</td><td>'+p.jerseyNumber+'</td><td>'+actualAge+'</td><td>'+ovr+'</td></tr>':''}
+      ${currentRoster.map(x=>'<tr><td>'+x.name+'</td><td>'+x.position+'</td><td>'+x.jersey+'</td><td>'+x.age+'</td><td>'+x.overall+'</td></tr>').join('')}
+     </tbody></table></div>
+    </section>
+    <section class="career-panel"><h2>Trades & roster news</h2>
+     <div class="roster-news">${transactionNews.length?transactionNews.map(e=>
+       '<div class="roster-news-item"><small>'+e.date+' · '+e.kind.toUpperCase()+'</small><p>'+e.description+'</p></div>').join(''):
+       '<p class="career-muted">No transactions recorded yet. More trades and signings happen as you simulate the season and offseason.</p>'}</div>
+    </section>
+   </div>
    <div data-season-view="my-stats" hidden><section class="career-panel">
     <h2>📊 My Stats</h2><p class="career-muted">Season and lifetime statistics with separate playoff records. Older careers may have incomplete historical detail.</p>
     <div class="my-stats-controls"><label>Season
@@ -442,6 +506,11 @@ root.innerHTML=`<main class="career-shell">
   };
   tabs.forEach(b=>b.addEventListener('click',()=>{if(simRunning)return;activeTab=b.dataset.tab!;showTab(activeTab,true);}));
   showTab(activeTab);
+  root.querySelector<HTMLSelectElement>('[data-roster-team]')?.addEventListener('change',e=>{
+   if(simRunning)return;
+   rosterViewedTeam=(e.currentTarget as HTMLSelectElement).value;
+   activeTab='roster';drawHub();
+  });
   root.querySelector<HTMLSelectElement>('[data-my-stats-season]')?.addEventListener('change',e=>{
    const value=(e.currentTarget as HTMLSelectElement).value;statsSelectedYear=value==='career'?null:Number(value);renderMyStats();
   });
@@ -468,13 +537,21 @@ root.innerHTML=`<main class="career-shell">
    const seasonStats=ledgerTotals(career.seasonLedger!);
    offseasonDevelopment(career.development!,career.attributes!,p.position,career.startingPath!.age,year,
     {games:seasonStats.gp,points:seasonStats.goals+seasonStats.assists,wins:seasonStats.wins});
-   const result=advanceCareerSeason(season,post,career.startingPath!,p.birthdate);
+   const historicalSeason={...season,teamId:career.playoffTeamId??season.teamId};
+   const result=advanceCareerSeason(historicalSeason,post,career.startingPath!,p.birthdate);
+   // The historic year belongs to the playoff club, but the player's next
+   // season begins with their new post-trade team.
+   result.season.teamId=career.teamId!;
    career.seasonHistory!.push(result.history);
    career.seasonLedgers!.push(career.seasonLedger!);
    career.playoffLedgers!.push(career.playoffLedger!);
    career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
+   career.playoffRosters=undefined;career.playoffTeamId=undefined;
+   nextSeasonRosters(career.organization!,result.start);
+   career.organization!.playerTeamId=career.teamId!;
+   result.season.teamRatings=rosterRatings(career.organization!);
    career.timelineDay=0;selectedDay=0;visibleMonth=0;
    months=[...new Set(Array.from({length:careerLastDay(result.season)+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
    persist();activeTab='home';drawHub();
@@ -482,7 +559,11 @@ root.innerHTML=`<main class="career-shell">
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
    if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));career.timelineDay=0;career.playoffs=undefined;selectedDay=0;visibleMonth=0;
+   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));
+   career.organization!.playerTeamId=career.teamId;
+   rosterViewedTeam=career.teamId;
+   career.season.teamRatings=rosterRatings(career.organization!);
+   career.timelineDay=0;career.playoffs=undefined;selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
   root.querySelector<HTMLSelectElement>('[data-training-focus]')?.addEventListener('change',e=>{
@@ -546,6 +627,7 @@ root.innerHTML=`<main class="career-shell">
  let activeTab='home';
  let statsSelectedYear:number|null=null;
  let statsScope:'regular'|'playoffs'|'combined'='combined';
+ let rosterViewedTeam=career.teamId!;
  const startPlayoffGame=(post:PlayoffSave,game:PostseasonCalendarGame)=>{
   const series=game.series;
   // The engine controls the first side. Even as the lower seed, the player
@@ -582,9 +664,24 @@ root.innerHTML=`<main class="career-shell">
    career.periodMinutes=minutes;persist();
   },home,away,startPace(career.startingPath!),leagueTitle(career.startingPath!)+' · PLAYOFFS');
  };
- const startMatch=(fixture:Fixture)=>{
+ const startMatch=(fixture:Fixture):ReturnType<typeof mountHockeyMatch>=>{
   const season=career.season!;
-  // Skip off-days and simulate other clubs up to the day before this game.
+  // Sim all intervening days so trades and signings can happen before puck drop.
+  // If a trade moves the player, the next scheduled opponent must be refreshed.
+  for(let d=career.timelineDay!;d<fixture.day;d++)processTimelineDay(d);
+  const move=processRosterMovesThrough(career.organization!,season,fixture.day,career.startingPath!);
+  if(move.teamId!==career.teamId){
+   career.teamId=move.teamId;season.teamId=move.teamId;rosterViewedTeam=move.teamId;
+  }
+  season.teamRatings=rosterRatings(career.organization!);
+  if(![fixture.homeId,fixture.awayId].includes(career.teamId!)){
+   const updated=nextUserFixture(season);
+   if(updated)return startMatch(updated);
+   activeTab='home';drawHub();
+   // A caller expects a match controller. Return a no-op controller when
+   // the new club has no regular-season games remaining.
+   return {stop:()=>{}};
+  }
   creditSimulation(season,Math.max(season.day,fixture.day-1));
   season.day=Math.max(season.day,fixture.day);
   persist();
@@ -600,6 +697,8 @@ root.innerHTML=`<main class="career-shell">
     {goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots});
    applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false,career.periodMinutes!*3);
    if(result.home>result.away)career.wins++;else if(result.home<result.away)career.losses++;
+   updateManagementAfterGame(career.organization!,result.home>result.away,false,
+    result.saves>=20||result.goals+result.assists>=2);
    career.goals+=result.goals;career.assists+=result.assists;career.saves+=result.saves;
    addXP(playedGameXP(result.goals,result.assists,result.saves,result.home>result.away));
    checkMilestoneAwards(career.trophyCase!,career.positionStats!,p.position,

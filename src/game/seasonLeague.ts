@@ -6,7 +6,7 @@ export interface Fixture {
  id:string;day:number;homeId:string;awayId:string;
  homeGoals?:number;awayGoals?:number;played?:boolean;
 }
-export interface SeasonSave {version:2;startDate:string;day:number;teamId:string;fixtures:Fixture[]}
+export interface SeasonSave {version:2;startDate:string;day:number;teamId:string;fixtures:Fixture[];teamRatings?:Record<string,number>}
 export interface TeamStanding {team:LeagueTeam;gp:number;w:number;l:number;gf:number;ga:number;pts:number;diff:number}
 export interface BotStat {id:string;name:string;teamId:string;position:'F'|'D'|'G';gp:number;goals:number;assists:number;points:number;saves:number;wins:number;shotsAgainst:number;goalsAgainst:number;shutouts:number}
 const firstNames=['Evan','Mason','Leo','Theo','Owen','Nolan','Finn','Alex','Riley','Jordan','Carter','Max','Jamie','Dylan','Quinn','Parker'];
@@ -102,10 +102,12 @@ export function dayPlan(s:SeasonSave,day:number,teamId=s.teamId):DayPlan{
  const playedYesterday=s.fixtures.some(f=>f.day===d-1&&(f.homeId===teamId||f.awayId===teamId));
  return {day:d,kind:playedYesterday||d%7===6?'rest':'training'};
 }
-function simulateScore(f:Fixture):[number,number]{
+function simulateScore(f:Fixture,ratings?:Record<string,number>):[number,number]{
  const seed=scoreSeed(f.id+'|'+f.homeId+'|'+f.awayId),strengthA=scoreSeed(f.homeId)%7,strengthB=scoreSeed(f.awayId)%7;
- const a=clamp(Math.floor(rand(seed)*5+strengthA*.15),0,7);
- const b=clamp(Math.floor(rand(seed+1)*5+strengthB*.15),0,7);
+ // Roster quality makes future simulated results respond to player trades.
+ const strengthDiff=ratings?(ratings[f.homeId]??60)-(ratings[f.awayId]??60):0;
+ const a=clamp(Math.floor(rand(seed)*5+strengthA*.15+strengthDiff*.035),0,7);
+ const b=clamp(Math.floor(rand(seed+1)*5+strengthB*.15-strengthDiff*.035),0,7);
  // No unresolved ties in this prototype: treat regulation ties as overtime
  // wins but preserve the full-game W/L table.
  return a===b?(rand(seed+2)>.5?[a+1,b]:[a,b+1]):[a,b];
@@ -115,7 +117,7 @@ export function simulateThrough(s:SeasonSave,day:number):{games:number;userGames
  let games=0,userGames=0,wins=0,losses=0;
  for(const f of s.fixtures){
   if(f.day>cutoff||f.homeGoals!==undefined)continue;
-  const [home,away]=simulateScore(f);
+  const [home,away]=simulateScore(f,s.teamRatings);
   f.homeGoals=home;f.awayGoals=away;f.played=false;games++;
   if(f.homeId===s.teamId||f.awayId===s.teamId){
    userGames++;
