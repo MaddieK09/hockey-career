@@ -72,12 +72,12 @@ export function advanceCareerSeason(season:SeasonSave,playoffs:PlayoffSave,start
 
 /** Fictional postseason dates, relative to Oct 1. The first semifinal game is
  * April 19 (day 200), games occur every three days, and the final starts in
- * mid-May (day 224). Both semifinal series play on the same dates.
+ * mid-May (day 227). Both semifinal series play on the same dates.
  */
 export const PLAYOFF_START_DAY=200;
-export const PLAYOFF_FINAL_START_DAY=224;
+export const PLAYOFF_FINAL_START_DAY=227;
 export const PLAYOFF_GAP_DAYS=3;
-export const PLAYOFF_LAST_DAY=242;
+export const PLAYOFF_LAST_DAY=245;
 export interface PlayoffCalendarGame {
  day:number;series:PlayoffSeries;homeId:string;awayId:string;gameIndex:number;
  scoreA?:number;scoreB?:number;played:boolean;
