@@ -152,6 +152,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const season=career.season!,d=clamp(Math.floor(day),0,careerLastDay(season));
   const moves=processRosterMovesThrough(career.organization!,season,d,career.startingPath!);
   if(moves.teamId!==career.teamId){
+   rosterViewedTeam=moves.teamId;
    career.teamId=moves.teamId;
    season.teamId=moves.teamId;
   }
@@ -200,12 +201,16 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
      ((completed??score)!==undefined?'<em class="season-day-score">'+(completed??score)+'</em>':''):
     '<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+
      (plan.kind==='rest'?'R':'T')+'</small>';
+   const news=career.organization!.events.some(e=>e.date===iso);
+   const deadline=d===tradeDeadline(season);
    const ours=!!(fixture&&[fixture.homeId,fixture.awayId].includes(career.teamId!))||
     matches.some(g=>[g.homeId,g.awayId].includes(career.teamId!));
    html+='<button type="button" data-day="'+d+'" class="season-date'+
     (selectedDay===d?' selected':'')+(d<career.timelineDay!?' elapsed':'')+
     (d===career.timelineDay?' current':'')+(ours?' player-game':'')+(playoff?' playoff-game':'')+
-    '" title="'+iso+' · '+(matchup||plan.kind)+'"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
+    '" title="'+iso+' · '+(matchup||plan.kind)+'"><span class="season-day-number">'+iso.slice(8)+'</span>'+
+     content+(news?'<small class="season-transaction-marker">↔</small>':'')+
+     (deadline?'<small class="season-trade-deadline">TD</small>':'')+'</button>';
   }
   return html;
  };
@@ -213,15 +218,18 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const season=career.season!;
   const games=season.fixtures.filter(f=>f.day===day);
   const playoffs=career.playoffs?playoffCalendarGames(career.playoffs).filter(g=>g.day===day):[];
+  const news=career.organization!.events.filter(e=>e.date===dateAt(season,day)).map(e=>
+   '<div class="season-sim-line"><span>'+e.kind.toUpperCase()+'</span><strong>'+
+   e.description+'</strong></div>').join('');
   if(playoffs.length)return playoffs.map(g=>'<div class="season-sim-line"><span>PLAYOFFS · '+
    getTeam(g.homeId).abbr+' vs. '+getTeam(g.awayId).abbr+'</span><strong>'+
-   (g.homeGoals!==undefined?g.homeGoals+'–'+g.awayGoals:'Scheduled')+'</strong></div>').join('');
+   (g.homeGoals!==undefined?g.homeGoals+'–'+g.awayGoals:'Scheduled')+'</strong></div>').join('')+news;
   if(games.length)return games.map(f=>'<div class="season-sim-line"><span>'+
    getTeam(f.homeId).abbr+' vs. '+getTeam(f.awayId).abbr+'</span><strong>'+
-   (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('');
+   (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('')+news;
   const plan=dayPlan(season,day);
   return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+
-   (day>MAX_SEASON_DAY?' · OFFSEASON':'')+' — '+dateAt(season,day)+'</div>';
+   (day>MAX_SEASON_DAY?' · OFFSEASON':'')+' — '+dateAt(season,day)+'</div>'+news;
  };
  const simTick=()=>{
   if(!simRunning)return;
@@ -287,8 +295,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const world=career.organization!,rosterClub=getTeam(rosterViewedTeam);
   const currentRoster=teamRoster(world,rosterViewedTeam).slice().sort((a,b)=>
    a.position.localeCompare(b.position)||b.overall-a.overall);
-  const transactionNews=world.events.filter(e=>e.seasonYear===undefined||e.date.startsWith(String(start.seasonYear))||
-   e.date.startsWith(String(start.seasonYear+1))).slice(-28).reverse();
+  const transactionNews=world.events.filter(e=>e.date>=season.startDate&&e.date<=dateAt(season,careerLastDay(season))).slice(-28).reverse();
   const deadlineDate=dateAt(season,tradeDeadline(season));
   const moveWindow=isTradeWindow(season,career.timelineDay!);
   const postFixtures=post?playoffCalendarGames(post):[];
