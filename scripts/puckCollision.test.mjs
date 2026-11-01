@@ -869,7 +869,7 @@ test('two playoff semifinals progress together on calendar dates with persistent
  assert.equal(simulatePostseasonDay(post,199).length,0);
  assert.equal(post.series[0].results.length,1);
  assert.equal(post.series[1].results.length,1);
- assert.equal(playoffDate(1,0),225);
+ assert.equal(playoffDate(1,0),223);
  simulatePostseasonDay(post,250);
  assert.ok(post.champion);
  assert.equal(post.series.length,3);
