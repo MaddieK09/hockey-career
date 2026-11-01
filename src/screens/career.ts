@@ -1,10 +1,11 @@
+import {careerLastDay,playoffCalendarGames,simulatePostseasonDay,calendarGameToFixture,playoffFixtureId,playoffBotStats,type PostseasonCalendarGame} from '../game/careerYear';
 import {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary,combineSummaries,careerSummary,statTableSummary,type PlayoffStatLedger} from '../game/careerStatsHistory';
 import {newDevelopment,normalizeDevelopment,overallRating,trainingFocuses,processTrainingThrough,offseasonDevelopment,scoutingEstimate,type DevelopmentSave} from '../game/careerDevelopment';
 import {ATTRIBUTES,visibleAttributes,normalizeAttributes,upgradeAttribute,matchRatings,type AttributeValues} from '../game/careerAttributes';
 import {newSeasonLedger,normalizeSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,type SeasonPlayerLedger} from '../game/seasonPlayerLedger';
 import {emptyTrophyCase,normalizeTrophyCase,checkMilestoneAwards,awardSeason,playedGameXP,simulatedGameXP,levelFromXP,type TrophyCase} from '../game/careerAwards';
 import {teamCrest,leagueCrest} from '../game/fictionalBranding';
-import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
+import {createPlayoffs,nextSeries,recordPlayoffGame,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
 import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
@@ -16,7 +17,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -27,7 +28,7 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const start=path??normalizeCareerStart(null,p.birthdate,'2026-10-01');
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
-  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),timelineDay:0,positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -66,12 +67,18 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  }else{
   career.positionStats=normalizePositionStats(career.positionStats,career);
  }
- let selectedDay=career.season.day;
+ // Existing saves retain completed postseason results and their approximate dates.
+ if(!Number.isFinite(career.timelineDay)){
+  const completed=career.playoffs?playoffCalendarGames(career.playoffs).filter(g=>g.homeGoals!==undefined):[];
+  career.timelineDay=Math.max(career.season.day,...completed.map(g=>g.day));
+ }
+ career.timelineDay=clamp(Math.floor(career.timelineDay!),0,careerLastDay(career.season));
+ let selectedDay=career.timelineDay;
  career.seasonHistory??=[];
  career.trophyCase=normalizeTrophyCase(career.trophyCase);
  career.attributes=normalizeAttributes(career.attributes,p.position,career);
  career.development=normalizeDevelopment(career.development,career.startingPath,career.attributes,
-  p.firstName+' '+p.lastName+'|'+p.birthdate,p.position,career.season.day);
+  p.firstName+' '+p.lastName+'|'+p.birthdate,p.position,career.timelineDay);
  career.seasonLedger=normalizeSeasonLedger(career.seasonLedger,Number(career.season.startDate.slice(0,4)));
  career.seasonLedgers??=[];
  career.playoffLedger=normalizePlayoffLedger(career.playoffLedger,Number(career.season.startDate.slice(0,4)));
@@ -91,7 +98,10 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   if(newLevel>career.level){career.skillPoints+=newLevel-career.level;career.level=newLevel;}
  };
  const persist=()=>saveCareer(career);
- const trainThrough=(season:SeasonSave,day:number)=>processTrainingThrough(career.development!,career.attributes!,season,p.position,career.startingPath!.age,day);
+ const trainThrough=(season:SeasonSave,day:number)=>{
+  const gameDays=new Set(career.playoffs?playoffCalendarGames(career.playoffs).map(g=>g.day):[]);
+  return processTrainingThrough(career.development!,career.attributes!,season,p.position,career.startingPath!.age,day,gameDays);
+ };
  const creditSimulation=(season:SeasonSave,day:number)=>{
   const pending=season.fixtures.filter(f=>f.homeGoals===undefined&&(f.homeId===career.teamId||f.awayId===career.teamId)&&f.day<=day);
   trainThrough(season,day);
@@ -116,13 +126,40 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   career.games+=report.userGames;career.wins+=report.wins;career.losses+=report.losses;
   persist();return report;
  };
- // The season is seven browsable months rather than a single 197-cell strip.
- let months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
+ const awardSimulatedPlayoff=(matches:PostseasonCalendarGame[])=>{
+  for(const g of matches){
+   if(![g.homeId,g.awayId].includes(career.teamId!))continue;
+   const fixture=calendarGameToFixture(g);
+   const before={goals:career.positionStats!.goals,assists:career.positionStats!.assists,saves:career.positionStats!.saves};
+   applySimulatedCareerFixture(career.positionStats!,p.position,fixture,career.teamId!);
+   addSimulatedStat(career.playoffLedger!,fixture,p.position,career.teamId!);
+   const own=g.homeId===career.teamId?g.homeGoals!:g.awayGoals!;
+   const against=g.homeId===career.teamId?g.awayGoals!:g.homeGoals!;
+   career.games++;if(own>against)career.wins++;else career.losses++;
+   career.development!.scoutingObservations++;
+   addXP(simulatedGameXP(career.positionStats!.goals-before.goals,
+    career.positionStats!.assists-before.assists,career.positionStats!.saves-before.saves,own>against));
+  }
+ };
+ const processTimelineDay=(day:number)=>{
+  const season=career.season!,d=clamp(Math.floor(day),0,careerLastDay(season));
+  if(d<=MAX_SEASON_DAY)creditSimulation(season,d);
+  else{
+   if(season.day<MAX_SEASON_DAY)creditSimulation(season,MAX_SEASON_DAY);
+   if(!career.playoffs)career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   const results=simulatePostseasonDay(career.playoffs,d);
+   awardSimulatedPlayoff(results);
+   trainThrough(season,d);
+  }
+  career.timelineDay=d;persist();
+ };
+ // Browse the full October-to-September career year.
+ let months=[...new Set(Array.from({length:careerLastDay(career.season!)+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
  let visibleMonth=Math.max(0,months.indexOf(dateAt(career.season,selectedDay).slice(0,7)));
  let simRunning=false;
  let simTimer:ReturnType<typeof setTimeout>|null=null;
  let simDelay=70;
- let simTarget=career.season.day;
+ let simTarget=career.timelineDay!;
  const cancelSim=()=>{
   if(simTimer!==null){clearTimeout(simTimer);simTimer=null;}
   simRunning=false;
