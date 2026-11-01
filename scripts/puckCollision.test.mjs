@@ -840,3 +840,49 @@ test('career stats use lifetime position counters without fabricating historical
  const c=careerSummary(old,'C');
  assert.equal(c.goals,0);assert.equal(c.points,0);
 });
+
+test('postseason schedules both semifinal games together on May calendar',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,calendarPlayoffGames,simulatePlayoffDay,playoffGameDay,PLAYOFF_START_DAY}=await loadTS('src/game/careerPlayoffs.ts');
+ const season=newSeason('northport');simulateThrough(season,MAX_SEASON_DAY);
+ const p=createPlayoffs(season,'junior');
+ assert.equal(playoffGameDay(0,0),200);
+ assert.equal(playoffGameDay(1,0),227);
+ assert.equal(calendarPlayoffGames(p).filter(g=>g.day===PLAYOFF_START_DAY).length,2);
+ assert.equal(simulatePlayoffDay(p,199).length,0);
+ const events=simulatePlayoffDay(p,200);
+ assert.equal(events.length,2);
+ assert.ok(events.every(g=>g.day===200));
+ assert.equal(simulatePlayoffDay(p,200).length,0);
+ const completed=calendarPlayoffGames(p).filter(x=>x.day===200);
+ assert.ok(completed.every(x=>x.scoreA!==undefined&&x.scoreB!==undefined));
+});
+test('simulating playoffs through June produces one final and only one result per scheduled series game',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,simulatePlayoffThrough,calendarPlayoffGames,playoffBotStats}=await loadTS('src/game/careerPlayoffs.ts');
+ const season=newSeason('northport');simulateThrough(season,MAX_SEASON_DAY);
+ const p=createPlayoffs(season,'junior');
+ const events=simulatePlayoffThrough(p,245);
+ assert.ok(p.champion);
+ assert.ok(events.length>8&&events.length<=21);
+ assert.equal(p.series.length,3);
+ assert.equal(simulatePlayoffThrough(p,245).length,0);
+ const schedule=calendarPlayoffGames(p);
+ assert.equal(schedule.length,events.length);
+ assert.ok(schedule.every(g=>g.day>=200&&g.day<=245));
+ const bots=playoffBotStats(season,p);
+ assert.ok(bots.some(x=>x.position==='G'&&x.saves>0));
+ assert.ok(bots.every(x=>x.gp>0&&x.points===x.goals+x.assists));
+});
+test('manual playoff results preserve scheduled day and do not get re-simulated',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {createPlayoffs,recordPlayoffGame,simulatePlayoffDay,calendarPlayoffGames}=await loadTS('src/game/careerPlayoffs.ts');
+ const season=newSeason('northport');simulateThrough(season,MAX_SEASON_DAY);
+ const p=createPlayoffs(season,'u13'),s=p.series[0];
+ recordPlayoffGame(p,s,3,1,200,true);
+ const rest=simulatePlayoffDay(p,200);
+ assert.equal(rest.length,1);
+ const first=calendarPlayoffGames(p).find(g=>g.series===s&&g.gameIndex===0);
+ assert.equal(first.day,200);assert.equal(first.played,true);assert.equal(first.scoreA,3);
+ assert.equal(s.results.length,1);
+});

@@ -1,6 +1,6 @@
-import {leagueStandings,newSeason,type SeasonSave} from './seasonLeague';
+import {leagueStandings,newSeason,botStats,type BotStat,type SeasonSave} from './seasonLeague';
 import {findDivision,eligibleDivisions,leagueTitle,type CareerStart,startingPath} from './careerPath';
-export interface PlayoffSeries {round:0|1;seedA:string;seedB:string;winsA:number;winsB:number;results:Array<{a:number;b:number}>}
+export interface PlayoffSeries {round:0|1;seedA:string;seedB:string;winsA:number;winsB:number;results:Array<{a:number;b:number;day?:number;played?:boolean}>}
 export interface PlayoffSave {version:1;seasonYear:number;bestOf:5|7;series:PlayoffSeries[];champion?:string}
 export interface SeasonHistory {seasonYear:number;division:string;teamId:string;champion?:string;clubRank:number;games:number}
 export const winsRequired=(p:PlayoffSave)=>Math.floor(p.bestOf/2)+1;
@@ -23,16 +23,16 @@ export function nextSeries(p:PlayoffSave):PlayoffSeries|undefined{
  }
  return p.series.find(s=>!winner(p,s));
 }
-export function recordPlayoffGame(p:PlayoffSave,s:PlayoffSeries,a:number,b:number):void{
+export function recordPlayoffGame(p:PlayoffSave,s:PlayoffSeries,a:number,b:number,day?:number,played=false):void{
  if(!p.series.includes(s)||winner(p,s))throw Error('This series has ended.');
  if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<0||a===b)throw Error('Playoff game must have a winner.');
- s.results.push({a,b});if(a>b)s.winsA++;else s.winsB++;
+ s.results.push({a,b,...(day===undefined?{}:{day}),played});if(a>b)s.winsA++;else s.winsB++;
  if(winner(p,s)&&s.round===1)p.champion=winner(p,s);
 }
-export function simPlayoffGame(p:PlayoffSave,s:PlayoffSeries):void{
+export function simPlayoffGame(p:PlayoffSave,s:PlayoffSeries,day?:number):void{
  const n=seed(p.seasonYear+'|'+s.seedA+'|'+s.seedB+'|'+s.results.length);
  const a=Math.floor(rand(n)*5),b=Math.floor(rand(n+83)*5);
- recordPlayoffGame(p,s,a===b?a+1:a,b);
+ recordPlayoffGame(p,s,a===b?a+1:a,b,day);
 }
 export function simulateRemainingPlayoffs(p:PlayoffSave):void{
  let count=0;while(!p.champion&&count++<28){const s=nextSeries(p);if(!s)break;simPlayoffGame(p,s);}
@@ -68,4 +68,92 @@ export function advanceCareerSeason(season:SeasonSave,playoffs:PlayoffSave,start
  const division=findDivision(following.division);
  const cycles=division?.cycles??8;
  return {history,start:following,season:newSeason(season.teamId,following.seasonYear+'-10-01',cycles)};
+}
+
+/** Fictional postseason dates, relative to Oct 1. The first semifinal game is
+ * April 19 (day 200), games occur every three days, and the final starts in
+ * mid-May (day 227). Both semifinal series play on the same dates.
+ */
+export const PLAYOFF_START_DAY=200;
+export const PLAYOFF_FINAL_START_DAY=227;
+export const PLAYOFF_GAP_DAYS=3;
+export const PLAYOFF_LAST_DAY=245;
+export interface PlayoffCalendarGame {
+ day:number;series:PlayoffSeries;homeId:string;awayId:string;gameIndex:number;
+ scoreA?:number;scoreB?:number;played:boolean;
+}
+export const playoffGameDay=(round:0|1,gameIndex:number):number=>
+ (round===0?PLAYOFF_START_DAY:PLAYOFF_FINAL_START_DAY)+gameIndex*PLAYOFF_GAP_DAYS;
+export const playoffGameId=(s:PlayoffSeries,gameIndex:number):string=>
+ 'PO-'+s.round+'-'+s.seedA+'-'+s.seedB+'-'+gameIndex;
+export function calendarPlayoffGames(p:PlayoffSave):PlayoffCalendarGame[]{
+ const entries:PlayoffCalendarGame[]=[];
+ for(const s of p.series){
+  s.results.forEach((r,i)=>entries.push({
+   day:r.day??playoffGameDay(s.round,i),series:s,homeId:s.seedA,awayId:s.seedB,
+   gameIndex:i,scoreA:r.a,scoreB:r.b,played:r.played===true
+  }));
+  if(!winner(p,s)){
+   const index=s.results.length;
+   entries.push({day:playoffGameDay(s.round,index),series:s,
+    homeId:s.seedA,awayId:s.seedB,gameIndex:index,played:false});
+  }
+ }
+ return entries.sort((a,b)=>a.day-b.day||a.series.round-b.series.round||a.series.seedA.localeCompare(b.series.seedA));
+}
+export interface NewPlayoffGame {series:PlayoffSeries;day:number;index:number;a:number;b:number}
+/** Return each newly generated game so career XP and individual stats can be
+ * credited exactly once. No scheduling before the required date. */
+export function simulatePlayoffDay(p:PlayoffSave,day:number):NewPlayoffGame[]{
+ const events:NewPlayoffGame[]=[];
+ if(p.champion||day<PLAYOFF_START_DAY)return events;
+ nextSeries(p);
+ // The first two series share dates. The final is created once both finish.
+ const eligible=p.series.filter(s=>!winner(p,s)&&playoffGameDay(s.round,s.results.length)<=day);
+ for(const s of eligible){
+  const index=s.results.length;
+  const scheduledDay=playoffGameDay(s.round,index);
+  simPlayoffGame(p,s,scheduledDay);
+  const r=s.results[index];
+  events.push({series:s,day:scheduledDay,index,a:r.a,b:r.b});
+ }
+ nextSeries(p);
+ return events;
+}
+export function simulatePlayoffThrough(p:PlayoffSave,targetDay:number):NewPlayoffGame[]{
+ const events:NewPlayoffGame[]=[];
+ for(let day=PLAYOFF_START_DAY;day<=Math.min(targetDay,PLAYOFF_LAST_DAY);day++)
+  events.push(...simulatePlayoffDay(p,day));
+ return events;
+}
+/** Playoff player stats use the same six established fictional bot identities
+ * as regular-season leaderboards, but all counters begin at zero.
+ * These are derived from saved series scores, not independent random results.
+ */
+export function playoffBotStats(season:SeasonSave,p:PlayoffSave):BotStat[]{
+ const players=botStats(season).map(b=>({...b,gp:0,goals:0,assists:0,points:0,saves:0,wins:0,shotsAgainst:0,goalsAgainst:0,shutouts:0}));
+ const hashed=(text:string)=>{let h=2166136261;for(let i=0;i<text.length;i++)h=Math.imul(h^text.charCodeAt(i),16777619);return h>>>0};
+ for(const series of p.series){
+  series.results.forEach((r,index)=>{
+   for(const [teamId,goals,against,won] of [
+    [series.seedA,r.a,r.b,r.a>r.b],[series.seedB,r.b,r.a,r.b>r.a]
+   ] as [string,number,number,boolean][]){
+    const roster=players.filter(x=>x.teamId===teamId);
+    if(roster.length!==6)continue;
+    roster.forEach(x=>x.gp++);
+    const seed=hashed(playoffGameId(series,index)+teamId);
+    for(let goal=0;goal<goals;goal++){
+     const scorer=roster[(seed+goal*13)%5];
+     const passer=roster[(seed+goal*13+3)%5];
+     scorer.goals++;scorer.points++;
+     if(scorer!==passer){passer.assists++;passer.points++;}
+    }
+    const goalie=roster[5],saves=18+(hashed('S'+seed+index)%16);
+    goalie.saves+=saves;goalie.shotsAgainst+=saves+against;
+    goalie.goalsAgainst+=against;if(won)goalie.wins++;
+    if(against===0)goalie.shutouts++;
+   }
+  });
+ }
+ return players.filter(x=>x.gp>0);
 }
