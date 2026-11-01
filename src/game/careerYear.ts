@@ -8,10 +8,10 @@ const hash=(text:string):number=>{
  return h>>>0;
 };
 /** Dates are relative to October 1. Two semifinal series run alongside
- * each other from April 18; the final begins May 14. These dates fit both
+ * each other from April 18; the final begins May 12. These dates fit both
  * best-of-five and best-of-seven formats, including leap-year careers. */
 export const SEMIFINAL_START=199;
-export const FINAL_START=225;
+export const FINAL_START=223;
 export const PLAYOFF_GAME_GAP=3;
 export const CAREER_YEAR_LAST_MONTH=9;
 export const careerLastDay=(season:SeasonSave):number=>{
