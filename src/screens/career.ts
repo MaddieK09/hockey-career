@@ -18,7 +18,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;organization?:CareerRosters;playoffRosters?:RosterPlayer[];timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;organization?:CareerRosters;playoffRosters?:RosterPlayer[];playoffTeamId?:string;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -164,6 +164,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    if(!career.playoffs){
     career.playoffs=createPlayoffs(season,career.startingPath!.division);
     career.playoffRosters=career.organization!.players.map(p=>({...p}));
+    career.playoffTeamId=career.teamId;
    }
    const results=simulatePostseasonDay(career.playoffs,d);
    awardSimulatedPlayoff(results);
@@ -271,12 +272,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    career.playoffRosters=career.organization!.players.map(p=>({...p}));
    persist();
   }
+  if(career.playoffs&&!career.playoffTeamId)career.playoffTeamId=career.teamId;
   if(career.playoffs&&!career.playoffRosters){
    career.playoffRosters=career.organization!.players.map(p=>({...p}));
    persist();
   }
   const post=career.playoffs; if(post)nextSeries(post);
-  if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
+  if(post?.champion&&awardSeason(career.trophyCase!,{...season,teamId:career.playoffTeamId??season.teamId},post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
 
   const isPostseason=!!post;
   const bracket=post?post.series.map((round,i)=>{
@@ -437,7 +439,7 @@ root.innerHTML=`<main class="career-shell">
      <button type="button" class="career-primary" data-open-calendar>OPEN PLAYOFF CALENDAR →</button>
     </section>
     <section class="career-panel"><h2>Your playoff statistics</h2>
-     ${isPostseason&&isQualified(post!,home.id)?
+     ${isPostseason&&(playoffSummary.gp>0||isQualified(post!,home.id))?
       '<div class="my-stats-highlights">'+statTableSummary(p.position,playoffSummary).map(v=>
        '<div><strong>'+v.value+'</strong><span>'+v.label+'</span></div>').join('')+'</div>':
       '<p class="career-muted">You have no playoff games this season.</p>'}
@@ -535,14 +537,18 @@ root.innerHTML=`<main class="career-shell">
    const seasonStats=ledgerTotals(career.seasonLedger!);
    offseasonDevelopment(career.development!,career.attributes!,p.position,career.startingPath!.age,year,
     {games:seasonStats.gp,points:seasonStats.goals+seasonStats.assists,wins:seasonStats.wins});
-   const result=advanceCareerSeason(season,post,career.startingPath!,p.birthdate);
+   const historicalSeason={...season,teamId:career.playoffTeamId??season.teamId};
+   const result=advanceCareerSeason(historicalSeason,post,career.startingPath!,p.birthdate);
+   // The historic year belongs to the playoff club, but the player's next
+   // season begins with their new post-trade team.
+   result.season.teamId=career.teamId!;
    career.seasonHistory!.push(result.history);
    career.seasonLedgers!.push(career.seasonLedger!);
    career.playoffLedgers!.push(career.playoffLedger!);
    career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
-   career.playoffRosters=undefined;
+   career.playoffRosters=undefined;career.playoffTeamId=undefined;
    nextSeasonRosters(career.organization!,result.start);
    career.organization!.playerTeamId=career.teamId!;
    result.season.teamRatings=rosterRatings(career.organization!);
