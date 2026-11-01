@@ -69,21 +69,24 @@ export function calendarGameToFixture(g:PostseasonCalendarGame):Fixture{
 }
 /** Fixture-based deterministic league playoff stat lines. These are fictional
  * AI lines derived from saved playoff scores, independent of UI rendering. */
+export type PlayoffPlayerPosition='F'|'D'|'G'|'C'|'LW'|'RW'|'LD'|'RD';
 export interface PlayoffBotLine {
- id:string;name:string;teamId:string;position:'F'|'D'|'G';
+ id:string;name:string;teamId:string;position:PlayoffPlayerPosition;
  gp:number;goals:number;assists:number;points:number;saves:number;shotsAgainst:number;goalsAgainst:number;wins:number;
 }
-export function playoffBotStats(post:PlayoffSave,players:readonly {id:string;name:string;teamId:string;position:'F'|'D'|'G'}[]):PlayoffBotLine[]{
+export function playoffBotStats(post:PlayoffSave,players:readonly {id:string;name:string;teamId:string;position:PlayoffPlayerPosition}[]):PlayoffBotLine[]{
  const entries=new Map(players.map(p=>[p.id,{...p,gp:0,goals:0,assists:0,points:0,saves:0,shotsAgainst:0,goalsAgainst:0,wins:0}]));
  for(const f of playoffCalendarGames(post)){
   if(f.homeGoals===undefined||f.awayGoals===undefined)continue;
   for(const [teamId,goals,against] of [[f.homeId,f.homeGoals,f.awayGoals],[f.awayId,f.awayGoals,f.homeGoals]] as [string,number,number][]){
    const roster=[...entries.values()].filter(p=>p.teamId===teamId);
    const skaters=roster.filter(p=>p.position!=='G');
-   const goalie=roster.find(p=>p.position==='G');
-   if(!skaters.length||!goalie)continue;
-   for(const p of roster)p.gp++;
+   const goalies=roster.filter(p=>p.position==='G');
+   if(!skaters.length||!goalies.length)continue;
    const h=hash(f.id+'|'+teamId);
+   const goalie=goalies[h%goalies.length];
+   for(const p of skaters)p.gp++;
+   goalie.gp++;
    for(let i=0;i<goals;i++){
     const scorer=skaters[(h+i*13)%skaters.length];
     const helper=skaters[(h+i*29+2)%skaters.length];
