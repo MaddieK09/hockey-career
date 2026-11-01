@@ -913,3 +913,98 @@ test('offseason training never repeats, excludes playoff dates, and survives sav
  assert.equal(normalizeDevelopment(JSON.parse(JSON.stringify(dev)),start,attrs,'offseason goalie','G',dev.lastDay).lastDay,364);
  assert.equal(dayPlan(s,300).day,300);
 });
+
+test('fictional teams carry persistent 20-player rosters and realistic positional depth',async()=>{
+ const {newCareerRosters,teamRoster,teamOverall,normalizeCareerRosters}=await loadTS('src/game/careerRosters.ts');
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ const start={age:12,division:'u13',tier:'aa',seasonYear:2026};
+ const world=newCareerRosters(start,'northport');
+ assert.equal(world.players.length,160);
+ assert.equal(new Set(world.players.map(x=>x.id)).size,160);
+ for(const club of LEAGUE_TEAMS){
+  const roster=teamRoster(world,club.id);
+  assert.equal(roster.length,20);
+  assert.equal(roster.filter(p=>p.position==='G').length,2);
+  assert.equal(roster.filter(p=>p.position==='LD'||p.position==='RD').length,6);
+  assert.equal(roster.filter(p=>['C','LW','RW'].includes(p.position)).length,12);
+  assert.ok(roster.every(p=>p.age>=11&&p.age<=12));
+  assert.ok(teamOverall(world,club.id)>=40&&teamOverall(world,club.id)<=90);
+ }
+ assert.equal(normalizeCareerRosters(JSON.parse(JSON.stringify(world)),start,'northport',0).players.length,160);
+});
+test('trade deadline blocks all in-season trades after March first and reopens market in June',async()=>{
+ const {newSeason,lastCareerDay}=await loadTS('src/game/seasonLeague.ts');
+ const {tradeDeadline,isTradeWindow}=await loadTS('src/game/careerRosters.ts');
+ const s=newSeason('northport','2026-10-01');
+ const deadline=tradeDeadline(s);
+ assert.equal(deadline,151);
+ assert.equal(isTradeWindow(s,deadline),true);
+ assert.equal(isTradeWindow(s,deadline+1),false);
+ assert.equal(isTradeWindow(s,243),false);
+ assert.equal(isTradeWindow(s,244),true);
+ assert.equal(isTradeWindow(s,lastCareerDay(s.startDate)),true);
+});
+test('transactions advance day by day, never replay, and preserve club roster sizes',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const {newCareerRosters,processRosterMovesThrough,teamRoster}=await loadTS('src/game/careerRosters.ts');
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ const start={age:16,division:'junior',tier:'jrb',seasonYear:2026};
+ const s=newSeason('northport'),a=newCareerRosters(start,'northport'),b=newCareerRosters(start,'northport');
+ const first=processRosterMovesThrough(a,s,120,start);
+ assert.equal(a.lastDay,120);
+ const count=a.events.length;
+ assert.equal(processRosterMovesThrough(a,s,120,start).newEvents.length,0);
+ assert.equal(a.events.length,count);
+ processRosterMovesThrough(a,s,364,start);
+ processRosterMovesThrough(b,s,364,start);
+ assert.deepEqual(a.events,b.events);
+ assert.deepEqual(a.players,b.players);
+ assert.ok(a.events.some(x=>x.kind==='trade'));
+ assert.ok(a.events.some(x=>x.kind==='signing'));
+ assert.ok(first.newEvents.length<=a.events.length);
+ assert.ok(LEAGUE_TEAMS.every(t=>teamRoster(a,t.id).length===20));
+ assert.ok(LEAGUE_TEAMS.every(t=>teamRoster(a,t.id).filter(x=>x.position==='G').length===2));
+});
+test('management confidence affects possible player transfers but restricts to one each season',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const {newCareerRosters,processRosterMovesThrough,updateManagementAfterGame}=await loadTS('src/game/careerRosters.ts');
+ const s=newSeason('northport');
+ const start={age:18,division:'junior',tier:'jra',seasonYear:2026};
+ const world=newCareerRosters(start,'northport');
+ for(let i=0;i<35;i++)updateManagementAfterGame(world,false,true);
+ assert.ok(world.coachTrust<42&&world.gmTrust<42);
+ const moves=processRosterMovesThrough(world,s,364,start);
+ assert.ok(world.playerTransfersThisYear<=1);
+ if(world.playerTransfersThisYear===1){
+  assert.notEqual(moves.teamId,'northport');
+  assert.ok(world.events.some(x=>x.kind==='transfer'&&x.to===moves.teamId));
+ }
+});
+test('offseason player aging retains franchise depth and enables next-year trades',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const {newCareerRosters,processRosterMovesThrough,nextSeasonRosters,teamRoster}=await loadTS('src/game/careerRosters.ts');
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ const a={age:12,division:'u13',tier:'aa',seasonYear:2026},b={...a,age:13,division:'u15',seasonYear:2027};
+ const world=newCareerRosters(a,'northport');
+ processRosterMovesThrough(world,newSeason('northport'),364,a);
+ const oldEvents=world.events.length;
+ nextSeasonRosters(world,b);
+ assert.equal(world.seasonYear,2027);
+ assert.equal(world.lastDay,-1);
+ assert.equal(world.playerTransfersThisYear,0);
+ assert.equal(world.events.length,oldEvents);
+ assert.ok(LEAGUE_TEAMS.every(t=>teamRoster(world,t.id).length===20));
+ assert.ok(world.players.every(p=>p.age>=13&&p.age<=14));
+});
+test('roster strength changes future simulated results but preserves saved score outcomes',async()=>{
+ const {newSeason,simulateThrough}=await loadTS('src/game/seasonLeague.ts');
+ const baseline=newSeason('northport'),strong=newSeason('northport');
+ strong.teamRatings={northport:90,lakehaven:30,ironvale:40,stonebridge:40,frostford:40,redcliff:40,clearwater:40,pinecrest:40};
+ simulateThrough(baseline,120);simulateThrough(strong,120);
+ assert.ok(strong.fixtures.some((f,i)=>f.homeGoals!==baseline.fixtures[i].homeGoals||
+  f.awayGoals!==baseline.fixtures[i].awayGoals));
+ const snapshot=JSON.stringify(strong.fixtures);
+ strong.teamRatings={northport:30};
+ simulateThrough(strong,120);
+ assert.equal(JSON.stringify(strong.fixtures),snapshot);
+});
