@@ -169,46 +169,57 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const renderCalendarMonth=()=>{
   const season=career.season!,month=months[visibleMonth];
   const first=new Date(month+'-01T12:00:00Z').getUTCDay();
-  const pads=(first+6)%7; // Monday-first column order
+  const pads=(first+6)%7;
   let html=Array.from({length:pads},()=>'<span class="season-day-empty"></span>').join('');
-  for(let d=0;d<=MAX_SEASON_DAY;d++){
+  for(let d=0;d<=careerLastDay(season);d++){
    const iso=dateAt(season,d);if(iso.slice(0,7)!==month)continue;
    const plan=dayPlan(season,d),fixture=plan.fixture;
-   const score=fixture&&fixture.homeGoals!==undefined&&fixture.awayGoals!==undefined
-    ?'<em class="season-day-score">'+fixture.homeGoals+'–'+fixture.awayGoals+'</em>':'';
-   const content=fixture
-    ?'<small class="season-day-match">'+getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr+'</small>'+score
-    :'<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+(plan.kind==='rest'?'R':'T')+'</small>';
+   const matches=d>MAX_SEASON_DAY&&career.playoffs?
+    playoffCalendarGames(career.playoffs).filter(g=>g.day===d):[];
+   const completed=fixture&&fixture.homeGoals!==undefined&&fixture.awayGoals!==undefined?
+    fixture.homeGoals+'–'+fixture.awayGoals:undefined;
+   const playoff=matches.find(g=>[g.homeId,g.awayId].includes(career.teamId!))??matches[0];
+   const score=playoff?.homeGoals!==undefined?playoff.homeGoals+'–'+playoff.awayGoals:undefined;
+   const matchup=fixture?getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr:
+    playoff?getTeam(playoff.homeId).abbr+' vs. '+getTeam(playoff.awayId).abbr:'';
+   const content=fixture||playoff?
+    '<small class="season-day-match">'+(playoff?'P · ':'')+matchup+'</small>'+
+     ((completed??score)!==undefined?'<em class="season-day-score">'+(completed??score)+'</em>':''):
+    '<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+
+     (plan.kind==='rest'?'R':'T')+'</small>';
+   const ours=!!(fixture&&[fixture.homeId,fixture.awayId].includes(career.teamId!))||
+    matches.some(g=>[g.homeId,g.awayId].includes(career.teamId!));
    html+='<button type="button" data-day="'+d+'" class="season-date'+
-    (selectedDay===d?' selected':'')+(d<season.day?' elapsed':'')+
-    (d===season.day?' current':'')+(fixture?' player-game':'')+
-    '" title="'+iso+' · '+(fixture?getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr:plan.kind)+
-    '"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
+    (selectedDay===d?' selected':'')+(d<career.timelineDay!?' elapsed':'')+
+    (d===career.timelineDay?' current':'')+(ours?' player-game':'')+(playoff?' playoff-game':'')+
+    '" title="'+iso+' · '+(matchup||plan.kind)+'"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
   }
   return html;
  };
  const renderDayResults=(day:number)=>{
-  const season=career.season!,games=season.fixtures.filter(f=>f.day===day);
-  if(!games.length){
-   const plan=dayPlan(season,day);
-   return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+' — '+dateAt(season,day)+'</div>';
-  }
-  return games.map(f=>'<div class="season-sim-line"><span>'+
+  const season=career.season!;
+  const games=season.fixtures.filter(f=>f.day===day);
+  const playoffs=career.playoffs?playoffCalendarGames(career.playoffs).filter(g=>g.day===day):[];
+  if(playoffs.length)return playoffs.map(g=>'<div class="season-sim-line"><span>PLAYOFFS · '+
+   getTeam(g.homeId).abbr+' vs. '+getTeam(g.awayId).abbr+'</span><strong>'+
+   (g.homeGoals!==undefined?g.homeGoals+'–'+g.awayGoals:'Scheduled')+'</strong></div>').join('');
+  if(games.length)return games.map(f=>'<div class="season-sim-line"><span>'+
    getTeam(f.homeId).abbr+' vs. '+getTeam(f.awayId).abbr+'</span><strong>'+
    (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('');
+  const plan=dayPlan(season,day);
+  return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+
+   (day>MAX_SEASON_DAY?' · OFFSEASON':'')+' — '+dateAt(season,day)+'</div>';
  };
  const simTick=()=>{
   if(!simRunning)return;
   if(!root.isConnected||!root.querySelector('[data-calendar-grid]')){cancelSim();return;}
-  const season=career.season!;
-  if(season.day>=simTarget){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
-  // Simulate the opening day's fixtures before advancing the calendar.
-  // Otherwise Oct 1 scores only appear once the clock reaches Oct 2.
-  const hasUnplayedToday=season.fixtures.some(f=>f.day===season.day&&f.homeGoals===undefined);
-  const next=hasUnplayedToday?season.day:season.day+1;
-  creditSimulation(season,next);
-  selectedDay=season.day;
-  const currentMonth=months.indexOf(dateAt(season,season.day).slice(0,7));
+  const season=career.season!,today=career.timelineDay!;
+  if(today>=simTarget){cancelSim();selectedDay=today;activeTab='calendar';drawHub();return;}
+  const opening=season.fixtures.some(f=>f.day===today&&f.homeGoals===undefined);
+  const next=opening?today:today+1;
+  processTimelineDay(next);
+  selectedDay=career.timelineDay!;
+  const currentMonth=months.indexOf(dateAt(season,career.timelineDay!).slice(0,7));
   if(currentMonth>=0)visibleMonth=currentMonth;
   const grid=root.querySelector<HTMLElement>('[data-calendar-grid]');
   const monthName=root.querySelector<HTMLElement>('[data-month-name]');
@@ -218,14 +229,14 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const results=root.querySelector<HTMLElement>('[data-sim-results]');
   if(grid)grid.innerHTML=renderCalendarMonth();
   if(monthName)monthName.textContent=monthTitle();
-  if(current)current.textContent=dateAt(season,season.day);
-  if(progress){progress.value=season.day;progress.max=simTarget;}
-  if(status)status.textContent='SIMULATING · '+dateAt(season,season.day)+' · Day '+season.day+' / '+simTarget;
-  if(results)results.innerHTML=renderDayResults(season.day);
-  if(season.day>=simTarget){cancelSim();activeTab='calendar';drawHub();return;}
+  if(current)current.textContent=dateAt(season,career.timelineDay!);
+  if(progress){progress.value=career.timelineDay!;progress.max=simTarget;}
+  if(status)status.textContent='SIMULATING · '+dateAt(season,career.timelineDay!)+
+   ' · Day '+career.timelineDay+' / '+simTarget;
+  if(results)results.innerHTML=renderDayResults(career.timelineDay!);
+  if(career.timelineDay!>=simTarget){cancelSim();activeTab='calendar';drawHub();return;}
   simTimer=setTimeout(simTick,simDelay);
  };
- const name=(p.firstName+' '+p.lastName).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));
  const drawHub=()=>{
   match?.stop();match=null;
   const season=career.season!,home=getTeam(career.teamId),fixture=nextUserFixture(season);
