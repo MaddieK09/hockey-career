@@ -4,7 +4,7 @@ import {ATTRIBUTES,visibleAttributes,normalizeAttributes,upgradeAttribute,matchR
 import {newSeasonLedger,normalizeSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,type SeasonPlayerLedger} from '../game/seasonPlayerLedger';
 import {emptyTrophyCase,normalizeTrophyCase,checkMilestoneAwards,awardSeason,playedGameXP,simulatedGameXP,levelFromXP,type TrophyCase} from '../game/careerAwards';
 import {teamCrest,leagueCrest} from '../game/fictionalBranding';
-import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
+import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,calendarPlayoffGames,simulatePlayoffDay,playoffGameDay,playoffGameId,playoffBotStats,PLAYOFF_LAST_DAY,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
 import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
@@ -16,7 +16,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; yearDay?:number;season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -27,7 +27,7 @@ export function startCareer(p:PlayerDraft,path?:CareerStart):CareerSave {
  const start=path??normalizeCareerStart(null,p.birthdate,'2026-10-01');
  const firstSeason=start.seasonYear+'-10-01';
  const s:CareerSave={player:p,startingPath:start,teamId:DEFAULT_TEAM_ID,
-  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
+  season:newSeason(DEFAULT_TEAM_ID,firstSeason,startCycles(start)),yearDay:0,positionStats:emptyPositionStats(),trophyCase:emptyTrophyCase(),attributes:normalizeAttributes(null,p.position,{speed:50,shot:50,handling:50,defense:50}),seasonLedger:newSeasonLedger(start.seasonYear),seasonLedgers:[],playoffLedger:newPlayoffLedger(start.seasonYear),playoffLedgers:[],periodMinutes:loadPeriodMinutes(),games:0,wins:0,losses:0,goals:0,assists:0,saves:0,xp:0,level:1,skillPoints:0,speed:50,shot:50,handling:50,defense:50};
  saveCareer(s);return s;
 }
 export function updateCareerPeriodMinutes(minutes:PeriodMinutes):void {
@@ -66,7 +66,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  }else{
   career.positionStats=normalizePositionStats(career.positionStats,career);
  }
- let selectedDay=career.season.day;
+ career.yearDay=clamp(Number(career.yearDay??(career.playoffs?Math.max(MAX_SEASON_DAY,career.season.day):career.season.day)),0,PLAYOFF_LAST_DAY);
+ let selectedDay=career.yearDay;
  career.seasonHistory??=[];
  career.trophyCase=normalizeTrophyCase(career.trophyCase);
  career.attributes=normalizeAttributes(career.attributes,p.position,career);
@@ -117,12 +118,12 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   persist();return report;
  };
  // The season is seven browsable months rather than a single 197-cell strip.
- let months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
+ let months=[...new Set(Array.from({length:PLAYOFF_LAST_DAY+1},(_,i)=>dateAt(career.season!,i).slice(0,7)))];
  let visibleMonth=Math.max(0,months.indexOf(dateAt(career.season,selectedDay).slice(0,7)));
  let simRunning=false;
  let simTimer:ReturnType<typeof setTimeout>|null=null;
  let simDelay=70;
- let simTarget=career.season.day;
+ let simTarget=career.yearDay;
  const cancelSim=()=>{
   if(simTimer!==null){clearTimeout(simTimer);simTimer=null;}
   simRunning=false;
@@ -130,28 +131,41 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
  const monthTitle=()=>new Date(months[visibleMonth]+'-01T12:00:00Z')
   .toLocaleDateString('en-CA',{month:'long',year:'numeric',timeZone:'UTC'});
  const renderCalendarMonth=()=>{
-  const season=career.season!,month=months[visibleMonth];
+  const season=career.season!,month=months[visibleMonth],post=career.playoffs;
+  const playoffEntries=post?calendarPlayoffGames(post):[];
   const first=new Date(month+'-01T12:00:00Z').getUTCDay();
   const pads=(first+6)%7; // Monday-first column order
   let html=Array.from({length:pads},()=>'<span class="season-day-empty"></span>').join('');
   for(let d=0;d<=MAX_SEASON_DAY;d++){
    const iso=dateAt(season,d);if(iso.slice(0,7)!==month)continue;
-   const plan=dayPlan(season,d),fixture=plan.fixture;
+   const plan=d<=MAX_SEASON_DAY?dayPlan(season,d):null,fixture=plan?.fixture;
+   const event=playoffEntries.filter(e=>e.day===d)
+    .sort((a,b)=>Number((b.homeId===career.teamId||b.awayId===career.teamId))-Number((a.homeId===career.teamId||a.awayId===career.teamId)))[0];
+   const game=fixture??event;
    const score=fixture&&fixture.homeGoals!==undefined&&fixture.awayGoals!==undefined
-    ?'<em class="season-day-score">'+fixture.homeGoals+'–'+fixture.awayGoals+'</em>':'';
-   const content=fixture
-    ?'<small class="season-day-match">'+getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr+'</small>'+score
-    :'<small class="season-day-activity '+(plan.kind==='rest'?'season-rest':'season-training')+'">'+(plan.kind==='rest'?'R':'T')+'</small>';
+    ?'<em class="season-day-score">'+fixture.homeGoals+'–'+fixture.awayGoals+'</em>'
+    :event&&event.scoreA!==undefined?'<em class="season-day-score">'+event.scoreA+'–'+event.scoreB+'</em>':'';
+   const content=game
+    ?'<small class="season-day-match">'+(event?'🏆 ':'')+getTeam(game.homeId).abbr+' vs. '+getTeam(game.awayId).abbr+'</small>'+score
+    :d>MAX_SEASON_DAY?'<small class="season-day-activity">'+(d%7===6?'R':'T')+'</small>'
+    :'<small class="season-day-activity '+(plan?.kind==='rest'?'season-rest':'season-training')+'">'+(plan?.kind==='rest'?'R':'T')+'</small>';
    html+='<button type="button" data-day="'+d+'" class="season-date'+
-    (selectedDay===d?' selected':'')+(d<season.day?' elapsed':'')+
-    (d===season.day?' current':'')+(fixture?' player-game':'')+
-    '" title="'+iso+' · '+(fixture?getTeam(fixture.homeId).abbr+' vs. '+getTeam(fixture.awayId).abbr:plan.kind)+
+    (selectedDay===d?' selected':'')+(d<career.yearDay!?' elapsed':'')+
+    (d===career.yearDay?' current':'')+(game?' player-game':'')+(event?' playoff-day':'')+
+    '" title="'+iso+' · '+(game?getTeam(game.homeId).abbr+' vs. '+getTeam(game.awayId).abbr:(plan?.kind??'offseason'))+
     '"><span class="season-day-number">'+iso.slice(8)+'</span>'+content+'</button>';
   }
   return html;
  };
  const renderDayResults=(day:number)=>{
   const season=career.season!,games=season.fixtures.filter(f=>f.day===day);
+  if(day>MAX_SEASON_DAY){
+   const entries=career.playoffs?calendarPlayoffGames(career.playoffs).filter(e=>e.day===day):[];
+   return entries.length?entries.map(e=>'<div class="season-sim-line"><span>🏆 '+
+    getTeam(e.homeId).abbr+' vs. '+getTeam(e.awayId).abbr+'</span><strong>'+
+    (e.scoreA===undefined?'Scheduled':e.scoreA+'–'+e.scoreB)+'</strong></div>').join(''):
+    '<div class="season-sim-line">POSTSEASON · '+dateAt(season,day)+'</div>';
+  }
   if(!games.length){
    const plan=dayPlan(season,day);
    return '<div class="season-sim-line">'+(plan.kind==='rest'?'R · REST DAY':'T · TRAINING DAY')+' — '+dateAt(season,day)+'</div>';
@@ -160,19 +174,47 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    getTeam(f.homeId).abbr+' vs. '+getTeam(f.awayId).abbr+'</span><strong>'+
    (f.homeGoals!==undefined?f.homeGoals+'–'+f.awayGoals:'Scheduled')+'</strong></div>').join('');
  };
+ const creditPlayoffEvents=(events:ReturnType<typeof simulatePlayoffDay>)=>{
+  for(const event of events){
+   const series=event.series;
+   if(series.seedA!==career.teamId&&series.seedB!==career.teamId)continue;
+   const fixture:Fixture={id:playoffGameId(series,event.index),day:event.day,
+    homeId:series.seedA,awayId:series.seedB,homeGoals:event.a,awayGoals:event.b};
+   if(career.playoffLedger!.games.some(g=>g.fixtureId===fixture.id))continue;
+   const before={goals:career.positionStats!.goals,assists:career.positionStats!.assists,saves:career.positionStats!.saves};
+   applySimulatedCareerFixture(career.positionStats!,p.position,fixture,career.teamId!);
+   addSimulatedStat(career.playoffLedger!,fixture,p.position,career.teamId!);
+   const own=fixture.homeId===career.teamId?event.a:event.b;
+   const against=fixture.homeId===career.teamId?event.b:event.a;
+   career.games++;if(own>against)career.wins++;else career.losses++;
+   addXP(simulatedGameXP(career.positionStats!.goals-before.goals,career.positionStats!.assists-before.assists,
+    career.positionStats!.saves-before.saves,own>against));
+   career.development!.scoutingObservations++;
+  }
+  checkMilestoneAwards(career.trophyCase!,career.positionStats!,p.position,
+   career.startingPath!.seasonYear,leagueTitle(career.startingPath!));
+ };
+ const simulateCareerDay=(day:number)=>{
+  const season=career.season!;
+  if(day<=MAX_SEASON_DAY)creditSimulation(season,day);
+  else{
+   if(!career.playoffs&&season.fixtures.every(f=>f.homeGoals!==undefined))
+    career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   if(career.playoffs)creditPlayoffEvents(simulatePlayoffDay(career.playoffs,day));
+  }
+  career.yearDay=day;persist();
+ };
  const simTick=()=>{
   if(!simRunning)return;
   if(!root.isConnected||!root.querySelector('[data-calendar-grid]')){cancelSim();return;}
-  const season=career.season!;
-  if(season.day>=simTarget){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
-  // Simulate the opening day's fixtures before advancing the calendar.
-  // Otherwise Oct 1 scores only appear once the clock reaches Oct 2.
-  const hasUnplayedToday=season.fixtures.some(f=>f.day===season.day&&f.homeGoals===undefined);
-  const next=hasUnplayedToday?season.day:season.day+1;
-  creditSimulation(season,next);
-  selectedDay=season.day;
-  const currentMonth=months.indexOf(dateAt(season,season.day).slice(0,7));
-  if(currentMonth>=0)visibleMonth=currentMonth;
+  const season=career.season!,now=career.yearDay!;
+  if(now>=simTarget){cancelSim();selectedDay=now;activeTab='calendar';drawHub();return;}
+  const pending=now<=MAX_SEASON_DAY&&season.fixtures.some(f=>f.day===now&&f.homeGoals===undefined);
+  const next=pending?now:now+1;
+  simulateCareerDay(next);
+  selectedDay=next;
+  const index=months.indexOf(dateAt(season,next).slice(0,7));
+  if(index>=0)visibleMonth=index;
   const grid=root.querySelector<HTMLElement>('[data-calendar-grid]');
   const monthName=root.querySelector<HTMLElement>('[data-month-name]');
   const current=root.querySelector<HTMLElement>('[data-calendar-today]');
@@ -181,11 +223,11 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const results=root.querySelector<HTMLElement>('[data-sim-results]');
   if(grid)grid.innerHTML=renderCalendarMonth();
   if(monthName)monthName.textContent=monthTitle();
-  if(current)current.textContent=dateAt(season,season.day);
-  if(progress){progress.value=season.day;progress.max=simTarget;}
-  if(status)status.textContent='SIMULATING · '+dateAt(season,season.day)+' · Day '+season.day+' / '+simTarget;
-  if(results)results.innerHTML=renderDayResults(season.day);
-  if(season.day>=simTarget){cancelSim();activeTab='calendar';drawHub();return;}
+  if(current)current.textContent=dateAt(season,next);
+  if(progress){progress.value=next;progress.max=simTarget;}
+  if(status)status.textContent='SIMULATING · '+dateAt(season,next)+' · Day '+next+' / '+simTarget;
+  if(results)results.innerHTML=renderDayResults(next);
+  if(next>=simTarget){cancelSim();activeTab='calendar';drawHub();return;}
   simTimer=setTimeout(simTick,simDelay);
  };
  const name=(p.firstName+' '+p.lastName).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]??c));
