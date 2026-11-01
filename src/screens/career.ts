@@ -7,7 +7,7 @@ import {teamCrest,leagueCrest} from '../game/fictionalBranding';
 import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,calendarPlayoffGames,simulatePlayoffDay,playoffGameDay,winner,playoffGameId,playoffBotStats,PLAYOFF_LAST_DAY,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
 import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
-import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
+import {newSeason,normalizeSeason,dateAt,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
 import {DEFAULT_TEAM_ID,getTeam,nextOpponent,teamChoiceOptions} from '../game/fictionalLeague';
 import {loadPeriodMinutes,validPeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
 import type {PlayerDraft} from '../player/types';
@@ -400,7 +400,7 @@ root.innerHTML=`<main class="career-shell">
       <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${career.yearDay}" hidden></progress>
       <p class="season-sim-status" data-sim-status aria-live="polite">Ready · Select a future date and simulate.</p>
       <div class="season-sim-results" data-sim-results>${renderDayResults(career.yearDay!)}</div>
-      <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. T and R have no training or recovery mechanics yet.</p>
+      <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. Training days provide progression; rest days remain off-days.</p>
     </section>
     ${post&&mySeries?'<section class="career-panel"><h2>🏆 Next playoff game</h2><p>'+
       getTeam(mySeries.seedA).abbr+' vs. '+getTeam(mySeries.seedB).abbr+' · '+dateAt(season,nextPlayoffDay!)+
@@ -434,19 +434,8 @@ root.innerHTML=`<main class="career-shell">
   }));
   root.querySelector<HTMLButtonElement>('[data-open-development]')?.addEventListener('click',()=>{activeTab='development';showTab(activeTab,true);});
   root.querySelector('[data-play]')?.addEventListener('click',()=>{if(fixture&&!simRunning){cancelSim();match=startMatch(fixture);}});
-  root.querySelector('[data-finish-regular]')?.addEventListener('click',()=>{
-   if(simRunning)return;
-   creditSimulation(career.season!,MAX_SEASON_DAY);selectedDay=MAX_SEASON_DAY;
-   activeTab='playoffs';drawHub();
-  });
-  root.querySelector('[data-sim-playoff]')?.addEventListener('click',()=>{
-   if(series){simPlayoffGame(post!,series);nextSeries(post!);persist();activeTab='playoffs';drawHub();}
-  });
-  root.querySelector('[data-sim-postseason]')?.addEventListener('click',()=>{
-   if(post){simulateRemainingPlayoffs(post);persist();activeTab='playoffs';drawHub();}
-  });
-  root.querySelector('[data-play-playoff]')?.addEventListener('click',()=>{
-   if(series&&mySeries&&!simRunning){cancelSim();match=startPlayoffGame(post!,series);}
+  root.querySelector('[data-play-playoff-calendar]')?.addEventListener('click',()=>{
+   if(post&&mySeries&&!simRunning){cancelSim();match=startPlayoffGame(post,mySeries);}
   });
   root.querySelector('[data-next-season]')?.addEventListener('click',()=>{
    if(!post?.champion)return;
@@ -463,15 +452,15 @@ root.innerHTML=`<main class="career-shell">
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
    // Career-wide experience and records persist; new season has fresh standings.
-   selectedDay=0;visibleMonth=0;
-   months=[...new Set(Array.from({length:MAX_SEASON_DAY+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
+   career.yearDay=0;selectedDay=0;visibleMonth=0;
+   months=[...new Set(Array.from({length:PLAYOFF_LAST_DAY+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
    persist();activeTab='home';drawHub();
   });
 
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
    if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));selectedDay=0;visibleMonth=0;
+   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));career.yearDay=0;selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
   root.querySelector<HTMLSelectElement>('[data-training-focus]')?.addEventListener('change',e=>{
@@ -503,7 +492,7 @@ root.innerHTML=`<main class="career-shell">
   const input=root.querySelector<HTMLInputElement>('[data-target-date]');
   input?.addEventListener('change',()=>{
    if(simRunning)return;
-   selectedDay=Math.max(season.day,seasonDay(input.value,season.startDate));
+   selectedDay=Math.max(career.yearDay!,clamp(Math.round((Date.parse(input.value+'T12:00:00Z')-Date.parse(season.startDate+'T12:00:00Z'))/86400000),0,PLAYOFF_LAST_DAY));
    visibleMonth=Math.max(0,months.indexOf(dateAt(season,selectedDay).slice(0,7)));
    activeTab='calendar';drawHub();
   });
@@ -512,15 +501,15 @@ root.innerHTML=`<main class="career-shell">
    simDelay=[35,70,130].includes(speed)?speed:70;
   });
   root.querySelector<HTMLButtonElement>('[data-sim-target]')?.addEventListener('click',()=>{
-   if(simRunning){cancelSim();selectedDay=season.day;activeTab='calendar';drawHub();return;}
-   if(selectedDay<=season.day)return;
+   if(simRunning){cancelSim();selectedDay=career.yearDay!;activeTab='calendar';drawHub();return;}
+   if(selectedDay<=career.yearDay!)return;
    simTarget=selectedDay;simRunning=true;
    const button=root.querySelector<HTMLButtonElement>('[data-sim-target]');
    if(button)button.textContent='STOP SIM';
    const progress=root.querySelector<HTMLProgressElement>('[data-sim-progress]');
-   if(progress){progress.hidden=false;progress.max=simTarget;progress.value=season.day;}
+   if(progress){progress.hidden=false;progress.max=simTarget;progress.value=career.yearDay!;}
    const status=root.querySelector<HTMLElement>('[data-sim-status]');
-   if(status)status.textContent='Advancing day by day from '+dateAt(season,season.day)+'…';
+   if(status)status.textContent='Advancing day by day from '+dateAt(season,career.yearDay!)+'…';
    simTimer=setTimeout(simTick,simDelay);
   });
  };
@@ -541,7 +530,11 @@ root.innerHTML=`<main class="career-shell">
    const awayGoals=overtime&&homeGoals===result.home?result.away+1:result.away;
    const a=reversed?awayGoals:homeGoals;
    const b=reversed?homeGoals:awayGoals;
-   recordPlayoffGame(post,series,a,b);
+   const scheduledDay=playoffGameDay(series.round,series.results.length);
+   recordPlayoffGame(post,series,a,b,scheduledDay,true);
+   career.yearDay=Math.max(career.yearDay!,scheduledDay);
+   // Simulate the other semifinal on this date; never overwrite this game.
+   creditPlayoffEvents(simulatePlayoffDay(post,scheduledDay));
    nextSeries(post);
    const own=homeGoals,against=awayGoals;
    addPlayoffResult(career.playoffLedger!,post.seasonYear+':'+series.round+':'+series.seedA+':'+series.seedB+':'+series.results.length,
@@ -557,7 +550,7 @@ root.innerHTML=`<main class="career-shell">
    checkMilestoneAwards(career.trophyCase!,career.positionStats!,p.position,
     Number(career.season!.startDate.slice(0,4)),leagueTitle(career.startingPath!));
    persist();
-  },()=>{activeTab='playoffs';drawHub();},(minutes)=>{
+  },()=>{selectedDay=career.yearDay!;activeTab='calendar';drawHub();},(minutes)=>{
    career.periodMinutes=minutes;persist();
   },home,away,startPace(career.startingPath!),leagueTitle(career.startingPath!)+' · PLAYOFFS');
  };
@@ -571,6 +564,7 @@ root.innerHTML=`<main class="career-shell">
   const opponent=getTeam(fixture.homeId===home.id?fixture.awayId:fixture.homeId);
   return mountHockeyMatch(root,p.position==='G',{...career,...matchRatings(career.attributes!,p.position)},(result)=>{
    recordUserResult(season,fixture,result.home,result.away);
+    career.yearDay=Math.max(career.yearDay!,fixture.day);
    creditSimulation(season,season.day);
    career.development!.scoutingObservations+=2;
    career.games+=1;
