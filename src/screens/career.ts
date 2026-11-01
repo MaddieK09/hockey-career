@@ -375,7 +375,7 @@ root.innerHTML=`<main class="career-shell">
      <button type="button" class="career-primary" data-open-calendar>OPEN PLAYOFF CALENDAR →</button>
     </section>
     <section class="career-panel"><h2>Your playoff statistics</h2>
-     ${isPostseason&&isQualified(post!,home.id)?
+     ${isPostseason&&(playoffSummary.gp>0||isQualified(post!,home.id))?
       '<div class="my-stats-highlights">'+statTableSummary(p.position,playoffSummary).map(v=>
        '<div><strong>'+v.value+'</strong><span>'+v.label+'</span></div>').join('')+'</div>':
       '<p class="career-muted">You have no playoff games this season.</p>'}
