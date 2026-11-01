@@ -56,8 +56,8 @@ export const tradeDeadline=(s:SeasonSave):number=>{
  return Math.round((Date.parse(iso+'T12:00:00Z')-Date.parse(s.startDate+'T12:00:00Z'))/86400000);
 };
 export const isTradeWindow=(s:SeasonSave,day:number):boolean=>
- day<=tradeDeadline(s)||(day>=244&&day<=lastCareerDay(s.startDate));
-export const isRosterOffseason=(day:number):boolean=>day>=244;
+ day<=tradeDeadline(s)||(day>=243&&day<=lastCareerDay(s.startDate));
+export const isRosterOffseason=(day:number):boolean=>day>=243;
 
 export function newCareerRosters(start:CareerStart,playerTeamId:string,day=-1):CareerRosters{
  const players=LEAGUE_TEAMS.flatMap(t=>POSITIONS.map((_,i)=>recruit(t.id,start.seasonYear,i,start)));
