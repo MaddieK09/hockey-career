@@ -1008,3 +1008,45 @@ test('roster strength changes future simulated results but preserves saved score
  simulateThrough(strong,120);
  assert.equal(JSON.stringify(strong.fixtures),snapshot);
 });
+
+test('full 20-player squads generate saved playoff skater and goalie statistics',async()=>{
+ const {newSeason,simulateThrough,MAX_SEASON_DAY}=await loadTS('src/game/seasonLeague.ts');
+ const {newCareerRosters}=await loadTS('src/game/careerRosters.ts');
+ const {createPlayoffs}=await loadTS('src/game/careerPlayoffs.ts');
+ const {simulatePostseasonDay,playoffCalendarGames,playoffBotStats}=await loadTS('src/game/careerYear.ts');
+ const start={age:18,division:'junior',tier:'jra',seasonYear:2026};
+ const season=newSeason('northport');simulateThrough(season,MAX_SEASON_DAY);
+ const post=createPlayoffs(season,'junior');
+ const rosters=newCareerRosters(start,'northport');
+ const snapshot=rosters.players.map(p=>({...p}));
+ simulatePostseasonDay(post,250);
+ const lines=playoffBotStats(post,snapshot);
+ const games=playoffCalendarGames(post).filter(g=>g.homeGoals!==undefined);
+ const actualGoals=games.reduce((n,g)=>n+g.homeGoals+g.awayGoals,0);
+ assert.equal(lines.filter(x=>x.position!=='G').reduce((n,x)=>n+x.goals,0),actualGoals);
+ assert.equal(lines.filter(x=>x.position==='G').reduce((n,x)=>n+x.goalsAgainst,0),actualGoals);
+ assert.ok(lines.length>24);
+ assert.ok(lines.every(x=>x.gp>0));
+ assert.ok(lines.filter(x=>x.position==='G').every(x=>x.saves<=x.shotsAgainst));
+ // Later trades must not rewrite historical playoff statistics.
+ const baseline=JSON.stringify(lines);
+ rosters.players[0].teamId='lakehaven';
+ assert.equal(JSON.stringify(playoffBotStats(post,snapshot)),baseline);
+});
+test('age-out replacements after trades retain distinct IDs and correct roster positions',async()=>{
+ const {newSeason}=await loadTS('src/game/seasonLeague.ts');
+ const {newCareerRosters,processRosterMovesThrough,nextSeasonRosters,teamRoster}=await loadTS('src/game/careerRosters.ts');
+ const {LEAGUE_TEAMS}=await loadTS('src/game/fictionalLeague.ts');
+ const start={age:12,division:'u13',tier:'aaa',seasonYear:2026};
+ const world=newCareerRosters(start,'northport');
+ processRosterMovesThrough(world,newSeason('northport'),364,start);
+ const next={...start,age:13,division:'u15',seasonYear:2027};
+ nextSeasonRosters(world,next);
+ assert.equal(new Set(world.players.map(p=>p.id)).size,160);
+ for(const club of LEAGUE_TEAMS){
+  const roster=teamRoster(world,club.id);
+  assert.equal(roster.length,20);
+  assert.equal(roster.filter(p=>p.position==='G').length,2);
+  assert.equal(roster.filter(p=>['LD','RD'].includes(p.position)).length,6);
+ }
+});
