@@ -21,12 +21,17 @@ export const SEASON_START_DATE='2026-10-01';
 export const SEASON_END_DATE='2027-04-15';
 export const MAX_SEASON_DAY=196;
 export const ROUNDS_PER_SEASON=56;
+/** Current career-year calendar spans October 1 through September 30. */
+export const lastCareerDay=(start:string):number=>{
+ const year=Number(start.slice(0,4));
+ return Math.round((Date.UTC(year+1,8,30,12)-Date.parse(start+'T12:00:00Z'))/86400000);
+};
 export type DayActivity='game'|'training'|'rest';
 export interface DayPlan {day:number;kind:DayActivity;fixture?:Fixture}
 
 export function seasonDay(iso:string,start:string):number{
  const a=Date.parse(iso+'T12:00:00Z'),b=Date.parse(start+'T12:00:00Z');
- return Number.isFinite(a)&&Number.isFinite(b)?clamp(Math.round((a-b)/86400000),0,MAX_SEASON_DAY):0;
+ return Number.isFinite(a)&&Number.isFinite(b)?clamp(Math.round((a-b)/86400000),0,lastCareerDay(start)):0;
 }
 export function newSeason(teamId:string,startDate=SEASON_START_DATE,cycles=8):SeasonSave{
  // Youth leagues play shorter calendars; junior and legacy leagues play 56 games.
@@ -87,7 +92,11 @@ export function normalizeSeason(raw:unknown,teamId:string):SeasonSave{
  * The day after a match and every seventh off-day are designated rest days.
  */
 export function dayPlan(s:SeasonSave,day:number,teamId=s.teamId):DayPlan{
- const d=clamp(Math.floor(day),0,MAX_SEASON_DAY);
+ const d=clamp(Math.floor(day),0,lastCareerDay(s.startDate));
+ if(d>MAX_SEASON_DAY){
+  // More offseason training: five practice days and two rest days weekly.
+  return {day:d,kind:(d%7===0||d%7===6)?'rest':'training'};
+ }
  const fixture=s.fixtures.find(f=>f.day===d&&(f.homeId===teamId||f.awayId===teamId));
  if(fixture)return {day:d,kind:'game',fixture};
  const playedYesterday=s.fixtures.some(f=>f.day===d-1&&(f.homeId===teamId||f.awayId===teamId));

@@ -1,7 +1,7 @@
 import type {Position} from '../player/types';
 import {visibleAttributes,type AttributeValues,normalizeAttributes} from './careerAttributes';
 import type {CareerStart} from './careerPath';
-import {dayPlan,type SeasonSave} from './seasonLeague';
+import {dayPlan,lastCareerDay,MAX_SEASON_DAY,type SeasonSave} from './seasonLeague';
 
 export type PotentialTier='Elite'|'High'|'Medium'|'Low';
 export type TrainingFocus='balanced'|'skating'|'offense'|'defense'|'goalie';
@@ -56,7 +56,7 @@ export function normalizeDevelopment(raw:unknown,start:CareerStart,attributes:At
   seed:data.seed!,potential:clamp(Math.floor(data.potential!),70,98),
   tier:tierFor(data.potential!),focus:options.includes(data.focus!)?data.focus!:'balanced',
   progress:{...(data.progress??{})},trainingGains:{...(data.trainingGains??{})},
-  lastDay:clamp(Math.floor(data.lastDay??seasonDay),0,196),
+  lastDay:clamp(Math.floor(data.lastDay??seasonDay),0,366),
   trainingDays:Math.max(0,Math.floor(data.trainingDays??0)),
   startingAttributes:{...(data.startingAttributes??attributes)},
   reports:Array.isArray(data.reports)?data.reports.map(r=>({...r,changes:[...(r.changes??[])]})):[]
@@ -78,12 +78,12 @@ function youthFactor(age:number){
  if(age<=24)return .70;if(age<=30)return .28;return .09;
 }
 export function processTrainingThrough(dev:DevelopmentSave,attributes:AttributeValues,
- season:SeasonSave,position:Position,age:number,targetDay:number):DevelopmentChange[]{
- const end=clamp(Math.floor(targetDay),dev.lastDay,196);
+ season:SeasonSave,position:Position,age:number,targetDay:number,skipGameDays?:ReadonlySet<number>):DevelopmentChange[]{
+ const end=clamp(Math.floor(targetDay),dev.lastDay,lastCareerDay(season.startDate));
  const changes:DevelopmentChange[]=[];
  const defs=visibleAttributes(position);
  for(let day=dev.lastDay+1;day<=end;day++){
-  if(dayPlan(season,day).kind!=='training')continue;
+  if(dayPlan(season,day).kind!=='training'||skipGameDays?.has(day))continue;
   dev.trainingDays++;
   // Training advances 1–2 targeted skills a day; each attribute gains
   // fractional progress which periodically converts into a +1 rating.
@@ -95,7 +95,8 @@ export function processTrainingThrough(dev:DevelopmentSave,attributes:AttributeV
    const value=attributes[def.key]??50;
    if(value>=99||value>=dev.potential+2)continue;
    const modifier=dev.focus==='balanced'?.72:1.12;
-   const progress=modifier*youthFactor(age)*(0.23+noise(dev.seed,def.key+':'+day)*.15);
+   const progress=modifier*youthFactor(age)*(day>MAX_SEASON_DAY?1.45:1)*
+    (0.23+noise(dev.seed,def.key+':'+day)*.15);
    dev.progress[def.key]=(dev.progress[def.key]??0)+progress;
    if(dev.progress[def.key]>=1){
     dev.progress[def.key]-=1;
