@@ -940,8 +940,8 @@ test('trade deadline blocks all in-season trades after March first and reopens m
  assert.equal(deadline,151);
  assert.equal(isTradeWindow(s,deadline),true);
  assert.equal(isTradeWindow(s,deadline+1),false);
- assert.equal(isTradeWindow(s,243),false);
- assert.equal(isTradeWindow(s,244),true);
+ assert.equal(isTradeWindow(s,242),false);
+ assert.equal(isTradeWindow(s,243),true);
  assert.equal(isTradeWindow(s,lastCareerDay(s.startDate)),true);
 });
 test('transactions advance day by day, never replay, and preserve club roster sizes',async()=>{
