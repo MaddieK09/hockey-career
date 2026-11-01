@@ -240,8 +240,8 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   }
   const post=career.playoffs,series=post?nextSeries(post):undefined;
   if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
-  const mySeries=series&&(series.seedA===home.id||series.seedB===home.id);
-  const isPostseason=!!post;
+  const mySeries=post?.series.find(candidate=>!winner(post,candidate)&&(candidate.seedA===home.id||candidate.seedB===home.id));
+  const nextPlayoffDay=mySeries?playoffGameDay(mySeries.round,mySeries.results.length):undefined;
   const bracket=post?post.series.map((round,i)=>{
    const first=getTeam(round.seedA),second=getTeam(round.seedB);
    const roundTitle=round.round===0?'SEMIFINAL '+(i+1):'CHAMPIONSHIP FINAL';
