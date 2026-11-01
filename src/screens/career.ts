@@ -4,7 +4,7 @@ import {ATTRIBUTES,visibleAttributes,normalizeAttributes,upgradeAttribute,matchR
 import {newSeasonLedger,normalizeSeasonLedger,addSimulatedStat,addPlayedStat,ledgerTotals,type SeasonPlayerLedger} from '../game/seasonPlayerLedger';
 import {emptyTrophyCase,normalizeTrophyCase,checkMilestoneAwards,awardSeason,playedGameXP,simulatedGameXP,levelFromXP,type TrophyCase} from '../game/careerAwards';
 import {teamCrest,leagueCrest} from '../game/fictionalBranding';
-import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,calendarPlayoffGames,simulatePlayoffDay,playoffGameDay,playoffGameId,playoffBotStats,PLAYOFF_LAST_DAY,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
+import {createPlayoffs,nextSeries,recordPlayoffGame,simPlayoffGame,simulateRemainingPlayoffs,calendarPlayoffGames,simulatePlayoffDay,playoffGameDay,winner,playoffGameId,playoffBotStats,PLAYOFF_LAST_DAY,isQualified,advanceCareerSeason,type PlayoffSave,type SeasonHistory} from '../game/careerPlayoffs';
 import {normalizeCareerStart,leagueTitle,startCycles,startPace,actualAgeOn,type CareerStart} from '../game/careerPath';
 import {emptyPositionStats,normalizePositionStats,applyCareerResult,applySimulatedCareerFixture,type CareerPositionStats} from '../game/careerPositionStats';
 import {newSeason,normalizeSeason,dateAt,seasonDay,dayPlan,MAX_SEASON_DAY,simulateThrough,nextUserFixture,recordUserResult,leagueStandings,botStats,type SeasonSave,type Fixture} from '../game/seasonLeague';
@@ -355,20 +355,30 @@ root.innerHTML=`<main class="career-shell">
    </div>
    <div data-season-view="playoffs" hidden>
     <section class="career-panel"><h2>🏆 Playoff bracket</h2>
-    ${!regularComplete?'<p>Complete the regular season before playoffs begin. The top four teams qualify.</p><button data-finish-regular>SIM REGULAR SEASON TO APRIL 15</button>':
-     '<p>Top four teams qualify. '+(post?.bestOf===5?'Best of five':'Best of seven')+' series · 1 vs 4 and 2 vs 3.</p>'+
-      '<p>'+(post?.champion?'CHAMPIONS: '+getTeam(post.champion).city+' '+getTeam(post.champion).name:
-      isQualified(post!,home.id)?'Your team qualified for the postseason!':'Your team missed the playoffs; you can still simulate the championship.')+'</p>'+
-      '<div class="playoff-bracket">'+bracket+'</div>'+
-      (post?.champion?'<button data-next-season>BEGIN NEXT SEASON →</button>':
-       '<div class="playoff-actions"><button data-play-playoff '+(mySeries?'':'disabled')+'>PLAY NEXT PLAYOFF GAME</button><button data-sim-playoff>SIM NEXT PLAYOFF GAME</button><button data-sim-postseason>SIM REMAINING PLAYOFFS</button></div>')}
+    ${!regularComplete?'<p>Top four qualify after April 15. Use Calendar to simulate to the playoffs.</p>':
+     '<p>Top four qualify · '+(post?.bestOf===5?'Best of five':'Best of seven')+' · 1 vs 4 and 2 vs 3. Games appear on Calendar.</p>'+
+      '<p>'+(post?.champion?'🏆 CHAMPIONS: '+getTeam(post.champion).city+' '+getTeam(post.champion).name:
+       isQualified(post!,home.id)?'Your club qualified! Follow your series and stats below.':'Your club did not qualify. Follow the others below.')+'</p>'+
+      '<div class="playoff-bracket">'+bracket+'</div>'}
+    <h3>Playoff player statistics</h3>
+    ${post?'<h4>Your playoff performance</h4>'+
+     (isQualified(post,home.id)?'<div class="my-stats-highlights">'+statTableSummary(p.position,
+      seasonSummary(career.playoffLedger!,career.periodMinutes!*3)).map(v=>'<div><strong>'+v.value+'</strong><span>'+v.label+'</span></div>').join('')+'</div>':
+      '<p class="career-muted">Your team did not qualify this season.</p>')+
+     '<h4>Skater leaders</h4><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Player</th><th>Club</th><th>GP</th><th>G</th><th>A</th><th>PTS</th></tr></thead><tbody>'+
+     playoffBotStats(season,post).filter(x=>x.position!=='G').sort((a,b)=>b.points-a.points||b.goals-a.goals).slice(0,10)
+      .map(x=>'<tr><td>'+x.name+'</td><td>'+getTeam(x.teamId).abbr+'</td><td>'+x.gp+'</td><td>'+x.goals+'</td><td>'+x.assists+'</td><td>'+x.points+'</td></tr>').join('')+
+     '</tbody></table></div><h4>Goaltender leaders</h4><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Goalie</th><th>Club</th><th>GP</th><th>W</th><th>SV</th><th>SV%</th></tr></thead><tbody>'+
+     playoffBotStats(season,post).filter(x=>x.position==='G').sort((a,b)=>b.wins-a.wins||b.saves-a.saves)
+      .map(x=>'<tr><td>'+x.name+'</td><td>'+getTeam(x.teamId).abbr+'</td><td>'+x.gp+'</td><td>'+x.wins+'</td><td>'+x.saves+'</td><td>'+(x.shotsAgainst?(x.saves/x.shotsAgainst*100).toFixed(1)+'%':'—')+'</td></tr>').join('')+
+     '</tbody></table></div>':'<p>Statistics appear when playoff games begin.</p>'}
     <h3>Career season history</h3><div class="season-history">${(career.seasonHistory??[]).slice().reverse().map(h=>'<p>'+h.seasonYear+'–'+String(h.seasonYear+1).slice(-2)+' · '+h.division+' · Rank #'+h.clubRank+' · '+(h.champion?'Champion '+getTeam(h.champion).abbr:'—')+'</p>').join('')||'<p>No completed seasons yet</p>'}</div>
     </section>
    </div>
    <div data-season-view="calendar" hidden>
     <section class="career-panel">
-      <h2>Season calendar · October–April</h2>
-      <p>Today: <strong data-calendar-today>${current}</strong>. Every game day shows the matchup and its final score after simulation. <b>T</b> = training placeholder; <b>R</b> = rest.</p>
+      <h2>Season calendar · October–June</h2>
+      <p>Today: <strong data-calendar-today>${current}</strong>. Matchups and scores include playoff dates (🏆). T marks training, R marks rest.</p>
       <div class="season-month-bar">
         <button type="button" data-month-step="-1" ${visibleMonth===0?'disabled':''} aria-label="Previous month">‹</button>
         <strong data-month-name>${monthTitle()}</strong>
@@ -378,20 +388,25 @@ root.innerHTML=`<main class="career-shell">
       <div class="season-calendar" data-calendar-grid>${calendar}</div>
       <div class="season-sim-controls">
        <label for="season-target">Simulate until</label>
-       <input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,MAX_SEASON_DAY)}" value="${selected}">
+       <input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,PLAYOFF_LAST_DAY)}" value="${selected}">
        <label for="season-speed">Simulation speed</label>
        <select data-sim-speed id="season-speed">
         <option value="130" ${simDelay===130?'selected':''}>Steady · 130ms/day</option>
         <option value="70" ${simDelay===70?'selected':''}>Fast · 70ms/day</option>
         <option value="35" ${simDelay===35?'selected':''}>Turbo · 35ms/day</option>
        </select>
-       <button type="button" data-sim-target ${selectedDay<=season.day?'disabled':''}>SIM DAY BY DAY</button>
+       <button type="button" data-sim-target ${selectedDay<=career.yearDay!?'disabled':''}>SIM DAY BY DAY</button>
       </div>
-      <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${season.day}" hidden></progress>
+      <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${career.yearDay}" hidden></progress>
       <p class="season-sim-status" data-sim-status aria-live="polite">Ready · Select a future date and simulate.</p>
-      <div class="season-sim-results" data-sim-results>${renderDayResults(season.day)}</div>
+      <div class="season-sim-results" data-sim-results>${renderDayResults(career.yearDay!)}</div>
       <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. T and R have no training or recovery mechanics yet.</p>
     </section>
+    ${post&&mySeries?'<section class="career-panel"><h2>🏆 Next playoff game</h2><p>'+
+      getTeam(mySeries.seedA).abbr+' vs. '+getTeam(mySeries.seedB).abbr+' · '+dateAt(season,nextPlayoffDay!)+
+      '</p><button type="button" data-play-playoff-calendar>PLAY NEXT PLAYOFF GAME 🏒</button>'+
+      '<p class="career-muted">Or simulate this date to record the result.</p></section>':''}
+    ${post?.champion?'<section class="career-panel"><h2>Postseason complete</h2><button data-next-season>CONTINUE TO NEXT SEASON →</button></section>':''}
     <section class="career-panel"><h2>Upcoming fixtures & results</h2><div class="season-fixtures">${scheduleMarkup||'All league games completed.'}</div></section>
    </div>
    <div data-season-view="standings" hidden><section class="career-panel"><h2>League standings</h2><p>Two points for a win. Ties are settled in overtime.</p><div class="season-table-wrap"><table class="season-table"><thead><tr><th>Club</th><th>GP</th><th>W</th><th>L</th><th>GF</th><th>GA</th><th>PTS</th></tr></thead><tbody>${standings.map((t,i)=>'<tr'+(t.team.id===home.id?' class="season-highlight"':'')+'><td>'+(i+1)+'. '+t.team.abbr+'</td><td>'+t.gp+'</td><td>'+t.w+'</td><td>'+t.l+'</td><td>'+t.gf+'</td><td>'+t.ga+'</td><td>'+t.pts+'</td></tr>').join('')}</tbody></table></div></section></div>
