@@ -475,7 +475,7 @@ root.innerHTML=`<main class="career-shell">
       <div class="season-sim-results" data-sim-results>${renderDayResults(career.timelineDay!)}</div>
       ${nextPlayerPost?'<p class="career-muted">Next playoff game: '+dateAt(season,nextPlayerPost.day)+' · '+getTeam(nextPlayerPost.homeId).abbr+' vs. '+getTeam(nextPlayerPost.awayId).abbr+'</p><button type="button" class="career-primary" data-play-playoff>PLAY SCHEDULED PLAYOFF GAME 🏒</button>':''}
       ${post?.champion&&career.timelineDay!>=careerLastDay(season)?'<button type="button" class="career-primary" data-next-season>BEGIN NEXT SEASON →</button>':
-       post?.champion?'<p class="career-muted">Postseason complete. Simulate the offseason through September 30 before beginning another year.</p>':''}
+       post?.champion?'<p class="career-muted">Postseason complete. Simulate summer training and roster movement through September 30.</p><button type="button" class="career-primary" data-sim-offseason>SIM OFFSEASON TO SEPTEMBER →</button>':''}
       <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. Playoffs advance on scheduled calendar dates; offseason training continues through September 30.</p>
     </section>
     <section class="career-panel"><h2>Upcoming fixtures & results</h2><div class="season-fixtures">${scheduleMarkup||'All league games completed.'}</div></section>
@@ -586,6 +586,14 @@ root.innerHTML=`<main class="career-shell">
   root.querySelector<HTMLSelectElement>('[data-sim-speed]')?.addEventListener('change',e=>{
    const speed=Number((e.currentTarget as HTMLSelectElement).value);
    simDelay=[35,70,130].includes(speed)?speed:70;
+  });
+  root.querySelector<HTMLButtonElement>('[data-sim-offseason]')?.addEventListener('click',()=>{
+   if(simRunning||career.timelineDay!>=careerLastDay(season))return;
+   selectedDay=careerLastDay(season);
+   const datePicker=root.querySelector<HTMLInputElement>('[data-target-date]');
+   if(datePicker)datePicker.value=dateAt(season,selectedDay);
+   const simButton=root.querySelector<HTMLButtonElement>('[data-sim-target]');
+   if(simButton){simButton.disabled=false;simButton.click();}
   });
   root.querySelector<HTMLButtonElement>('[data-sim-target]')?.addEventListener('click',()=>{
    if(simRunning){cancelSim();selectedDay=career.timelineDay!;activeTab='calendar';drawHub();return;}
