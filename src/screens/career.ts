@@ -397,8 +397,8 @@ root.innerHTML=`<main class="career-shell">
    </div>
    <div data-season-view="calendar" hidden>
     <section class="career-panel">
-      <h2>Season calendar · October–April</h2>
-      <p>Today: <strong data-calendar-today>${current}</strong>. Every game day shows the matchup and its final score after simulation. <b>T</b> = training placeholder; <b>R</b> = rest.</p>
+      <h2>Career calendar · October–September</h2>
+      <p>Today: <strong data-calendar-today>${current}</strong>. Regular-season and playoff matchups show scores. <b>T</b> = training, <b>R</b> = rest. Offseason has extra T days.</p>
       <div class="season-month-bar">
         <button type="button" data-month-step="-1" ${visibleMonth===0?'disabled':''} aria-label="Previous month">‹</button>
         <strong data-month-name>${monthTitle()}</strong>
@@ -408,19 +408,22 @@ root.innerHTML=`<main class="career-shell">
       <div class="season-calendar" data-calendar-grid>${calendar}</div>
       <div class="season-sim-controls">
        <label for="season-target">Simulate until</label>
-       <input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,MAX_SEASON_DAY)}" value="${selected}">
+       <input type="date" data-target-date id="season-target" min="${current}" max="${dateAt(season,careerLastDay(season))}" value="${selected}">
        <label for="season-speed">Simulation speed</label>
        <select data-sim-speed id="season-speed">
         <option value="130" ${simDelay===130?'selected':''}>Steady · 130ms/day</option>
         <option value="70" ${simDelay===70?'selected':''}>Fast · 70ms/day</option>
         <option value="35" ${simDelay===35?'selected':''}>Turbo · 35ms/day</option>
        </select>
-       <button type="button" data-sim-target ${selectedDay<=season.day?'disabled':''}>SIM DAY BY DAY</button>
+       <button type="button" data-sim-target ${selectedDay<=career.timelineDay!?'disabled':''}>SIM DAY BY DAY</button>
       </div>
-      <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${season.day}" hidden></progress>
+      <progress class="season-sim-progress" data-sim-progress max="${Math.max(1,selectedDay)}" value="${career.timelineDay}" hidden></progress>
       <p class="season-sim-status" data-sim-status aria-live="polite">Ready · Select a future date and simulate.</p>
-      <div class="season-sim-results" data-sim-results>${renderDayResults(season.day)}</div>
-      <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. T and R have no training or recovery mechanics yet.</p>
+      <div class="season-sim-results" data-sim-results>${renderDayResults(career.timelineDay!)}</div>
+      ${nextPlayerPost?'<p class="career-muted">Next playoff game: '+dateAt(season,nextPlayerPost.day)+' · '+getTeam(nextPlayerPost.homeId).abbr+' vs. '+getTeam(nextPlayerPost.awayId).abbr+'</p><button type="button" class="career-primary" data-play-playoff>PLAY SCHEDULED PLAYOFF GAME 🏒</button>':''}
+      ${post?.champion&&career.timelineDay!>=careerLastDay(season)?'<button type="button" class="career-primary" data-next-season>BEGIN NEXT SEASON →</button>':
+       post?.champion?'<p class="career-muted">Postseason complete. Simulate the offseason through September 30 before beginning another year.</p>':''}
+      <p class="career-muted">Simulation runs visibly one day at a time, saves each day's results and can be stopped. It simulates your team's unplayed games too. Playoffs advance on scheduled calendar dates; offseason training continues through September 30.</p>
     </section>
     <section class="career-panel"><h2>Upcoming fixtures & results</h2><div class="season-fixtures">${scheduleMarkup||'All league games completed.'}</div></section>
    </div>
