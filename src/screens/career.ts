@@ -284,6 +284,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    return '<div class="season-fixture'+(ours?' season-ours':'')+'"><span>'+dateAt(season,f.day).slice(5)+'</span><span>'+getTeam(f.homeId).abbr+' vs '+getTeam(f.awayId).abbr+'</span><strong>'+(done?f.homeGoals+'–'+f.awayGoals:ours?'YOUR GAME':'Scheduled')+'</strong></div>';
   }).join('');
   const calendar=renderCalendarMonth();
+  const world=career.organization!,rosterClub=getTeam(rosterViewedTeam);
+  const currentRoster=teamRoster(world,rosterViewedTeam).slice().sort((a,b)=>
+   a.position.localeCompare(b.position)||b.overall-a.overall);
+  const transactionNews=world.events.filter(e=>e.seasonYear===undefined||e.date.startsWith(String(start.seasonYear))||
+   e.date.startsWith(String(start.seasonYear+1))).slice(-28).reverse();
+  const deadlineDate=dateAt(season,tradeDeadline(season));
+  const moveWindow=isTradeWindow(season,career.timelineDay!);
   const postFixtures=post?playoffCalendarGames(post):[];
   const nextPlayerPost=postFixtures.find(g=>g.homeGoals===undefined&&[g.homeId,g.awayId].includes(home.id));
   const playoffSummary=seasonSummary(career.playoffLedger!,career.periodMinutes!*3);
@@ -319,7 +326,32 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
 root.innerHTML=`<main class="career-shell">
    <header class="career-top"><button data-menu>← Menu</button><span class="league-brand">${leagueCrest(start,35)}<strong>${leagueName.toUpperCase()}</strong></span><span>LEVEL ${career.level}</span></header>
    <section class="career-hero"><div class="career-avatar">${playerPortrait(p.appearance,p.equipment,home.id)}</div><div><p class="eyebrow">${leagueCrest(start,32)} ${teamCrest(home.id,34)} ${career.seasonHistory?.length ? `SEASON ${career.seasonHistory.length+1}` : "ROOKIE SEASON"} · ${leagueName.toUpperCase()}</p><h1>${name}</h1><p>#${p.jerseyNumber} · ${p.position} · ${p.nationality} · Age ${actualAge} (season age ${start.age})</p><p>${career.games} GP · ${career.wins} W · ${career.losses} L</p></div></section>
-   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="my-stats">My Stats</button><button data-tab="development">Development</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
+   <nav class="season-tabs" aria-label="Career sections"><button data-tab="home">Hub</button><button data-tab="roster">Roster</button><button data-tab="my-stats">My Stats</button><button data-tab="development">Development</button><button data-tab="calendar">Calendar</button><button data-tab="standings">Standings</button><button data-tab="stats">League stats</button><button data-tab="playoffs">Playoffs</button><button data-tab="trophies">Trophies</button></nav>
+   <div data-season-view="roster" hidden>
+    <section class="career-panel"><h2>🏒 Team rosters & front office</h2>
+     <p class="career-muted">Real fictional players move between the eight clubs, and trades change team strength and future results.</p>
+     <div class="front-office-trust">
+      <div><strong>Coach trust</strong><span>${world.coachTrust}/100</span><progress max="100" value="${world.coachTrust}"></progress></div>
+      <div><strong>GM trust</strong><span>${world.gmTrust}/100</span><progress max="100" value="${world.gmTrust}"></progress></div>
+     </div>
+     <p class="career-muted">Your results influence management. A low rating raises the chance of a trade or club transfer; nothing is guaranteed.</p>
+     <div class="roster-market"><strong>${moveWindow?'TRANSACTION WINDOW OPEN':'TRANSACTION WINDOW CLOSED'}</strong>
+       <span>Trade deadline: ${deadlineDate} · No in-season trades after March 1. Offseason deals begin June 1.</span></div>
+     <label class="roster-selector">View club
+       <select data-roster-team>${teamChoiceOptions(rosterViewedTeam)}</select>
+     </label>
+     <h3>${teamCrest(rosterClub.id,28)} ${rosterClub.city} ${rosterClub.name} · ${teamOverall(world,rosterClub.id)} team OVR</h3>
+     <div class="season-table-wrap"><table class="season-table"><thead><tr><th>Player</th><th>Pos</th><th>#</th><th>Age</th><th>OVR</th></tr></thead><tbody>
+      ${rosterViewedTeam===career.teamId?'<tr class="season-highlight"><td>'+name+' (YOU)</td><td>'+p.position+'</td><td>'+p.jerseyNumber+'</td><td>'+actualAge+'</td><td>'+ovr+'</td></tr>':''}
+      ${currentRoster.map(x=>'<tr><td>'+x.name+'</td><td>'+x.position+'</td><td>'+x.jersey+'</td><td>'+x.age+'</td><td>'+x.overall+'</td></tr>').join('')}
+     </tbody></table></div>
+    </section>
+    <section class="career-panel"><h2>Trades & roster news</h2>
+     <div class="roster-news">${transactionNews.length?transactionNews.map(e=>
+       '<div class="roster-news-item"><small>'+e.date+' · '+e.kind.toUpperCase()+'</small><p>'+e.description+'</p></div>').join(''):
+       '<p class="career-muted">No transactions recorded yet. More trades and signings happen as you simulate the season and offseason.</p>'}</div>
+    </section>
+   </div>
    <div data-season-view="my-stats" hidden><section class="career-panel">
     <h2>📊 My Stats</h2><p class="career-muted">Season and lifetime statistics with separate playoff records. Older careers may have incomplete historical detail.</p>
     <div class="my-stats-controls"><label>Season
@@ -455,6 +487,11 @@ root.innerHTML=`<main class="career-shell">
   };
   tabs.forEach(b=>b.addEventListener('click',()=>{if(simRunning)return;activeTab=b.dataset.tab!;showTab(activeTab,true);}));
   showTab(activeTab);
+  root.querySelector<HTMLSelectElement>('[data-roster-team]')?.addEventListener('change',e=>{
+   if(simRunning)return;
+   rosterViewedTeam=(e.currentTarget as HTMLSelectElement).value;
+   activeTab='roster';drawHub();
+  });
   root.querySelector<HTMLSelectElement>('[data-my-stats-season]')?.addEventListener('change',e=>{
    const value=(e.currentTarget as HTMLSelectElement).value;statsSelectedYear=value==='career'?null:Number(value);renderMyStats();
   });
@@ -551,6 +588,7 @@ root.innerHTML=`<main class="career-shell">
  let activeTab='home';
  let statsSelectedYear:number|null=null;
  let statsScope:'regular'|'playoffs'|'combined'='combined';
+ let rosterViewedTeam=career.teamId!;
  const startPlayoffGame=(post:PlayoffSave,game:PostseasonCalendarGame)=>{
   const series=game.series;
   // The engine controls the first side. Even as the lower seed, the player
