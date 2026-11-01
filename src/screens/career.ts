@@ -1,4 +1,4 @@
-import {newCareerRosters,normalizeCareerRosters,processRosterMovesThrough,rosterRatings,teamRoster,teamOverall,tradeDeadline,isTradeWindow,nextSeasonRosters,updateManagementAfterGame,type CareerRosters} from '../game/careerRosters';
+import {newCareerRosters,normalizeCareerRosters,processRosterMovesThrough,rosterRatings,teamRoster,teamOverall,tradeDeadline,isTradeWindow,nextSeasonRosters,updateManagementAfterGame,type CareerRosters,type RosterPlayer} from '../game/careerRosters';
 import {careerLastDay,playoffCalendarGames,simulatePostseasonDay,calendarGameToFixture,playoffFixtureId,playoffBotStats,type PostseasonCalendarGame} from '../game/careerYear';
 import {newPlayoffLedger,normalizePlayoffLedger,addPlayoffResult,seasonSummary,combineSummaries,careerSummary,statTableSummary,type PlayoffStatLedger} from '../game/careerStatsHistory';
 import {newDevelopment,normalizeDevelopment,overallRating,trainingFocuses,processTrainingThrough,offseasonDevelopment,scoutingEstimate,type DevelopmentSave} from '../game/careerDevelopment';
@@ -18,7 +18,7 @@ import {mountHockeyMatch} from './hockeyMatch';
 import {drawHockeyCharacter,drawRink} from '../graphics/animatedHockey2d';
 
 export interface CareerSave {
- player:PlayerDraft;organization?:CareerRosters;timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
+ player:PlayerDraft;organization?:CareerRosters;playoffRosters?:RosterPlayer[];timelineDay?:number;playoffLedger?:PlayoffStatLedger;playoffLedgers?:PlayoffStatLedger[];development?:DevelopmentSave;attributes?:AttributeValues;seasonLedger?:SeasonPlayerLedger;seasonLedgers?:SeasonPlayerLedger[];trophyCase?:TrophyCase; playoffs?:PlayoffSave;seasonHistory?:SeasonHistory[]; startingPath?:CareerStart; teamId?:string; season?:SeasonSave; positionStats?:CareerPositionStats; periodMinutes?:PeriodMinutes; games:number;wins:number;losses:number;goals:number;assists:number;saves:number;
  xp:number;level:number;skillPoints:number;speed:number;shot:number;handling:number;defense:number;
 }
 const KEY='hockey-career-save-v1';
@@ -161,7 +161,10 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   if(d<=MAX_SEASON_DAY)creditSimulation(season,d);
   else{
    if(season.day<MAX_SEASON_DAY)creditSimulation(season,MAX_SEASON_DAY);
-   if(!career.playoffs)career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   if(!career.playoffs){
+    career.playoffs=createPlayoffs(season,career.startingPath!.division);
+    career.playoffRosters=career.organization!.players.map(p=>({...p}));
+   }
    const results=simulatePostseasonDay(career.playoffs,d);
    awardSimulatedPlayoff(results);
    trainThrough(season,d);
@@ -264,7 +267,13 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const season=career.season!,home=getTeam(career.teamId),fixture=nextUserFixture(season);
   const regularComplete=season.fixtures.every(f=>f.homeGoals!==undefined);
   if(regularComplete&&!career.playoffs){
-   career.playoffs=createPlayoffs(season,career.startingPath!.division);persist();
+   career.playoffs=createPlayoffs(season,career.startingPath!.division);
+   career.playoffRosters=career.organization!.players.map(p=>({...p}));
+   persist();
+  }
+  if(career.playoffs&&!career.playoffRosters){
+   career.playoffRosters=career.organization!.players.map(p=>({...p}));
+   persist();
   }
   const post=career.playoffs; if(post)nextSeries(post);
   if(post?.champion&&awardSeason(career.trophyCase!,season,post,p.position,career.positionStats!,leagueTitle(career.startingPath!),career.seasonLedger))persist();
@@ -302,7 +311,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
   const postFixtures=post?playoffCalendarGames(post):[];
   const nextPlayerPost=postFixtures.find(g=>g.homeGoals===undefined&&[g.homeId,g.awayId].includes(home.id));
   const playoffSummary=seasonSummary(career.playoffLedger!,career.periodMinutes!*3);
-  const playoffLeaders=post?playoffBotStats(post,botStats(season)):[];
+  const playoffLeaders=post?playoffBotStats(post,career.playoffRosters??world.players):[];
   const skaterPost=playoffLeaders.filter(x=>x.position!=='G').sort((a,b)=>b.points-a.points||b.goals-a.goals);
   const goaliePost=playoffLeaders.filter(x=>x.position==='G').sort((a,b)=>b.wins-a.wins||b.saves-a.saves);
   const ovr=overallRating(career.attributes!,p.position),scout=scoutingEstimate(career.development!);
@@ -533,6 +542,7 @@ root.innerHTML=`<main class="career-shell">
    career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
+   career.playoffRosters=undefined;
    nextSeasonRosters(career.organization!,result.start);
    career.organization!.playerTeamId=career.teamId!;
    result.season.teamRatings=rosterRatings(career.organization!);
