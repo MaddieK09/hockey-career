@@ -143,6 +143,7 @@ export function renderCareer(root:HTMLElement,career:CareerSave,onMenu:()=>void)
    const own=g.homeId===career.teamId?g.homeGoals!:g.awayGoals!;
    const against=g.homeId===career.teamId?g.awayGoals!:g.homeGoals!;
    career.games++;if(own>against)career.wins++;else career.losses++;
+   updateManagementAfterGame(career.organization!,own>against,true);
    career.development!.scoutingObservations++;
    addXP(simulatedGameXP(career.positionStats!.goals-before.goals,
     career.positionStats!.assists-before.assists,career.positionStats!.saves-before.saves,own>against));
@@ -532,6 +533,9 @@ root.innerHTML=`<main class="career-shell">
    career.playoffLedger=newPlayoffLedger(result.start.seasonYear);
    career.seasonLedger=newSeasonLedger(result.start.seasonYear);
    career.startingPath=result.start;career.season=result.season;career.playoffs=undefined;
+   nextSeasonRosters(career.organization!,result.start);
+   career.organization!.playerTeamId=career.teamId!;
+   result.season.teamRatings=rosterRatings(career.organization!);
    career.timelineDay=0;selectedDay=0;visibleMonth=0;
    months=[...new Set(Array.from({length:careerLastDay(result.season)+1},(_,i)=>dateAt(result.season,i).slice(0,7)))];
    persist();activeTab='home';drawHub();
@@ -539,7 +543,11 @@ root.innerHTML=`<main class="career-shell">
   root.querySelector<HTMLSelectElement>('[data-team-choice]')?.addEventListener('change',e=>{
    if(simRunning)return;
    career.teamId=getTeam((e.currentTarget as HTMLSelectElement).value).id;
-   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));career.timelineDay=0;career.playoffs=undefined;selectedDay=0;visibleMonth=0;
+   career.season=newSeason(career.teamId,season.startDate,startCycles(career.startingPath!));
+   career.organization!.playerTeamId=career.teamId;
+   rosterViewedTeam=career.teamId;
+   career.season.teamRatings=rosterRatings(career.organization!);
+   career.timelineDay=0;career.playoffs=undefined;selectedDay=0;visibleMonth=0;
    persist();drawHub();
   });
   root.querySelector<HTMLSelectElement>('[data-training-focus]')?.addEventListener('change',e=>{
@@ -632,9 +640,24 @@ root.innerHTML=`<main class="career-shell">
    career.periodMinutes=minutes;persist();
   },home,away,startPace(career.startingPath!),leagueTitle(career.startingPath!)+' · PLAYOFFS');
  };
- const startMatch=(fixture:Fixture)=>{
+ const startMatch=(fixture:Fixture):ReturnType<typeof mountHockeyMatch>=>{
   const season=career.season!;
-  // Skip off-days and simulate other clubs up to the day before this game.
+  // Sim all intervening days so trades and signings can happen before puck drop.
+  // If a trade moves the player, the next scheduled opponent must be refreshed.
+  for(let d=career.timelineDay!;d<fixture.day;d++)processTimelineDay(d);
+  const move=processRosterMovesThrough(career.organization!,season,fixture.day,career.startingPath!);
+  if(move.teamId!==career.teamId){
+   career.teamId=move.teamId;season.teamId=move.teamId;rosterViewedTeam=move.teamId;
+  }
+  season.teamRatings=rosterRatings(career.organization!);
+  if(![fixture.homeId,fixture.awayId].includes(career.teamId!)){
+   const updated=nextUserFixture(season);
+   if(updated)return startMatch(updated);
+   activeTab='home';drawHub();
+   // A caller expects a match controller. Return a no-op controller when
+   // the new club has no regular-season games remaining.
+   return {stop:()=>{}};
+  }
   creditSimulation(season,Math.max(season.day,fixture.day-1));
   season.day=Math.max(season.day,fixture.day);
   persist();
@@ -650,6 +673,8 @@ root.innerHTML=`<main class="career-shell">
     {goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots});
    applyCareerResult(career.positionStats!,p.position,result.home,result.away,{goals:result.goals,assists:result.assists,saves:result.saves,shotsAgainst:result.awayShots},false,career.periodMinutes!*3);
    if(result.home>result.away)career.wins++;else if(result.home<result.away)career.losses++;
+   updateManagementAfterGame(career.organization!,result.home>result.away,false,
+    result.saves>=20||result.goals+result.assists>=2);
    career.goals+=result.goals;career.assists+=result.assists;career.saves+=result.saves;
    addXP(playedGameXP(result.goals,result.assists,result.saves,result.home>result.away));
    checkMilestoneAwards(career.trophyCase!,career.positionStats!,p.position,
