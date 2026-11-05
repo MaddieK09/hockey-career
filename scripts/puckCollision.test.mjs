@@ -1050,3 +1050,26 @@ test('age-out replacements after trades retain distinct IDs and correct roster p
   assert.equal(roster.filter(p=>['LD','RD'].includes(p.position)).length,6);
  }
 });
+
+test('desktop keyboard defaults, directional normalization and swapped binds',async()=>{
+ const {DEFAULT_BINDINGS,loadBindings,rebind,pressedDirection,allowedBinding,ACTIONS}=await loadTS('src/game/desktopControls.ts');
+ const defaults=loadBindings(null);
+ assert.deepEqual(defaults,DEFAULT_BINDINGS);
+ assert.equal(new Set(Object.values(defaults)).size,ACTIONS.length);
+ const moved=pressedDirection(new Set(['KeyW','KeyD']),defaults);
+ assert.ok(Math.abs(Math.hypot(moved.x,moved.y)-1)<.00001);
+ assert.ok(moved.x>0&&moved.y<0);
+ assert.deepEqual(pressedDirection(new Set(['KeyW','KeyS']),defaults),{x:0,y:0});
+ const swap=rebind(defaults,'primary','KeyE');
+ assert.equal(swap.primary,'KeyE');assert.equal(swap.secondary,'Space');
+ assert.equal(defaults.primary,'Space');
+ assert.equal(rebind(swap,'left','F13'),swap);
+ assert.equal(allowedBinding('ArrowUp'),true);
+ assert.equal(allowedBinding('F13'),false);
+});
+test('malformed desktop bindings recover usable unique defaults without changing career files',async()=>{
+ const {loadBindings,ACTIONS}=await loadTS('src/game/desktopControls.ts');
+ const loaded=loadBindings({up:'KeyE',primary:'KeyE',down:4,cover:'some-hack'});
+ assert.equal(new Set(Object.values(loaded)).size,ACTIONS.length);
+ assert.ok(ACTIONS.every(a=>typeof loaded[a]==='string'&&loaded[a].length));
+});
