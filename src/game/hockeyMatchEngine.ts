@@ -63,6 +63,7 @@ export class HockeyMatch {
  private rng:()=>number;
  private decisionCooldown:[number,number]=[1.5,1.5];
  private movement:MatchControls={x:0,y:0};
+ private shotAimY:number|null=null;
  private goalieActionCooldown=0;
  /** Goalkeeper glove possession is distinct from skater possession. */
  get goalieHolding():boolean{return this.goalies[0].holdTime>0;}
@@ -106,6 +107,8 @@ export class HockeyMatch {
   this.resetFaceoff(1);
  }
  setMovement(x:number,y:number):void{this.movement={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
+ /** Optional desktop pointer aim. No aim means the usual automatic shot targeting. */
+ setShotAim(y:number|null):void{this.shotAimY=y===null||!Number.isFinite(y)?null:clamp(y,165,275);}
  switchSkater():void {
   if(this.goalieCareer||this.phase!=='live')return;
   const nearest=this.skaters.map((s,i)=>({i,d:distance(s.x,s.y,this.puck.x,this.puck.y)}))
@@ -150,7 +153,7 @@ export class HockeyMatch {
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
-   this.shoot(this.selected,clamp(220+(this.rng()-.5)*92,177,263),true);
+   this.shoot(this.selected,this.shotAimY??clamp(220+(this.rng()-.5)*92,177,263),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
