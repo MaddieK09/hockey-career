@@ -1,3 +1,4 @@
+import {actionsFor,defaultsFor,commandFor,movementFor,rinkMovement,remapBinding,loadBindings,saveBindings,labelCommand,labelKey,mouseShotTarget,type DesktopRole,type HockeyCommand} from '../config/desktopControls';
 import {teamCrest} from '../game/fictionalBranding';
 import {getTeam,type LeagueTeam} from '../game/fictionalLeague';
 import {validPeriodMinutes,periodOptions,savePeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
@@ -28,6 +29,11 @@ export function mountHockeyMatch(
  let paused=false;let cameraMode:CameraMode=goalieCareer?'goalie':'player';
  let cameraNotice=0;
  let arenaMode=true;
+ const pcRole:DesktopRole=goalieCareer?'goalie':'skater';
+ let bindings=loadBindings(pcRole);
+ let awaitingBind:HockeyCommand|null=null;
+ let mouseEnabled=true;
+ let mouseAim:{x:number;y:number}|null=null;
  let goalieDistance:'close'|'medium'|'far'='medium';
  let futurePeriod=match.periodMinutes;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
@@ -61,9 +67,18 @@ export function mountHockeyMatch(
   +(goalieCareer?'<button type="button" data-distance="close">CREASE CLOSE</button><button type="button" data-distance="medium">CREASE STANDARD</button><button type="button" data-distance="far">CREASE WIDE</button>':'')
   +'<button type="button" data-view="overhead">OVERHEAD (CLASSIC)</button>'
   +'<button type="button" data-overhead="full">FULL RINK</button><button type="button" data-overhead="track">TRACK PUCK</button>'
-  +'</div><button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
+  +'</div>'
+  +'<div class="pause-setting pc-control-panel"><strong>COMPUTER CONTROLS · '+(goalieCareer?'GOALIE':'SKATER')+'</strong>'
+  +'<p>Click a key to rebind, then press a new key. Escape cancels; arrow keys always move.</p>'
+  +'<div class="pc-bindings" data-pc-bindings></div>'
+  +'<div class="pc-mouse-toggle"><label><input type="checkbox" data-mouse-enabled checked> ENABLE MOUSE ACTIONS</label></div>'
+  +'<small>Mouse: left '+(goalieCareer?'glove':'shoot')+', right '+(goalieCareer?'blocker':'pass')+
+   ', middle '+(goalieCareer?'poke check':'switch player')+'. '+(goalieCareer?'':'Hover the rink to aim shots. ')+'1–5 change camera. Escape pauses.</small>'
+  +'<button type="button" data-reset-bindings>RESTORE DEFAULT KEYBINDS</button>'
+  +'<p class="pc-bind-status" data-bind-status aria-live="polite"></p></div>'
+  +'<button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
   +'<p class="career-muted" data-hint>'
-  +(goalieCareer?'Move inside the crease · Toggle Butterfly for low shots · Blocker for high shots · Poke when the puck is close.':'Use the joystick to skate · Shoot and pass · Switch to your nearest teammate.')
+  +(goalieCareer?'PC: WASD move · Space butterfly · Q glove · E blocker · Tab poke · F cover · R pass.':'PC: WASD move · Mouse to aim · Left click / Space shoot · Right click / E pass · Tab switch.')
   +'</p><section class="match-result" data-result hidden></section></main>';
  const canvas=root.querySelector<HTMLCanvasElement>('[data-rink]')!;
  const ctx=canvas.getContext('2d')!;
