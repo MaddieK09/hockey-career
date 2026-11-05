@@ -359,7 +359,7 @@ export function mountHockeyMatch(
     ctx.fillStyle='rgba(7,26,43,.78)';ctx.fillRect(215,174,370,91);
     ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(match.message,400,225);
    }
-   ctx.restore();return;
+   drawMouseReticle();ctx.restore();return;
   }
   // Camera zoom preserves simulation coordinates; only rendering changes.
   if(cameraZoom){
@@ -418,7 +418,7 @@ export function mountHockeyMatch(
    ctx.fillText(match.message,400,229);
    ctx.font='14px system-ui';ctx.fillText('Next faceoff',400,253);
   }
-  ctx.restore();
+  drawMouseReticle();ctx.restore();
  }
  function completedMatch(){
   if(completed)return;completed=true;stop();
