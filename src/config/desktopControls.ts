@@ -22,7 +22,7 @@ const blocked=new Set(['Escape','CapsLock','NumLock','ScrollLock','MetaLeft','Me
  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Backspace','Delete']);
 export const actionsFor=(role:DesktopRole):HockeyCommand[]=>
  [...MOVEMENT,...(role==='goalie'?GOALIE_ACTIONS:SKATER_ACTIONS)];
-export const defaultsFor=(role:DesktopRole):DesktopBindings=>({...role==='goalie'?DEFAULT_GOALIE:DEFAULT_SKATER});
+export const defaultsFor=(role:DesktopRole):DesktopBindings=>({...(role==='goalie'?DEFAULT_GOALIE:DEFAULT_SKATER)});
 export function normalizeBindings(raw:unknown,role:DesktopRole):DesktopBindings{
  const defaults=defaultsFor(role);
  if(!raw||typeof raw!=='object')return defaults;
