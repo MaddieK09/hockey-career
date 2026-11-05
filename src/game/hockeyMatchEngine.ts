@@ -106,6 +106,11 @@ export class HockeyMatch {
   this.resetFaceoff(1);
  }
  setMovement(x:number,y:number):void{this.movement={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
+ private userShotLane:number|null=null;
+ /** Mouse-guided aim selects a goal-mouth lane; shot error still applies. */
+ setShotAim(targetY:number|null):void{
+  this.userShotLane=targetY===null||!Number.isFinite(targetY)?null:clamp(targetY,189,251);
+ }
  switchSkater():void {
   if(this.goalieCareer||this.phase!=='live')return;
   const nearest=this.skaters.map((s,i)=>({i,d:distance(s.x,s.y,this.puck.x,this.puck.y)}))
@@ -150,7 +155,7 @@ export class HockeyMatch {
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
-   this.shoot(this.selected,clamp(220+(this.rng()-.5)*92,177,263),true);
+   this.shoot(this.selected,this.userShotLane??clamp(220+(this.rng()-.5)*92,177,263),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
