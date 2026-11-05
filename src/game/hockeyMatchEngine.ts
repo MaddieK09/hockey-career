@@ -1,3 +1,4 @@
+import {puckPresser,defensiveCoverage,choosePassTarget,shootingLane,goalieTrackY} from './computerHockeyAI';
 import {supportPosition,separateFormation,openPassingLane} from './formationAI';
 import {getTeam,type LeagueTeam} from './fictionalLeague';
 import {findGoalFrameImpact,findGoalieImpact,findSkaterImpact,type PuckPoint,type EquipmentHit,type GoalieCollider} from './puckCollision';
@@ -241,20 +242,14 @@ export class HockeyMatch {
     y:clamp(skater.y+dodge+(skater.role==='LW'?92-skater.y:skater.role==='RW'?348-skater.y:0)*.13,65,375)};
   }
   const mates=this.skaters.filter((s,j)=>s.team===team&&j!==i&&j!==owner);
-  // Only one puck presser per side; everybody else covers a role lane.
-  let presser=-1,nearest=Infinity;
-  for(let j=0;j<this.skaters.length;j++){
-   const other=this.skaters[j];
-   if(other.team!==team||other.role==='LD'||other.role==='RD')continue;
-   const d=distance(other.x,other.y,puck.x,puck.y);
-   if(d<nearest){nearest=d;presser=j;}
-  }
+  // One active presser per side, while other players protect role lanes.
+  const presser=puckPresser(this.skaters,team,puck);
   if(!friendly&&i===presser){
    const vx=carrier?.vx??this.puck.vx,vy=carrier?.vy??this.puck.vy;
    return {x:clamp(puck.x+vx*.10,85,715),y:clamp(puck.y+vy*.10,55,385)};
   }
-  const base=supportPosition(skater.role,team,
-   carrier&&friendly?carrier:puck,!!friendly);
+  const base=friendly?supportPosition(skater.role,team,carrier!,true):
+   defensiveCoverage(skater.role,team,puck,carrier);
   const defenders=this.skaters.filter(other=>other.team!==team);
   const lane=friendly?openPassingLane(skater.role,base,defenders):base;
   return separateFormation(lane,skater,mates);
@@ -307,12 +302,9 @@ export class HockeyMatch {
    if(user){
     targetX=this.movement.x;targetY=this.movement.y;
    }else{
-    const approaching=g.team===0?this.puck.vx<0:this.puck.vx>0;
-    const range=Math.abs(this.puck.x-g.x);
-    const predicted=approaching&&range<300
-     ?this.puck.y+this.puck.vy*Math.min(.28,range/Math.max(180,Math.abs(this.puck.vx)))
-     :this.puck.y;
-    targetY=clamp((220+(predicted-220)*.62-g.y)/30,-1,1);
+    const owner=this.puck.owner>=0?this.skaters[this.puck.owner]:null;
+    const predicted=goalieTrackY(g,g.team,this.puck,owner);
+    targetY=clamp((predicted-g.y)/28,-1,1);
     const idealX=g.team===0?92:708;
     targetX=clamp((idealX-g.x)/25,-1,1);
    }
@@ -396,28 +388,16 @@ export class HockeyMatch {
   // Aim around the wider opening, including challenging corners.
   const targetY=clamp(220+(this.rng()-.5)*100,172,268);
   // Avoid firing directly into an obvious defender: create a passing lane first.
-  const laneBlocked=this.skaters.some((def,i)=>{
-   if(i===owner||def.team===team)return false;
-   const goalX=team===0?740:60,span=goalX-carrier.x;
-   const t=span===0?0:(def.x-carrier.x)/span;
-   if(t<=.04||t>=.96)return false;
-   const laneY=carrier.y+(targetY-carrier.y)*t;
-   return Math.abs(def.y-laneY)<16;
-  });
+  const defenders=this.skaters.filter(s=>s.team!==team);
+  const laneBlocked=!shootingLane(carrier,team,targetY,defenders);
   if(this.liveSinceFaceoff>=4.5&&this.shotClock[team]<=0&&carrier.carriedFor>1.2&&offensive&&inShootingLane&&!laneBlocked&&(team===0?carrier.x>515:carrier.x<285)){
    this.shoot(owner,targetY);return;
   }
-  // Longer periods need possession cycles, not skaters camping in the slot.
-  // Cycle the puck while the team's next shooting opportunity develops.
-  const cycling=offensive&&(this.shotClock[team]>3||laneBlocked)&&carrier.carriedFor>1.5;
-  if((pressured||cycling)&&carrier.carriedFor>1.8&&this.rng()<(cycling?.55:.30)){
-   const partners=this.skaters.map((a,i)=>({a,i})).filter(t=>t.a.team===team&&t.i!==owner);
-   partners.sort((a,b)=>{
-    const aheadA=(a.a.x-carrier.x)*(team===0?1:-1);
-    const aheadB=(b.a.x-carrier.x)*(team===0?1:-1);
-    return (aheadB+distance(b.a.x,b.a.y,carrier.x,carrier.y)*.1)-(aheadA+distance(a.a.x,a.a.y,carrier.x,carrier.y)*.1);
-   });
-   if(partners[0]&&distance(partners[0].a.x,partners[0].a.y,carrier.x,carrier.y)>72)this.pass(owner,partners[0].i);
+  // Pass if the lane is genuinely useful, and do not force puck cycles.
+  const cycling=offensive&&(this.shotClock[team]>3||laneBlocked)&&carrier.carriedFor>1.4;
+  if((pressured||cycling)&&carrier.carriedFor>1.6&&this.rng()<(cycling?.68:.53)){
+   const receiver=choosePassTarget(owner,this.skaters);
+   if(receiver!==null)this.pass(owner,receiver);
   }
  }
  private intercept():void {
