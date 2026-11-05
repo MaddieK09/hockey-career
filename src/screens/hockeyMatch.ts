@@ -163,24 +163,18 @@ export function mountHockeyMatch(
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
  function syncMovement(){
-  let x=touchX,y=touchY;
   if(paused){match.setMovement(0,0);return;}
-  if(controls.has('a')||controls.has('arrowleft'))x-=1;
-  if(controls.has('d')||controls.has('arrowright'))x+=1;
-  if(controls.has('w')||controls.has('arrowup'))y-=1;
-  if(controls.has('s')||controls.has('arrowdown'))y+=1;
+  const keyboard=movementFor(controls,bindings);
+  const x=keyboard.x+touchX,y=keyboard.y+touchY;
   const n=Math.max(1,Math.hypot(x,y));
-  // Chase goalie camera looks down +rink-X: screen up is rink +X,
-  // screen right is rink +Y. Overhead and skater cameras retain rink axes.
-  if(goalieCareer&&cameraMode==='goalie')match.setMovement(-y/n,x/n);
-  else match.setMovement(x/n,y/n);
+  const direction=rinkMovement({x:x/n,y:y/n},goalieCareer,cameraMode==='goalie');
+  match.setMovement(direction.x,direction.y);
  }
  function joystick(e:PointerEvent){
-  const r=stick.getBoundingClientRect();
-  const radius=r.width*.30;
+  const r=stick.getBoundingClientRect(),radius=r.width*.30;
   let x=(e.clientX-r.left-r.width/2)/radius;
   let y=(e.clientY-r.top-r.height/2)/radius;
-  const len=Math.max(1,Math.hypot(x,y));x/=len;y/=len;
+  const n=Math.max(1,Math.hypot(x,y));x/=n;y/=n;
   touchX=x;touchY=y;
   knob.style.transform='translate('+(x*radius)+'px,'+(y*radius)+'px)';
   syncMovement();
@@ -205,21 +199,123 @@ export function mountHockeyMatch(
   if(key==='a'){match.perform(goalieCareer?'butterfly':'shoot');return;}
   if(key==='b'){match.perform(goalieCareer?'blocker':'pass');}
  }
- function keyDown(e:KeyboardEvent){
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key))e.preventDefault();
-  if(e.key==='Escape'){setPaused(!paused);return;}
-  controls.add(e.key.toLowerCase());syncMovement();
-  if(e.repeat)return;
-  if(e.code==='Space')action('a');
-  if(e.key.toLowerCase()==='e')action('b');
-  if(e.key==='Tab')action('c');
-  if(e.key.toLowerCase()==='q')action('d');
-  if(e.key.toLowerCase()==='f')action('e');
-  if(e.key.toLowerCase()==='r')action('f');
-  if(e.key.toLowerCase()==='v')action('g');
-  if(e.key.toLowerCase()==='b')action('h');
+ const viewOrder:CameraMode[]=['player','broadcast','sideline','goalie','overhead'];
+ function selectCamera(view:CameraMode){
+  cameraMode=view;cameraNotice=1.6;
+  viewButtons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
+  syncMovement();
  }
- function keyUp(e:KeyboardEvent){controls.delete(e.key.toLowerCase());syncMovement();}
+ function performCommand(cmd:HockeyCommand){
+  if(cmd==='camera'){selectCamera(viewOrder[(viewOrder.indexOf(cameraMode)+1)%viewOrder.length]);return;}
+  const mapping:Partial<Record<HockeyCommand,string>>={
+   shoot:'a',pass:'b',switch:'c',butterfly:'a',blocker:'b',
+   glove:'d',poke:'c',cover:'e',release:'f',vh:'g',rvh:'h'
+  };
+  const chosen=mapping[cmd];if(chosen)action(chosen);
+ }
+ const bindingsNode=root.querySelector<HTMLElement>('[data-pc-bindings]')!;
+ const bindStatus=root.querySelector<HTMLElement>('[data-bind-status]')!;
+ function displayBindings(){
+  bindingsNode.replaceChildren();
+  for(const cmd of actionsFor(pcRole)){
+   const row=document.createElement('div');row.className='pc-key-row';
+   const label=document.createElement('span');label.textContent=labelCommand(cmd);
+   const button=document.createElement('button');button.type='button';
+   button.dataset.bind=cmd;button.textContent=awaitingBind===cmd?'PRESS A KEY…':labelKey(bindings[cmd]!);
+   button.setAttribute('aria-label','Rebind '+labelCommand(cmd));
+   button.setAttribute('aria-pressed',String(awaitingBind===cmd));
+   button.addEventListener('click',()=>{
+    awaitingBind=awaitingBind===cmd?null:cmd;
+    bindStatus.textContent=awaitingBind?'Press a new key for '+labelCommand(cmd)+'. Escape cancels.':'Key change cancelled.';
+    displayBindings();
+   });
+   row.append(label,button);bindingsNode.append(row);
+  }
+ }
+ displayBindings();
+ root.querySelector<HTMLButtonElement>('[data-reset-bindings]')?.addEventListener('click',()=>{
+  bindings=defaultsFor(pcRole);awaitingBind=null;controls.clear();
+  saveBindings(pcRole,bindings);displayBindings();syncMovement();
+  bindStatus.textContent='Default '+pcRole+' keyboard controls restored.';
+ });
+ const mouseCheckbox=root.querySelector<HTMLInputElement>('[data-mouse-enabled]')!;
+ const mouseStorage='hockey-career.pc-mouse-enabled.'+pcRole;
+ try{mouseEnabled=localStorage.getItem(mouseStorage)!=='false';}catch{/* Optional setting */}
+ mouseCheckbox.checked=mouseEnabled;
+ mouseCheckbox.addEventListener('change',()=>{
+  mouseEnabled=mouseCheckbox.checked;
+  try{localStorage.setItem(mouseStorage,String(mouseEnabled));}catch{/* Optional setting */}
+  if(!mouseEnabled){mouseAim=null;match.setShotAim(null);}
+ });
+ const editable=(target:EventTarget|null):boolean=>
+  target instanceof HTMLElement&&(target.isContentEditable||
+   ['INPUT','SELECT','TEXTAREA'].includes(target.tagName));
+ function keyDown(e:KeyboardEvent){
+  if(!active||completed||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(awaitingBind){
+   e.preventDefault();e.stopPropagation();
+   if(e.code==='Escape'){awaitingBind=null;bindStatus.textContent='Key change cancelled.';}
+   else{
+    const result=remapBinding(bindings,pcRole,awaitingBind,e.code);
+    if(result.error)bindStatus.textContent=result.error;
+    else{
+     bindings=result.bindings;saveBindings(pcRole,bindings);
+     bindStatus.textContent=labelCommand(awaitingBind)+' assigned to '+labelKey(e.code)+'.';
+     awaitingBind=null;controls.clear();syncMovement();
+    }
+   }
+   displayBindings();return;
+  }
+  if(editable(e.target))return;
+  if(e.code==='Escape'){e.preventDefault();controls.clear();setPaused(!paused);return;}
+  if(paused)return;
+  const cmd=commandFor(e.code,bindings,pcRole);
+  const isArrow=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code);
+  const cameraIndex=['Digit1','Digit2','Digit3','Digit4','Digit5'].indexOf(e.code);
+  if(cmd||isArrow||cameraIndex>=0)e.preventDefault();
+  if(cmd||isArrow){controls.add(e.code);syncMovement();}
+  if(e.repeat)return;
+  if(cameraIndex>=0){selectCamera(viewOrder[cameraIndex]);return;}
+  if(cmd&&!['moveUp','moveDown','moveLeft','moveRight'].includes(cmd))performCommand(cmd);
+ }
+ function keyUp(e:KeyboardEvent){
+  if(controls.delete(e.code))syncMovement();
+ }
+ function resetDesktopInput(){
+  controls.clear();touchX=touchY=0;pointerId=-1;
+  knob.style.transform='translate(0,0)';mouseAim=null;match.setShotAim(null);
+  match.setMovement(0,0);
+ }
+ function windowBlur(){resetDesktopInput();}
+ function pointerAim(e:PointerEvent){
+  if(!active||paused||!mouseEnabled||e.pointerType!=='mouse')return;
+  const rect=canvas.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  const x=clamp((e.clientX-rect.left)*canvas.width/rect.width,0,canvas.width);
+  const y=clamp((e.clientY-rect.top)*canvas.height/rect.height,0,canvas.height);
+  mouseAim={x,y};
+  if(!goalieCareer)match.setShotAim(mouseShotTarget(x,y,cameraMode));
+ }
+ function rinkMouseDown(e:PointerEvent){
+  if(!active||paused||!mouseEnabled||e.pointerType!=='mouse')return;
+  if(e.button>2)return;
+  e.preventDefault();pointerAim(e);
+  performCommand(goalieCareer?
+   e.button===0?'glove':e.button===2?'blocker':'poke':
+   e.button===0?'shoot':e.button===2?'pass':'switch');
+ }
+ function pointerLeave(){mouseAim=null;match.setShotAim(null);}
+ function stopContextMenu(e:MouseEvent){if(mouseEnabled)e.preventDefault();}
+ function drawMouseReticle(){
+  if(goalieCareer||!mouseEnabled||!mouseAim||paused)return;
+  ctx.save();ctx.setTransform(1,0,0,1,0,0);
+  const {x,y}=mouseAim;
+  ctx.strokeStyle='#ffcf64';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);
+  ctx.moveTo(x-17,y);ctx.lineTo(x-12,y);ctx.moveTo(x+12,y);ctx.lineTo(x+17,y);
+  ctx.moveTo(x,y-17);ctx.lineTo(x,y-12);ctx.moveTo(x,y+12);ctx.lineTo(x,y+17);
+  ctx.stroke();ctx.restore();
+ }
  function visibility(){last=performance.now();}
  stick.addEventListener('pointerdown',pointerDown);
  stick.addEventListener('pointermove',pointerMove);
