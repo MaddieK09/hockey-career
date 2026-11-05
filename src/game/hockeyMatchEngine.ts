@@ -84,6 +84,7 @@ export class HockeyMatch {
   this.announce('GOALIE PLAYS THE PUCK!');
  }
  private rating:MatchRating;
+ private playerShotAimY:number|null=null;
  private faceoffNext:Team=1;
  private possessionTime:[number,number]=[0,0];
  private goalieSaveCooldown:[number,number]=[0,0];
@@ -106,6 +107,9 @@ export class HockeyMatch {
   this.resetFaceoff(1);
  }
  setMovement(x:number,y:number):void{this.movement={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
+ /** PC mouse aim adjusts the intended net height/lane; collision and puck
+  * flight still use the exact same physical shot simulation as touch input. */
+ setShotAim(y:number|null):void{this.playerShotAimY=y===null?null:clamp(y,155,285);}
  switchSkater():void {
   if(this.goalieCareer||this.phase!=='live')return;
   const nearest=this.skaters.map((s,i)=>({i,d:distance(s.x,s.y,this.puck.x,this.puck.y)}))
@@ -150,7 +154,7 @@ export class HockeyMatch {
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
   if(action==='shoot'){
-   this.shoot(this.selected,clamp(220+(this.rng()-.5)*92,177,263),true);
+   this.shoot(this.selected,this.playerShotAimY??clamp(220+(this.rng()-.5)*92,177,263),true);
   }else{
    const teammates=this.skaters.map((s,i)=>({s,i}))
     .filter(a=>a.i<5&&a.i!==this.selected)
