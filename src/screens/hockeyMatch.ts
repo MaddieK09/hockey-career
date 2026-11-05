@@ -137,7 +137,7 @@ export function mountHockeyMatch(
  function setPaused(next:boolean){
   paused=next;pausePanel.hidden=!paused;
   cameraButton.textContent=paused?'▶ RESUME':'Ⅱ PAUSE / CAMERA';
-  if(paused){match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
+  if(paused){resetDesktopInput();awaitingBind=null;displayBindings();}
   shell.classList.toggle('match-is-paused',paused);
   last=performance.now();
  }
@@ -286,7 +286,7 @@ export function mountHockeyMatch(
   knob.style.transform='translate(0,0)';mouseAim=null;match.setShotAim(null);
   match.setMovement(0,0);
  }
- function windowBlur(){resetDesktopInput();}
+ function windowBlur(){if(active&&!completed&&!paused)setPaused(true);else resetDesktopInput();}
  function pointerAim(e:PointerEvent){
   if(!active||paused||!mouseEnabled||e.pointerType!=='mouse')return;
   const rect=canvas.getBoundingClientRect();
@@ -316,13 +316,18 @@ export function mountHockeyMatch(
   ctx.moveTo(x,y-17);ctx.lineTo(x,y-12);ctx.moveTo(x,y+12);ctx.lineTo(x,y+17);
   ctx.stroke();ctx.restore();
  }
- function visibility(){last=performance.now();}
+ function visibility(){last=performance.now();if(document.hidden&&active&&!completed&&!paused)setPaused(true);}
  stick.addEventListener('pointerdown',pointerDown);
  stick.addEventListener('pointermove',pointerMove);
  stick.addEventListener('pointerup',pointerUp);
  stick.addEventListener('pointercancel',pointerUp);
  window.addEventListener('keydown',keyDown);
  window.addEventListener('keyup',keyUp);
+ window.addEventListener('blur',windowBlur);
+ canvas.addEventListener('pointermove',pointerAim);
+ canvas.addEventListener('pointerdown',rinkMouseDown);
+ canvas.addEventListener('pointerleave',pointerLeave);
+ canvas.addEventListener('contextmenu',stopContextMenu);
  document.addEventListener('visibilitychange',visibility);
  root.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(button=>{
   button.addEventListener('click',()=>action(button.dataset.action??''));
@@ -330,8 +335,14 @@ export function mountHockeyMatch(
  function stop(){
   if(!active)return;
   active=false;cancelAnimationFrame(raf);shell.classList.remove('arena-expanded');
+  resetDesktopInput();
   window.removeEventListener('keydown',keyDown);
   window.removeEventListener('keyup',keyUp);
+  window.removeEventListener('blur',windowBlur);
+  canvas.removeEventListener('pointermove',pointerAim);
+  canvas.removeEventListener('pointerdown',rinkMouseDown);
+  canvas.removeEventListener('pointerleave',pointerLeave);
+  canvas.removeEventListener('contextmenu',stopContextMenu);
   document.removeEventListener('visibilitychange',visibility);
   stick.removeEventListener('pointerdown',pointerDown);
   stick.removeEventListener('pointermove',pointerMove);
