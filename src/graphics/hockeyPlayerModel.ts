@@ -44,15 +44,15 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  const tapered=(a:THREE.Vector3,b:THREE.Vector3,ra:number,rb:number,c:string,parent:THREE.Group)=>{const d=b.clone().sub(a);const m=mesh(new THREE.CylinderGeometry(rb,ra,d.length(),20,1),c,parent);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());return m;};
  // The jersey is a connected cloth-like shape, not an assembly of capsules.
  mesh(loft([{y:-.64,rx:.273,rz:.197,z:.01},{y:-.55,rx:.289,rz:.208,z:.01},{y:-.36,rx:.283,rz:.206},{y:-.09,rx:isGoalie?.327:.296,rz:isGoalie?.251:.211},{y:.24,rx:isGoalie?.366:.325,rz:isGoalie?.267:.223},{y:.37,rx:.328,rz:.219},{y:.48,rx:.205,rz:.146}]),color.shirt,jersey,.98);
- // A high padded collar meets the helmet throat shield and hides the exposed neck.
+ // Goalie-only sealed neck assembly: no bare skin between mask and chest protector.
  if(isGoalie){
   const collar=group('goalie-chest-collar');
-  mesh(loft([{y:.416,rx:.236,rz:.198,z:.020},{y:.499,rx:.194,rz:.165,z:.017},{y:.593,rx:.141,rz:.121,z:.004},{y:.646,rx:.118,rz:.102,z:.004}]),color.navy,collar,.92);
-  ell(0,.617,.059,.148,.061,.132,color.ink,collar);
-  panel(0,.516,.187,.277,.073,.065,color.white,collar,.026);
+  mesh(loft([{y:.408,rx:.245,rz:.205,z:.022},{y:.505,rx:.198,rz:.171,z:.019},{y:.605,rx:.155,rz:.138,z:.009},{y:.705,rx:.134,rz:.119,z:.009}]),color.navy,collar,.94);
+  ell(0,.650,.040,.149,.095,.139,color.ink,collar);
+  panel(0,.529,.185,.277,.077,.068,color.white,collar,.029);
   for(const s of [-1,1]){
-   panel(s*.177,.496,.075,.123,.091,.175,color.navy,collar,.035);
-   ell(s*.102,.615,.037,.058,.073,.093,color.navy,collar);
+   panel(s*.175,.499,.077,.125,.096,.175,color.navy,collar,.036);
+   ell(s*.111,.654,.037,.064,.096,.102,color.navy,collar);
   }
  }
  // Upper-body yoke and cloth trims.
@@ -84,7 +84,12 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
   for(const z of [-.01,.32])panel(ankleX,-2.038,z,.105,.046,.028,color.ink,legs,.008);
  }
  const faceShape=p.faceShape==='Round'?1.06:p.faceShape==='Angular'?.94:p.faceShape==='Square'?1.04:1;
- ell(0,.558,0,.095,.14,.092,color.skin,head);
+ if(!isGoalie) ell(0,.558,0,.095,.14,.092,color.skin,head);
+ else {
+  // Dark protective neck sleeve bridges the head and padded chest collar.
+  ell(0,.594,0,.114,.164,.111,color.ink,head);
+  ell(0,.671,.041,.131,.081,.116,color.navy,head);
+ }
  ell(0,.897,.0,.191*faceShape,.244,.183,color.skin,head);
  ell(0,.751,.094,.132*faceShape,.08,.11,color.skin,head);
  for(const s of [-1,1]){
@@ -98,7 +103,14 @@ export function buildHockeyPlayerModel(p:PlayerAppearance,e:Equipment,position:P
  panel(0,.772,.178,.073,.009,.011,'#955e5c',head,.004);
  // Goal mask is a dedicated contoured assembly. The skater helmet stays unchanged.
  if(isGoalie){
-  head.add(createGoalieMask(color.shell));
+  // Scale the entire mask around its face centre rather than scaling the
+  // player's head or moving the chin away from the throat guard.
+  const mask=createGoalieMask(color.shell);
+  const pivot=new THREE.Group();pivot.name='goalie-mask-fit-pivot';
+  pivot.position.set(0,.925,0);
+  mask.position.set(0,-.925,0);
+  pivot.scale.set(1.105,1.105,1.105);
+  pivot.add(mask);head.add(pivot);
  }else{
   const verts:number[]=[],indices:number[]=[];
   for(let j=0;j<2;j++)for(let i=0;i<=16;i++){const x=(i/16-.5)*.408;verts.push(x,j===0?1.008:.914,.215+.025*(1-Math.pow(2*i/16-1,2)));}
