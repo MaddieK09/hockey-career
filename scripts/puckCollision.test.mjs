@@ -1051,6 +1051,41 @@ test('age-out replacements after trades retain distinct IDs and correct roster p
  }
 });
 
+test('defensive AI picks one presser and protects the slot without converging',async()=>{
+ const {puckPresser,defensiveCoverage}=await loadTS('src/game/computerHockeyAI.ts');
+ const players=[
+  {team:0,role:'C',x:290,y:210,vx:0,vy:0},
+  {team:0,role:'LD',x:140,y:160,vx:0,vy:0},
+  {team:0,role:'RD',x:150,y:280,vx:0,vy:0},
+  {team:1,role:'C',x:280,y:210,vx:0,vy:0}];
+ assert.equal(puckPresser(players,0,{x:300,y:215}),0);
+ assert.equal(puckPresser(players,0,{x:145,y:170}),1);
+ const ld=defensiveCoverage('LD',0,{x:220,y:190},{x:220,y:190});
+ const rd=defensiveCoverage('RD',0,{x:220,y:190},{x:220,y:190});
+ assert.ok(ld.y<rd.y);
+ assert.ok(ld.x<350&&rd.x<350);
+});
+test('AI ranks pass lanes by defenders between players, not just receiver proximity',async()=>{
+ const {choosePassTarget,laneClearance,shootingLane}=await loadTS('src/game/computerHockeyAI.ts');
+ const carrier={team:0,role:'C',x:400,y:220,vx:0,vy:0};
+ const blocked={team:0,role:'RW',x:525,y:220,vx:0,vy:0};
+ const clear={team:0,role:'LW',x:505,y:120,vx:0,vy:0};
+ const defender={team:1,role:'C',x:460,y:220,vx:0,vy:0};
+ assert.ok(laneClearance(carrier,blocked,[defender])<20);
+ assert.equal(choosePassTarget(0,[carrier,blocked,clear,defender]),2);
+ assert.equal(shootingLane(carrier,0,220,[defender]),false);
+ assert.equal(shootingLane(carrier,0,175,[{x:460,y:300}]),true);
+});
+test('goalie prediction tracks incoming pucks but stays within crease coverage',async()=>{
+ const {goalieTrackY}=await loadTS('src/game/computerHockeyAI.ts');
+ const g={x:92,y:220};
+ const high=goalieTrackY(g,0,{x:290,y:240,vx:-420,vy:-120},null);
+ const low=goalieTrackY(g,0,{x:270,y:210,vx:-410,vy:130},null);
+ assert.ok(high<220&&low>220);
+ assert.ok([high,low].every(y=>y>=168&&y<=272));
+ assert.equal(goalieTrackY(g,0,{x:300,y:220,vx:0,vy:0},null),220);
+});
+
 test('PC skater and goalie profiles bind distinct actions and normalize bad saved data',async()=>{
  const {defaultsFor,actionsFor,normalizeBindings,commandFor}=await loadTS('src/config/desktopControls.ts');
  const goalie=defaultsFor('goalie'),skater=defaultsFor('skater');
@@ -1118,4 +1153,14 @@ test('desktop aiming influences actual skater shots while goalie actions remain 
  const m=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5);
  m.phase='live';m.setShotAim(274);m.perform('glove');
  assert.equal(m.goalies[0].saveHand,'glove');
+});
+
+test('new PC bindings migrate original desktop preferences and reject reserved saved keys',async()=>{
+ const {migrateLegacyBindings,normalizeBindings,defaultsFor}=await loadTS('src/config/desktopControls.ts');
+ const old={up:'KeyI',down:'KeyK',left:'KeyJ',right:'KeyL',primary:'Space',secondary:'KeyE',switch:'Tab',glove:'KeyQ',cover:'KeyF',release:'KeyR',vh:'KeyV',rvh:'KeyB'};
+ const skater=migrateLegacyBindings(old,'skater'),goalie=migrateLegacyBindings(old,'goalie');
+ assert.equal(skater.moveUp,'KeyI');assert.equal(skater.shoot,'Space');
+ assert.equal(goalie.moveUp,'KeyI');assert.equal(goalie.glove,'KeyQ');
+ assert.equal(goalie.butterfly,'Space');
+ assert.equal(normalizeBindings({...defaultsFor('goalie'),glove:'Digit3'},'goalie').glove,'KeyQ');
 });

@@ -17,6 +17,11 @@ export const DEFAULT_GOALIE:DesktopBindings={
  release:'KeyR',vh:'KeyV',rvh:'KeyB',camera:'KeyC'
 };
 const STORAGE='hockey-career.pc-controls-v1';
+const LEGACY_STORAGE='hockey-career-desktop-bindings-v1';
+/** Code-based keys only; gameplay and camera keys stay reserved. */
+const allowedKey=(code:string):boolean=>
+ /^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Space|Tab|Backquote|Minus|Equal|BracketLeft|BracketRight|Semicolon|Quote|Comma|Period|Slash|Backslash)$/.test(code)&&
+ !/^Digit[1-5]$/.test(code);
 const blocked=new Set(['Escape','CapsLock','NumLock','ScrollLock','MetaLeft','MetaRight',
  'ControlLeft','ControlRight','AltLeft','AltRight','ShiftLeft','ShiftRight',
  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Backspace','Delete']);
@@ -30,7 +35,7 @@ export function normalizeBindings(raw:unknown,role:DesktopRole):DesktopBindings{
  const mapped=defaultsFor(role);
  for(const cmd of actionsFor(role)){
   const key=source[cmd];
-  if(typeof key==='string'&&key.length<24&&!blocked.has(key)){
+  if(typeof key==='string'&&key.length<24&&allowedKey(key)&&!blocked.has(key)){
    mapped[cmd]=key;
   }
  }
@@ -47,8 +52,7 @@ export function normalizeBindings(raw:unknown,role:DesktopRole):DesktopBindings{
 export function remapBinding(bindings:DesktopBindings,role:DesktopRole,command:HockeyCommand,
  code:string):{bindings:DesktopBindings;error?:string}{
  if(!actionsFor(role).includes(command))return {bindings,error:'Unavailable action for this role'};
- if(!code||code.length>23||blocked.has(code)||/^F([1-9]|1[0-2])$/.test(code)||
-  /^Digit[1-5]$/.test(code))return {bindings,error:'That key is reserved for game or camera controls'};
+ if(!code||code.length>23||blocked.has(code)||!allowedKey(code))return {bindings,error:'That key is reserved for game or camera controls'};
  const next=normalizeBindings(bindings,role),previous=next[command]!;
  const existing=actionsFor(role).find(x=>x!==command&&next[x]===code);
  // Swap duplicates so changing a binding never silently unbinds an action.
@@ -82,10 +86,34 @@ export const labelCommand=(command:HockeyCommand):string=>({
  glove:'Glove save',blocker:'Blocker save',poke:'Poke check',cover:'Cover / freeze puck',
  release:'Pass held puck',vh:'VH post',rvh:'RVH post',camera:'Cycle camera'
 } as Record<HockeyCommand,string>)[command];
+/** Preserve customized keys from the earlier single-profile computer controls. */
+export function migrateLegacyBindings(raw:unknown,role:DesktopRole):DesktopBindings{
+ const next=defaultsFor(role);
+ if(!raw||typeof raw!=='object')return next;
+ const legacy=raw as Record<string,unknown>;
+ const fields:Record<string,string>={
+  moveUp:'up',moveDown:'down',moveLeft:'left',moveRight:'right',
+  ...(role==='goalie'?{
+   butterfly:'primary',blocker:'secondary',poke:'switch',glove:'glove',
+   cover:'cover',release:'release',vh:'vh',rvh:'rvh'
+  }:{shoot:'primary',pass:'secondary',switch:'switch'})
+ };
+ for(const [action,oldKey] of Object.entries(fields)){
+  const value=legacy[oldKey];
+  if(typeof value==='string')next[action as HockeyCommand]=value;
+ }
+ return normalizeBindings(next,role);
+}
 export function loadBindings(role:DesktopRole):DesktopBindings{
  try{
   const saved=JSON.parse(localStorage.getItem(STORAGE)??'{}');
-  return normalizeBindings(saved?.[role],role);
+  if(saved&&Object.prototype.hasOwnProperty.call(saved,role))
+   return normalizeBindings(saved[role],role);
+  const previous=localStorage.getItem(LEGACY_STORAGE);
+  if(previous===null)return defaultsFor(role);
+  const migrated=migrateLegacyBindings(JSON.parse(previous),role);
+  saveBindings(role,migrated);
+  return migrated;
  }catch{return defaultsFor(role);}
 }
 export function saveBindings(role:DesktopRole,bindings:DesktopBindings):void{
