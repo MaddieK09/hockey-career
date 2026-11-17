@@ -1,3 +1,4 @@
+import {DEFAULT_BINDINGS,ACTIONS,ACTION_LABELS,DESKTOP_BINDINGS_KEY,loadBindings,rebind,pressedDirection,formatKey,type DesktopAction} from '../game/desktopControls';
 import {teamCrest} from '../game/fictionalBranding';
 import {getTeam,type LeagueTeam} from '../game/fictionalLeague';
 import {validPeriodMinutes,periodOptions,savePeriodMinutes,type PeriodMinutes} from '../config/matchSettings';
@@ -30,6 +31,11 @@ export function mountHockeyMatch(
  let arenaMode=true;
  let goalieDistance:'close'|'medium'|'far'='medium';
  let futurePeriod=match.periodMinutes;
+ let keyBindings=(()=>{
+  try{return loadBindings(JSON.parse(localStorage.getItem(DESKTOP_BINDINGS_KEY)??'null'));}
+  catch{return {...DEFAULT_BINDINGS};}
+ })();
+ let capturing:DesktopAction|null=null;
  const actA=goalieCareer?'BUTTERFLY':'SHOOT';
  const actB=goalieCareer?'BLOCKER':'PASS';
  const actC=goalieCareer?'POKE':'SWITCH';
@@ -53,6 +59,7 @@ export function mountHockeyMatch(
   +'<div class="match-pause" data-pause hidden><div class="match-pause-panel"><h2>GAME PAUSED</h2><p>Camera and post settings apply now. Period length applies to your next game.</p>'
   +(goalieCareer?'<div class="pause-setting"><strong>POST TECHNIQUE</strong><div class="camera-options"><button type="button" data-post-mode="auto">AUTO VH / RVH</button><button type="button" data-post-mode="manual">MANUAL VH / RVH</button></div><small>Auto chooses VH for shots in front and RVH for plays near or behind the goal line. Manual enables post buttons near either post.</small></div>':'')
   +'<div class="pause-setting"><label for="pause-period-length"><strong>PERIOD LENGTH (NEXT GAME)</strong></label><select id="pause-period-length" data-period-length>'+periodOptions(futurePeriod)+'</select><small>This game remains '+match.periodMinutes+' minutes per period; the next game uses your selection.</small></div>'
+  +'<div class="pause-setting desktop-keyboard-config"><strong>KEYBOARD & MOUSE</strong><small>WASD to skate · Mouse controls shot height · Left-click shoots / butterfly · Right-click passes / blocker · Middle-click switches / pokes. Configure keys below.</small><div class="desktop-key-grid" data-key-grid></div><button type="button" data-keys-reset>RESET DEFAULT KEYBINDS</button><small data-key-feedback aria-live="polite">Click any key to rebind it. Escape cancels.</small></div>'
   +'<div class="camera-options">'
   +'<button type="button" data-view="player">PLAYER CHASE (NHL)</button>'
   +'<button type="button" data-view="broadcast">TV BROADCAST</button>'
@@ -122,7 +129,7 @@ export function mountHockeyMatch(
  function setPaused(next:boolean){
   paused=next;pausePanel.hidden=!paused;
   cameraButton.textContent=paused?'▶ RESUME':'Ⅱ PAUSE / CAMERA';
-  if(paused){match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
+  if(paused){controls.clear();match.setMovement(0,0);touchX=touchY=0;knob.style.transform='translate(0,0)';}
   shell.classList.toggle('match-is-paused',paused);
   last=performance.now();
  }
@@ -144,19 +151,29 @@ export function mountHockeyMatch(
  });
  root.querySelector('[data-resume]')?.addEventListener('click',()=>setPaused(false));
  const controls=new Set<string>();
+ const keyGrid=root.querySelector<HTMLElement>('[data-key-grid]')!;
+ const feedback=root.querySelector<HTMLElement>('[data-key-feedback]')!;
+ const drawKeyGrid=()=>{
+  keyGrid.innerHTML=ACTIONS.map(a=>'<button type="button" data-rebind="'+a+'"'+(capturing===a?' class="key-capturing"':'')+'><span>'+ACTION_LABELS[a]+'</span><strong>'+ (capturing===a?'PRESS KEY…':formatKey(keyBindings[a]))+'</strong></button>').join('');
+ };
+ keyGrid.addEventListener('click',e=>{
+  const b=(e.target as HTMLElement).closest<HTMLButtonElement>('[data-rebind]');
+  if(!b)return;capturing=b.dataset.rebind as DesktopAction;drawKeyGrid();
+  feedback.textContent='Press a key for '+ACTION_LABELS[capturing]+' (Escape to cancel).';
+ });
+ root.querySelector('[data-keys-reset]')?.addEventListener('click',()=>{
+  keyBindings={...DEFAULT_BINDINGS};localStorage.setItem(DESKTOP_BINDINGS_KEY,JSON.stringify(keyBindings));
+  capturing=null;controls.clear();syncMovement();drawKeyGrid();feedback.textContent='Default controls restored.';
+ });
+ drawKeyGrid();
  cameraButton.addEventListener('click',()=>setPaused(!paused));
  const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
  let touchX=0,touchY=0;
  function syncMovement(){
-  let x=touchX,y=touchY;
+  const keyboard=pressedDirection(controls,keyBindings);
+  const x=touchX+keyboard.x,y=touchY+keyboard.y;
   if(paused){match.setMovement(0,0);return;}
-  if(controls.has('a')||controls.has('arrowleft'))x-=1;
-  if(controls.has('d')||controls.has('arrowright'))x+=1;
-  if(controls.has('w')||controls.has('arrowup'))y-=1;
-  if(controls.has('s')||controls.has('arrowdown'))y+=1;
   const n=Math.max(1,Math.hypot(x,y));
-  // Chase goalie camera looks down +rink-X: screen up is rink +X,
-  // screen right is rink +Y. Overhead and skater cameras retain rink axes.
   if(goalieCareer&&cameraMode==='goalie')match.setMovement(-y/n,x/n);
   else match.setMovement(x/n,y/n);
  }
@@ -190,26 +207,53 @@ export function mountHockeyMatch(
   if(key==='a'){match.perform(goalieCareer?'butterfly':'shoot');return;}
   if(key==='b'){match.perform(goalieCareer?'blocker':'pass');}
  }
+ const keyActions:Partial<Record<DesktopAction,string>>={
+  primary:'a',secondary:'b',switch:'c',glove:'d',cover:'e',release:'f',vh:'g',rvh:'h'
+ };
  function keyDown(e:KeyboardEvent){
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Tab'].includes(e.key))e.preventDefault();
-  if(e.key==='Escape'){setPaused(!paused);return;}
-  controls.add(e.key.toLowerCase());syncMovement();
+  if(!active||e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement)return;
+  if(capturing){
+   e.preventDefault();
+   if(e.code==='Escape'){capturing=null;feedback.textContent='Rebinding canceled.';drawKeyGrid();return;}
+   const next=rebind(keyBindings,capturing,e.code);
+   if(next!==keyBindings){
+    keyBindings=next;localStorage.setItem(DESKTOP_BINDINGS_KEY,JSON.stringify(keyBindings));
+    feedback.textContent='Saved '+ACTION_LABELS[capturing]+': '+formatKey(e.code);
+   }else feedback.textContent='That key cannot be bound.';
+   capturing=null;controls.clear();drawKeyGrid();syncMovement();return;
+  }
+  const name=ACTIONS.find(a=>keyBindings[a]===e.code);
+  if(!name)return;
+  e.preventDefault();
+  if(name==='pause'){if(!e.repeat)setPaused(!paused);return;}
+  if(paused)return;
+  controls.add(e.code);syncMovement();
   if(e.repeat)return;
-  if(e.code==='Space')action('a');
-  if(e.key.toLowerCase()==='e')action('b');
-  if(e.key==='Tab')action('c');
-  if(e.key.toLowerCase()==='q')action('d');
-  if(e.key.toLowerCase()==='f')action('e');
-  if(e.key.toLowerCase()==='r')action('f');
-  if(e.key.toLowerCase()==='v')action('g');
-  if(e.key.toLowerCase()==='b')action('h');
+  const button=keyActions[name];if(button)action(button);
  }
- function keyUp(e:KeyboardEvent){controls.delete(e.key.toLowerCase());syncMovement();}
- function visibility(){last=performance.now();}
+ function keyUp(e:KeyboardEvent){controls.delete(e.code);syncMovement();}
+ function visibility(){last=performance.now();if(document.hidden){controls.clear();syncMovement();}}
+ function mouseMove(e:MouseEvent){
+  const rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)return;
+  match.setDesktopShotAim(Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height)));
+ }
+ function mouseDown(e:MouseEvent){
+  if(paused||!active)return;
+  if(e.button===0){e.preventDefault();action('a');}
+  else if(e.button===2){e.preventDefault();action('b');}
+  else if(e.button===1){e.preventDefault();action('c');}
+ }
+ function mouseContext(e:MouseEvent){e.preventDefault();}
+ function mouseLeave(){match.setDesktopShotAim(null);}
  stick.addEventListener('pointerdown',pointerDown);
  stick.addEventListener('pointermove',pointerMove);
  stick.addEventListener('pointerup',pointerUp);
  stick.addEventListener('pointercancel',pointerUp);
+ canvas.addEventListener('mousemove',mouseMove);
+ canvas.addEventListener('mousedown',mouseDown);
+ canvas.addEventListener('contextmenu',mouseContext);
+ canvas.addEventListener('mouseleave',mouseLeave);
  window.addEventListener('keydown',keyDown);
  window.addEventListener('keyup',keyUp);
  document.addEventListener('visibilitychange',visibility);
@@ -219,6 +263,10 @@ export function mountHockeyMatch(
  function stop(){
   if(!active)return;
   active=false;cancelAnimationFrame(raf);shell.classList.remove('arena-expanded');
+  canvas.removeEventListener('mousemove',mouseMove);
+  canvas.removeEventListener('mousedown',mouseDown);
+  canvas.removeEventListener('contextmenu',mouseContext);
+  canvas.removeEventListener('mouseleave',mouseLeave);
   window.removeEventListener('keydown',keyDown);
   window.removeEventListener('keyup',keyUp);
   document.removeEventListener('visibilitychange',visibility);

@@ -359,3 +359,14 @@
 .season-date{position:relative}
 .season-sim-line strong{overflow-wrap:anywhere;text-align:right;max-width:65%}
 @media(max-width:420px){.season-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}.front-office-trust{gap:7px}.roster-market{padding:10px}}
+
+/* Desktop controls: pause menu rebinding */
+.desktop-keyboard-config{margin:16px 0;padding:12px;border:1px solid #406b82;border-radius:12px}
+.desktop-keyboard-config>small{display:block;margin:8px 0;color:#bad6e3;line-height:1.45}
+.desktop-key-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:12px 0}
+.desktop-key-grid button{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#173b51;color:#ebf6fb;border:1px solid #58859d;border-radius:8px;padding:9px;min-height:38px;cursor:pointer;text-align:left}
+.desktop-key-grid button span{font-size:11px;line-height:1.3}
+.desktop-key-grid button strong{font-size:12px;white-space:nowrap;color:#9ceaff}
+.desktop-key-grid button.key-capturing{border-color:#f2d487;outline:2px solid #f2d487}
+.desktop-keyboard-config [data-keys-reset]{padding:9px 14px;border-radius:8px;border:1px solid #6293ad;background:#214c65;color:#fff;font-weight:700}
+@media(min-width:800px){.desktop-key-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.match-controls{max-width:980px;margin-left:auto;margin-right:auto}}
