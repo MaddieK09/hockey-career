@@ -73,7 +73,7 @@ export function mountHockeyMatch(
   +'<div class="pc-bindings" data-pc-bindings></div>'
   +'<div class="pc-mouse-toggle"><label><input type="checkbox" data-mouse-enabled checked> ENABLE MOUSE ACTIONS</label></div>'
   +'<small>Mouse: left '+(goalieCareer?'glove':'shoot')+', right '+(goalieCareer?'blocker':'pass')+
-   ', middle '+(goalieCareer?'poke check':'switch player')+'. '+(goalieCareer?'':'Hover the rink to aim shots. ')+'1–5 change camera. Escape pauses.</small>'
+   ', middle '+(goalieCareer?'poke check':'switch player')+'. '+(goalieCareer?'':'Hover to aim shots; overhead right-click targets a teammate. ')+'1–5 change camera. Escape pauses.</small>'
   +'<button type="button" data-reset-bindings>RESTORE DEFAULT KEYBINDS</button>'
   +'<p class="pc-bind-status" data-bind-status aria-live="polite"></p></div>'
   +'<button type="button" class="career-primary" data-resume>▶ RESUME GAME</button></div></div>'
@@ -300,6 +300,14 @@ export function mountHockeyMatch(
   if(!active||paused||!mouseEnabled||e.pointerType!=='mouse')return;
   if(e.button>2)return;
   e.preventDefault();pointerAim(e);
+  if(!goalieCareer&&e.button===2&&cameraMode==='overhead'){
+   // Convert mouse pixels back to rink coordinates, including overhead zoom.
+   const zoom=cameraZoom?1.45:1;
+   const cx=Math.max(400/zoom,Math.min(800-400/zoom,cameraX));
+   const cy=220+(match.puck.y-220)*.36;
+   if(mouseAim)match.setPassTarget(cameraZoom?(mouseAim.x-400)/zoom+cx:mouseAim.x,
+    cameraZoom?(mouseAim.y-220)/zoom+cy:mouseAim.y);
+  }
   performCommand(goalieCareer?
    e.button===0?'glove':e.button===2?'blocker':'poke':
    e.button===0?'shoot':e.button===2?'pass':'switch');
@@ -438,8 +446,9 @@ export function mountHockeyMatch(
  function frame(now:number){
   if(!active)return;
   const dt=Math.min((now-last)/1000,.04);last=now;
-  if(!paused){visualTime+=dt;match.step(dt);cameraNotice=Math.max(0,cameraNotice-dt);}
+  // Apply current-frame input before physics; do not add a frame of input lag.
   syncMovement();
+  if(!paused){visualTime+=dt;match.step(dt);cameraNotice=Math.max(0,cameraNotice-dt);}
   homeScore.textContent=String(match.scores[0]);
   awayScore.textContent=String(match.scores[1]);
   scorebug.classList.toggle('scorebug-goal',match.phase==='goal');

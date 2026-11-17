@@ -4,6 +4,7 @@ import {drawTeamCrest} from '../game/fictionalBranding';
  */
 import type {HockeyMatch} from '../game/hockeyMatchEngine';
 import {GOAL_HALF_WIDTH,GOAL_HEIGHT} from '../game/puckCollision';
+import {easeCamera} from './cameraMotion';
 const TAU=Math.PI*2;
 const clamp=(v:number,a:number,b:number)=>Math.max(a,Math.min(b,v));
 const ln=(c:CanvasRenderingContext2D,x:number,y:number,u:number,v:number,w:number,color:string)=>{
@@ -12,23 +13,32 @@ const ln=(c:CanvasRenderingContext2D,x:number,y:number,u:number,v:number,w:numbe
 const oval=(c:CanvasRenderingContext2D,x:number,y:number,rx:number,ry:number,color:string)=>{
  c.beginPath();c.ellipse(x,y,rx,ry,0,0,TAU);c.fillStyle=color;c.fill();
 };
-let cameraDepth=0,cameraLateral=220,previousMode='';
+interface ChaseState {depth:number;lateral:number;mode:'player'|'goalie';lastTime:number}
+// Avoid leaking camera offsets from one match into the next.
+const cameraStates=new WeakMap<HockeyMatch,ChaseState>();
 export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'player'|'goalie',time:number,goalieDistance:'close'|'medium'|'far'='medium'):void{
  const goalieMode=mode==='goalie';
  const controlled=goalieMode?m.goalies[0]:m.skaters[m.selected];
  // Always look toward the opposing end from behind the controlled player.
  const direction=goalieMode?1:(m.skaters[m.selected].team===0?1:-1);
  const goalDepth=direction===1?controlled.x:800-controlled.x;
- if(previousMode!==mode){cameraDepth=goalieMode?60:goalDepth;cameraLateral=goalieMode?220:controlled.y;previousMode=mode;}
- if(goalieMode){
-  cameraDepth=60;
-  // Small puck-side lookahead preserves the crease in frame while following
-  // wide attacks; never pan all the way to a skater and lose the net.
-  const targetLane=clamp(220+(m.puck.y-220)*.18,192,248);
-  cameraLateral+=(targetLane-cameraLateral)*.075;
+ let camera=cameraStates.get(m);
+ if(!camera||camera.mode!==mode){
+  camera={depth:goalieMode?60:goalDepth,lateral:goalieMode?220:controlled.y,mode,lastTime:time};
+  cameraStates.set(m,camera);
  }
- else {cameraDepth+=(goalDepth-cameraDepth)*.13;cameraLateral+=(controlled.y-cameraLateral)*.1;}
- const eye=goalieMode?0:Math.max(0,cameraDepth-55);
+ const dt=clamp(time-camera.lastTime,0,.05);
+ camera.lastTime=time;
+ if(goalieMode){
+  camera.depth=60;
+  // Look toward the puck but stay anchored to the net.
+  const targetLane=clamp(220+(m.puck.y-220)*.18,192,248);
+  camera.lateral=easeCamera(camera.lateral,targetLane,dt,4.7);
+ }else{
+  camera.depth=easeCamera(camera.depth,goalDepth,dt,8.4);
+  camera.lateral=easeCamera(camera.lateral,controlled.y,dt,6.3);
+ }
+ const eye=goalieMode?0:Math.max(0,camera.depth-55);
  const cameraFactor=goalieDistance==='close'?1.10:goalieDistance==='far'?.88:1;
  const cameraElevation=goalieDistance==='close'?13:goalieDistance==='far'?-9:0;
  // The original camera compresses almost the whole rink into a thin row.
@@ -46,7 +56,7 @@ export function drawChaseHockey(c:CanvasRenderingContext2D,m:HockeyMatch,mode:'p
   const z=clamp(perspectiveDistance/(perspectiveDistance+depth),goalieMode?.25:.28,1.16);
   const visibleWidth=Math.pow(z,.70);
   const floorY=horizon+(goalieMode?325:305)*cameraFactor*(1-depthFraction);
-  return {x:400+(y-cameraLateral)*visibleWidth*(goalieMode?1.65*cameraFactor:1.46),
+  return {x:400+(y-camera.lateral)*visibleWidth*(goalieMode?1.65*cameraFactor:1.46),
    y:floorY,scale:z*(goalieMode?1.72*cameraFactor:1.45),behind:along< -25};
  };
  // Stands and glass.
