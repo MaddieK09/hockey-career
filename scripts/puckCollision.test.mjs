@@ -1164,3 +1164,42 @@ test('new PC bindings migrate original desktop preferences and reject reserved s
  assert.equal(goalie.butterfly,'Space');
  assert.equal(normalizeBindings({...defaultsFor('goalie'),glove:'Digit3'},'goalie').glove,'KeyQ');
 });
+
+test('WASD moves the controlled skater and braking follows key release',async()=>{
+ const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
+ const m=new HockeyMatch(false,{speed:55,shot:55,handling:50,defense:50},()=>.5,5);
+ const s=m.skaters[0],x=s.x;m.puck.owner=0;m.phase='live';
+ m.setMovement(1,0);
+ for(let i=0;i<15;i++)m.step(1/60);
+ assert.ok(s.x>x+15,'WASD must create meaningful controlled motion');
+ assert.ok(s.vx>75,'controlled steering must not use the AI deadzone');
+ const cruising=s.vx;m.setMovement(0,0);
+ for(let i=0;i<18;i++)m.step(1/60);
+ assert.ok(Math.abs(s.vx)<cruising*.3,'released key should brake gradually');
+});
+test('overhead mouse can pass to a selected winger with real puck travel',async()=>{
+ const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
+ const m=new HockeyMatch(false,{speed:50,shot:50,handling:70,defense:50},()=>.5,5);
+ m.phase='live';m.selected=0;m.puck.owner=0;
+ m.setPassTarget(m.skaters[2].x,m.skaters[2].y);m.perform('pass');
+ assert.equal(m.puck.owner,-1);
+ assert.ok(m.puck.vy>0,'the pass should travel toward the lower winger');
+ assert.ok(Math.hypot(m.puck.vx,m.puck.vy)>300,'passes move physically, not via teleport');
+});
+test('a nearby low slow loose puck is collectable at stick distance',async()=>{
+ const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
+ const m=new HockeyMatch(false,{speed:50,shot:50,handling:50,defense:50},()=>.5,5);
+ const s=m.skaters[0];m.phase='live';
+ m.puck={...m.puck,owner:-1,x:s.x+22.5,y:s.y,vx:0,vy:0,height:0,vz:0,lock:0,shotTeam:null};
+ m.setMovement(0,0);m.step(1/60);
+ assert.equal(m.puck.owner,0);
+});
+test('chase camera follow is independent of render frame rate',async()=>{
+ const {easeCamera}=await loadTS('src/graphics/cameraMotion.ts');
+ let sixty=0,thirty=0;
+ for(let i=0;i<60;i++)sixty=easeCamera(sixty,100,1/60,6);
+ for(let i=0;i<30;i++)thirty=easeCamera(thirty,100,1/30,6);
+ assert.ok(Math.abs(sixty-thirty)<.001);
+ assert.equal(easeCamera(sixty,100,0),sixty);
+ assert.ok(easeCamera(sixty,100,.01)>sixty&&easeCamera(sixty,100,.01)<100);
+});

@@ -65,6 +65,7 @@ export class HockeyMatch {
  private decisionCooldown:[number,number]=[1.5,1.5];
  private movement:MatchControls={x:0,y:0};
  private desktopShotAim:number|null=null;
+ private passTarget:{x:number;y:number}|null=null;
  private goalieActionCooldown=0;
  /** Goalkeeper glove possession is distinct from skater possession. */
  get goalieHolding():boolean{return this.goalies[0].holdTime>0;}
@@ -107,7 +108,10 @@ export class HockeyMatch {
   }
   this.resetFaceoff(1);
  }
- setMovement(x:number,y:number):void{this.movement={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
+ setMovement(x:number,y:number):void{
+  const n=Math.max(1,Math.hypot(x,y));
+  this.movement={x:clamp(x/n,-1,1),y:clamp(y/n,-1,1)};
+ }
  /** Accept an absolute vertical shot aim from the PC mouse pointer. */
  setShotAim(y:number|null):void{
   this.desktopShotAim=y===null||!Number.isFinite(y)?null:clamp(y,165,275);
@@ -115,6 +119,11 @@ export class HockeyMatch {
  /** A screen-relative vertical cursor position maps to the actual goal opening. */
  setDesktopShotAim(fraction:number|null):void{
   this.desktopShotAim=fraction===null?null:clamp(172+fraction*96,172,268);
+ }
+ /** Select a recipient near the overhead mouse cursor for one pass only. */
+ setPassTarget(x:number|null,y:number|null):void{
+  this.passTarget=x===null||y===null||!Number.isFinite(x)||!Number.isFinite(y)?null:
+   {x:clamp(x,42,758),y:clamp(y,43,397)};
  }
  switchSkater():void {
   if(this.goalieCareer||this.phase!=='live')return;
@@ -156,6 +165,7 @@ export class HockeyMatch {
    return;
   }
   if(action!=='shoot'&&action!=='pass')return;
+  const pointedPass=this.passTarget;this.passTarget=null;
   const skater=this.skaters[this.selected];
   // Shooting and passing require possession. No instant telekinetic steals.
   if(this.puck.owner!==this.selected)return;
@@ -169,7 +179,10 @@ export class HockeyMatch {
      const sb=(b.s.x-skater.x)*1.2-Math.abs(b.s.y-skater.y)*.18;
      return sb-sa;
     });
-   const target=teammates[0];
+   const nearest=pointedPass?teammates.map(a=>({a,gap:distance(a.s.x,a.s.y,pointedPass.x,pointedPass.y)}))
+    .sort((a,b)=>a.gap-b.gap)[0]:null;
+   // Explicit click on a teammate takes priority; empty ice keeps auto-pass.
+   const target=nearest&&nearest.gap<90?nearest.a:teammates[0];
    if(target)this.pass(this.selected,target.i);
   }
  }
@@ -272,8 +285,10 @@ export class HockeyMatch {
    if(controlled){dx=this.movement.x;dy=this.movement.y;}
    else {const target=this.aiTarget(i);dx=target.x-a.x;dy=target.y-a.y;}
    const mag=Math.hypot(dx,dy),speed=(controlled?185+this.rating.speed*.55:175)*this.paceFactor;
-   const desiredX=mag<4?0:dx/Math.max(1,mag)*Math.min(speed,mag*2.8);
-   const desiredY=mag<4?0:dy/Math.max(1,mag)*Math.min(speed,mag*2.8);
+   // Keyboard/touch values are directions; AI targets are world-space distances.
+   // Applying the AI's four-unit dead zone to WASD prevents all movement.
+   const desiredX=controlled?dx*speed:mag<4?0:dx/Math.max(1,mag)*Math.min(speed,mag*2.8);
+   const desiredY=controlled?dy*speed:mag<4?0:dy/Math.max(1,mag)*Math.min(speed,mag*2.8);
    const accel=controlled?8:4.8;
    a.vx+=(desiredX-a.vx)*Math.min(1,accel*dt);
    a.vy+=(desiredY-a.vy)*Math.min(1,accel*dt);
@@ -410,14 +425,13 @@ export class HockeyMatch {
   }
  }
  private intercept():void {
-  if(this.puck.owner>=0||this.puck.lock>0)return;
+  if(this.puck.owner>=0||this.puck.lock>0||this.puck.height>9)return;
   let nearest=-1,best=Infinity;
   for(let i=0;i<10;i++){
    const s=this.skaters[i],r=distance(s.x,s.y,this.puck.x,this.puck.y);
-   if(r<21&&r<best){best=r;nearest=i;}
+   if(r<24&&r<best){best=r;nearest=i;}
   }
   if(nearest>=0){
-   if(this.puck.height>9)return;
    this.puck.owner=nearest;this.puck.vx=this.puck.vy=0;this.puck.height=this.puck.vz=0;
    this.puck.countedShotTeam=null;
    this.puck.shotTeam=null;
