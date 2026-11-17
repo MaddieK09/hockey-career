@@ -1051,29 +1051,6 @@ test('age-out replacements after trades retain distinct IDs and correct roster p
  }
 });
 
-test('desktop keyboard defaults, directional normalization and swapped binds',async()=>{
- const {DEFAULT_BINDINGS,loadBindings,rebind,pressedDirection,allowedBinding,ACTIONS}=await loadTS('src/game/desktopControls.ts');
- const defaults=loadBindings(null);
- assert.deepEqual(defaults,DEFAULT_BINDINGS);
- assert.equal(new Set(Object.values(defaults)).size,ACTIONS.length);
- const moved=pressedDirection(new Set(['KeyW','KeyD']),defaults);
- assert.ok(Math.abs(Math.hypot(moved.x,moved.y)-1)<.00001);
- assert.ok(moved.x>0&&moved.y<0);
- assert.deepEqual(pressedDirection(new Set(['KeyW','KeyS']),defaults),{x:0,y:0});
- const swap=rebind(defaults,'primary','KeyE');
- assert.equal(swap.primary,'KeyE');assert.equal(swap.secondary,'Space');
- assert.equal(defaults.primary,'Space');
- assert.equal(rebind(swap,'left','F13'),swap);
- assert.equal(allowedBinding('ArrowUp'),true);
- assert.equal(allowedBinding('F13'),false);
-});
-test('malformed desktop bindings recover usable unique defaults without changing career files',async()=>{
- const {loadBindings,ACTIONS}=await loadTS('src/game/desktopControls.ts');
- const loaded=loadBindings({up:'KeyE',primary:'KeyE',down:4,cover:'some-hack'});
- assert.equal(new Set(Object.values(loaded)).size,ACTIONS.length);
- assert.ok(ACTIONS.every(a=>typeof loaded[a]==='string'&&loaded[a].length));
-});
-
 test('defensive AI picks one presser and protects the slot without converging',async()=>{
  const {puckPresser,defensiveCoverage}=await loadTS('src/game/computerHockeyAI.ts');
  const players=[
@@ -1107,4 +1084,83 @@ test('goalie prediction tracks incoming pucks but stays within crease coverage',
  assert.ok(high<220&&low>220);
  assert.ok([high,low].every(y=>y>=168&&y<=272));
  assert.equal(goalieTrackY(g,0,{x:300,y:220,vx:0,vy:0},null),220);
+});
+
+test('PC skater and goalie profiles bind distinct actions and normalize bad saved data',async()=>{
+ const {defaultsFor,actionsFor,normalizeBindings,commandFor}=await loadTS('src/config/desktopControls.ts');
+ const goalie=defaultsFor('goalie'),skater=defaultsFor('skater');
+ assert.equal(goalie.glove,'KeyQ');assert.equal(goalie.blocker,'KeyE');
+ assert.equal(skater.shoot,'Space');assert.equal(skater.pass,'KeyE');
+ assert.equal(skater.switch,'Tab');
+ assert.equal(commandFor('Space',goalie,'goalie'),'butterfly');
+ assert.equal(commandFor('Space',skater,'skater'),'shoot');
+ assert.equal(actionsFor('goalie').length,13);
+ const corrupt=normalizeBindings({...goalie,glove:'KeyW'},'goalie');
+ assert.equal(corrupt.glove,'KeyQ');
+ assert.equal(corrupt.moveUp,'KeyW');
+ assert.equal(normalizeBindings(null,'skater').shoot,'Space');
+});
+test('PC remapping safely swaps duplicate key commands and rejects reserved keys',async()=>{
+ const {defaultsFor,remapBinding,commandFor,normalizeBindings}=await loadTS('src/config/desktopControls.ts');
+ const base=defaultsFor('goalie');
+ const changed=remapBinding(base,'goalie','glove','KeyE');
+ assert.equal(changed.error,undefined);
+ assert.equal(changed.bindings.glove,'KeyE');
+ assert.equal(changed.bindings.blocker,'KeyQ');
+ assert.equal(commandFor('KeyQ',changed.bindings,'goalie'),'blocker');
+ assert.equal(normalizeBindings(changed.bindings,'goalie').glove,'KeyE');
+ assert.ok(remapBinding(base,'goalie','glove','Escape').error);
+ assert.ok(remapBinding(base,'goalie','glove','Digit3').error);
+ assert.ok(remapBinding(base,'goalie','glove','ArrowLeft').error);
+ assert.ok(remapBinding(base,'goalie','shoot','KeyQ').error);
+});
+test('PC held keys normalize diagonals and goalie camera maps player-relative movement',async()=>{
+ const {movementFor,rinkMovement,defaultsFor,remapBinding}=await loadTS('src/config/desktopControls.ts');
+ const base=defaultsFor('goalie');
+ const straight=movementFor(new Set(['KeyW']),base);
+ assert.deepEqual(straight,{x:0,y:-1});
+ const diagonal=movementFor(new Set(['KeyW','KeyD']),base);
+ assert.ok(Math.abs(Math.hypot(diagonal.x,diagonal.y)-1)<1e-8);
+ assert.deepEqual(rinkMovement(straight,true,true),{x:1,y:0});
+ assert.deepEqual(rinkMovement(straight,true,false),straight);
+ assert.deepEqual(movementFor(new Set(['KeyW','KeyS']),base),{x:0,y:0});
+ const remapped=remapBinding(base,'goalie','moveUp','KeyI').bindings;
+ assert.deepEqual(movementFor(new Set(['KeyI']),remapped),{x:0,y:-1});
+ assert.deepEqual(movementFor(new Set(['ArrowUp']),remapped),{x:0,y:-1});
+});
+test('mouse shot target follows cursor across net for overhead and chase cameras',async()=>{
+ const {mouseShotTarget}=await loadTS('src/config/desktopControls.ts');
+ assert.equal(mouseShotTarget(400,220,'overhead'),220);
+ assert.ok(mouseShotTarget(400,50,'overhead')<220);
+ assert.ok(mouseShotTarget(400,400,'overhead')>220);
+ assert.ok(mouseShotTarget(40,220,'player')<220);
+ assert.ok(mouseShotTarget(760,220,'player')>220);
+ assert.ok(mouseShotTarget(0,-1000,'overhead')>=166);
+ assert.ok(mouseShotTarget(1000,1000,'overhead')<=274);
+});
+test('desktop aiming influences actual skater shots while goalie actions remain separate',async()=>{
+ const {HockeyMatch}=await loadTS('src/game/hockeyMatchEngine.ts');
+ function shot(target){
+  const m=new HockeyMatch(false,{speed:50,shot:80,handling:50,defense:50},()=>.5,5);
+  m.phase='live';m.selected=0;m.puck.owner=0;
+  m.puck.x=m.skaters[0].x;m.puck.y=m.skaters[0].y;
+  m.setShotAim(target);m.perform('shoot');
+  return m.puck.vy;
+ }
+ assert.ok(shot(270)>0);
+ assert.ok(shot(170)<0);
+ assert.ok(shot(270)>shot(170));
+ const m=new HockeyMatch(true,{speed:50,shot:50,handling:50,defense:50},()=>.5,5);
+ m.phase='live';m.setShotAim(274);m.perform('glove');
+ assert.equal(m.goalies[0].saveHand,'glove');
+});
+
+test('new PC bindings migrate original desktop preferences and reject reserved saved keys',async()=>{
+ const {migrateLegacyBindings,normalizeBindings,defaultsFor}=await loadTS('src/config/desktopControls.ts');
+ const old={up:'KeyI',down:'KeyK',left:'KeyJ',right:'KeyL',primary:'Space',secondary:'KeyE',switch:'Tab',glove:'KeyQ',cover:'KeyF',release:'KeyR',vh:'KeyV',rvh:'KeyB'};
+ const skater=migrateLegacyBindings(old,'skater'),goalie=migrateLegacyBindings(old,'goalie');
+ assert.equal(skater.moveUp,'KeyI');assert.equal(skater.shoot,'Space');
+ assert.equal(goalie.moveUp,'KeyI');assert.equal(goalie.glove,'KeyQ');
+ assert.equal(goalie.butterfly,'Space');
+ assert.equal(normalizeBindings({...defaultsFor('goalie'),glove:'Digit3'},'goalie').glove,'KeyQ');
 });

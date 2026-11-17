@@ -108,6 +108,10 @@ export class HockeyMatch {
   this.resetFaceoff(1);
  }
  setMovement(x:number,y:number):void{this.movement={x:clamp(x,-1,1),y:clamp(y,-1,1)};}
+ /** Accept an absolute vertical shot aim from the PC mouse pointer. */
+ setShotAim(y:number|null):void{
+  this.desktopShotAim=y===null||!Number.isFinite(y)?null:clamp(y,165,275);
+ }
  /** A screen-relative vertical cursor position maps to the actual goal opening. */
  setDesktopShotAim(fraction:number|null):void{
   this.desktopShotAim=fraction===null?null:clamp(172+fraction*96,172,268);
